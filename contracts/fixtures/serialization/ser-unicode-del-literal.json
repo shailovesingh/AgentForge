@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-del-literal",
+  "description": "U+007F (DEL) inside a string stays literal.",
+  "inputText": "\"ab\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"ab\"",
+    "export": "\"ab\"\n"
+  }
+}

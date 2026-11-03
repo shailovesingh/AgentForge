@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-nested-empty-containers",
+  "description": "Empty containers nested inside others stay inline as {} and [].",
+  "inputText": "{\"a\":{},\"b\":[],\"c\":[[]],\"d\":{\"e\":{}}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\":{},\"b\":[],\"c\":[[]],\"d\":{\"e\":{}}}",
+    "export": "{\n  \"a\": {},\n  \"b\": [],\n  \"c\": [\n    []\n  ],\n  \"d\": {\n    \"e\": {}\n  }\n}\n"
+  }
+}

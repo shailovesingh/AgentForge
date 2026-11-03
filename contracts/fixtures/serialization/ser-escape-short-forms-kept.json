@@ -1,0 +1,10 @@
+{
+  "name": "ser-escape-short-forms-kept",
+  "description": "The five short escapes for backspace, tab, newline, form feed and carriage return are kept.",
+  "inputText": "\"\\b\\t\\n\\f\\r\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"\\b\\t\\n\\f\\r\"",
+    "export": "\"\\b\\t\\n\\f\\r\"\n"
+  }
+}

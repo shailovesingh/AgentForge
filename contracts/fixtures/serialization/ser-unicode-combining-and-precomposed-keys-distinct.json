@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-combining-and-precomposed-keys-distinct",
+  "description": "e plus U+0301 and the precomposed e-acute are two different keys (no normalization), sorted by code unit.",
+  "inputText": "{\"é\":2,\"é\":1}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"é\":1,\"é\":2}",
+    "export": "{\n  \"é\": 1,\n  \"é\": 2\n}\n"
+  }
+}

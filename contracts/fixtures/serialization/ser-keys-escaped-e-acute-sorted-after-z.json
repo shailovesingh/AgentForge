@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-escaped-e-acute-sorted-after-z",
+  "description": "An escaped e-acute key is sorted as U+00E9, after z, and written literally.",
+  "inputText": "{\"\\u00e9\":1,\"z\":2}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"z\":2,\"é\":1}",
+    "export": "{\n  \"z\": 2,\n  \"é\": 1\n}\n"
+  }
+}

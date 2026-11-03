@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-e-acute-after-z",
+  "description": "A non-ASCII key sorts after ASCII letters: a, z, e-acute.",
+  "inputText": "{\"é\":1,\"z\":2,\"a\":3}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\":3,\"z\":2,\"é\":1}",
+    "export": "{\n  \"a\": 3,\n  \"z\": 2,\n  \"é\": 1\n}\n"
+  }
+}

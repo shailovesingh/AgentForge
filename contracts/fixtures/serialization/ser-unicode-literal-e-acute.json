@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-literal-e-acute",
+  "description": "A literal e-acute stays literal (UTF-8 text, no escaping).",
+  "inputText": "\"é\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"é\"",
+    "export": "\"é\"\n"
+  }
+}

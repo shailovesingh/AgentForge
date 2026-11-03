@@ -1,0 +1,10 @@
+{
+  "name": "ser-escape-solidus-decodes",
+  "description": "The escaped solidus decodes to a plain slash, which is never escaped on output.",
+  "inputText": "\"\\/\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"/\"",
+    "export": "\"/\"\n"
+  }
+}

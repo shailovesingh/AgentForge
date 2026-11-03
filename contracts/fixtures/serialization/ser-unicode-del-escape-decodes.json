@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-del-escape-decodes",
+  "description": "An escaped U+007F is written as the literal character.",
+  "inputText": "\"\\u007f\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"\"",
+    "export": "\"\"\n"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ser-escape-control-0001-lowercase-hex",
+  "description": "U+0001 is written as a six-character escape with lowercase hex.",
+  "inputText": "\"\\u0001\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"\\u0001\"",
+    "export": "\"\\u0001\"\n"
+  }
+}

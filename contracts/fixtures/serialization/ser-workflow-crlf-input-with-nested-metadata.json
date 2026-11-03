@@ -1,0 +1,10 @@
+{
+  "name": "ser-workflow-crlf-input-with-nested-metadata",
+  "description": "A hand-edited CRLF and tab-indented file with nested metadata is written with LF, two-space indentation and sorted nested keys; array order is kept.",
+  "inputText": "{\r\n\t\"schemaVersion\": \"1.0\",\r\n\t\"id\": \"wf_meta\",\r\n\t\"name\": \"Meta\",\r\n\t\"description\": \"\",\r\n\t\"nodes\": [],\r\n\t\"edges\": [],\r\n\t\"metadata\": { \"tags\": [\"b\", \"a\"], \"nested\": { \"z\": 1, \"a\": { \"k\": [] } } }\r\n}\r\n",
+  "expect": {
+    "valid": true,
+    "compact": "{\"description\":\"\",\"edges\":[],\"id\":\"wf_meta\",\"metadata\":{\"nested\":{\"a\":{\"k\":[]},\"z\":1},\"tags\":[\"b\",\"a\"]},\"name\":\"Meta\",\"nodes\":[],\"schemaVersion\":\"1.0\"}",
+    "export": "{\n  \"description\": \"\",\n  \"edges\": [],\n  \"id\": \"wf_meta\",\n  \"metadata\": {\n    \"nested\": {\n      \"a\": {\n        \"k\": []\n      },\n      \"z\": 1\n    },\n    \"tags\": [\n      \"b\",\n      \"a\"\n    ]\n  },\n  \"name\": \"Meta\",\n  \"nodes\": [],\n  \"schemaVersion\": \"1.0\"\n}\n"
+  }
+}

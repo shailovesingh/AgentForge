@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-one",
+  "description": "The number 1 is written as 1.",
+  "inputText": "1",
+  "expect": {
+    "valid": true,
+    "compact": "1",
+    "export": "1\n"
+  }
+}

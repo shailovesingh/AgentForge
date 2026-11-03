@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-negative-1e-7",
+  "description": "The number -1e-7 is written as -1e-7.",
+  "inputText": "-1e-7",
+  "expect": {
+    "valid": true,
+    "compact": "-1e-7",
+    "export": "-1e-7\n"
+  }
+}

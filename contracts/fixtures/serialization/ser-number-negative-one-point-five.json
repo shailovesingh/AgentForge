@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-negative-one-point-five",
+  "description": "The number -1.5 is written as -1.5.",
+  "inputText": "-1.5",
+  "expect": {
+    "valid": true,
+    "compact": "-1.5",
+    "export": "-1.5\n"
+  }
+}

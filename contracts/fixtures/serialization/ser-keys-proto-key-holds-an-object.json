@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-proto-key-holds-an-object",
+  "description": "An own __proto__ key holding an object is kept and its contents are sorted.",
+  "inputText": "{\"__proto__\":{\"b\":1,\"a\":2}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"__proto__\":{\"a\":2,\"b\":1}}",
+    "export": "{\n  \"__proto__\": {\n    \"a\": 2,\n    \"b\": 1\n  }\n}\n"
+  }
+}

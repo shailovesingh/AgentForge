@@ -1,0 +1,14 @@
+{
+  "name": "ser-invalid-duplicate-key-differs-by-escape",
+  "description": "A key and its escaped spelling are the same key and collide.",
+  "inputText": "{\"a\":1,\"\\u0061\":2}",
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "doc.duplicate-key",
+        "path": "/a"
+      }
+    ]
+  }
+}

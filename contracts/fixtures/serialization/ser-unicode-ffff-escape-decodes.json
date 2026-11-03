@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-ffff-escape-decodes",
+  "description": "An escaped U+FFFF (a noncharacter, but well-formed) is written literally.",
+  "inputText": "\"\\uffff\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"￿\"",
+    "export": "\"￿\"\n"
+  }
+}

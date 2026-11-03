@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-case-differing-keys-are-distinct",
+  "description": "Keys that differ only by case are different keys: A sorts before a.",
+  "inputText": "{\"a\":1,\"A\":2}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"A\":2,\"a\":1}",
+    "export": "{\n  \"A\": 2,\n  \"a\": 1\n}\n"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-quote-backslash-and-space",
+  "description": "Keys with a space, a quote and a backslash sort by code unit (0x20, 0x22, 0x5C) and are escaped on output.",
+  "inputText": "{\"a b\":1,\"a\\\"b\":2,\"a\\\\b\":3,\"a\":0}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\":0,\"a b\":1,\"a\\\"b\":2,\"a\\\\b\":3}",
+    "export": "{\n  \"a\": 0,\n  \"a b\": 1,\n  \"a\\\"b\": 2,\n  \"a\\\\b\": 3\n}\n"
+  }
+}

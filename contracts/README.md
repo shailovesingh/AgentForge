@@ -1,8 +1,9 @@
 # contracts/
 
 Language-neutral test fixtures that describe the **expected outcome** of AgentForge's validation rules
-(workflow import, connection rules, node config validation, and the node catalog). They are plain JSON
-data with no code in them.
+(workflow import, connection rules, node config validation, the node catalog, and the exact JSON text
+written by the two serialization profiles). They are plain JSON data with no code in them.
+The serialization profiles are specified in `CANONICAL_JSON.md`.
 
 ## Status: tested in TypeScript only
 
@@ -18,6 +19,7 @@ Run them with the rest of the frontend tests: `cd frontend && npm test`.
 ```
 contracts/
   README.md
+  CANONICAL_JSON.md                 the two text profiles (canonical-json/1 and export-json/1)
   fixtures/
     format.json                     { "fixtureFormat": 1 }; the runner asserts it
     catalog/builtin.catalog.json    export of the node catalog (see "Catalog fixture")
@@ -25,6 +27,7 @@ contracts/
     workflow/invalid/*.json         documents that must be rejected, with the expected errors
     connection/*.json               one proposed connection and the rule it should hit (or null)
     config/*.json                   one node config and the schema errors it should produce
+    serialization/*.json            arbitrary JSON text in, exact compact and export text out
 ```
 
 ## Common rules for every case file
@@ -134,6 +137,34 @@ TypeScript runs these fixtures only; **no Python parity is claimed** until a Pyt
 - **At most 20 errors** are reported (`MAX_ERRORS` in `frontend/src/workflow/validate.ts`); the first 20 in
   the order above are kept (see `wf-invalid-error-cap`, built with `inputRepeat`).
 
+### `serialization/*.json`
+
+Arbitrary JSON text in, the **exact text** of both output profiles out (see `CANONICAL_JSON.md`). This family
+does not involve workflows or the catalog: it pins key order, number text, string escapes and layout.
+
+```json
+{ "name": "...", "description": "...", "inputText": "{\"b\":1.0,\"a\":[]}",
+  "expect": { "valid": true, "compact": "{\"a\":[],\"b\":1}",
+              "export": "{\n  \"a\": [],\n  \"b\": 1\n}\n" } }
+```
+
+- Exactly one of `inputText` (the raw JSON text) or `inputBytesBase64` (the UTF-8 bytes, standard padded base64;
+  decoded without dropping a leading byte order mark, which the strict parser would then reject: tolerating a BOM
+  is the importer's job, not the parser's).
+- A valid case gives `compact` (profile `canonical-json/1`, no trailing LF) and `export` (profile `export-json/1`,
+  ending with exactly one LF, no CR). The runner parses the input with the strict parser and compares **both texts as
+  exact strings**.
+- A rejection case is `{ "valid": false, "errors": [ { "code": "...", "path": "..." } ] }` with **exactly one**
+  entry (the parser reports the first problem only), compared like the other families (below).
+- `inputText` keeps the raw spelling on purpose: parsing a fixture would already lose `1.0`, `-0`, key order and
+  duplicate keys.
+- **The expected texts are written by hand from the rules** in `CANONICAL_JSON.md`. Do not paste what the code
+  prints. A key sorted by Unicode code point, an escaped U+007F or U+2028, a CRLF export or a missing trailing LF must
+  each make a fixture fail.
+
+Besides this family the runner has property tests over the `workflow/valid` cases: importing, exporting, importing
+and exporting again is byte-identical, and `canonicalCompact(parse(export)) === canonicalCompact(workflow)`.
+
 ### `connection/*.json`
 
 ```json
@@ -206,8 +237,9 @@ the independent statement of what the code must do.
 3. Run `npm test` in `frontend/`. The runner names the file if it is malformed or fails.
 4. Raise `MIN_COUNTS` in the runner to the new totals. The floors make deleting fixtures fail the run and
    are never lowered.
-5. Every error code must stay covered by at least one `workflow/invalid` case, and every
-   `connection.*` code by at least one `connection` case; the runner enforces both.
+5. Every error code must stay covered by at least one `workflow/invalid` case, every `connection.*` code by at
+   least one `connection` case, and the `serialization` family must keep covering its own rejection codes; the
+   runner enforces all three.
 
 ## Never edit expected values just to make a test pass
 

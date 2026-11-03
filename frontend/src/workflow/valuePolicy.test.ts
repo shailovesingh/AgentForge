@@ -167,7 +167,9 @@ describe('the config panel path (parseConfigInput) never commits a value the imp
     expect(imported.ok).toBe(true)
     // One level more would have been rejected by the importer, which is why the panel refuses it.
     wf.nodes[0].config = { payload: JSON.parse(nestedText(61)) as unknown }
-    const tooDeep = importWorkflow(serializeWorkflow(wf), nodeDefinitions)
+    // The exporter refuses it outright (see canonicalJson.test.ts), so the text is built by hand here.
+    expect(() => serializeWorkflow(wf)).toThrow(/nested more than 64 levels/)
+    const tooDeep = importWorkflow(JSON.stringify(wf), nodeDefinitions)
     expect(tooDeep.ok).toBe(false)
     if (!tooDeep.ok) expect(tooDeep.errors[0].code).toBe('doc.too-deep')
   })

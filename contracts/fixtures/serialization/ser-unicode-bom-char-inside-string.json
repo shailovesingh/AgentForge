@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-bom-char-inside-string",
+  "description": "U+FEFF inside a string is kept literally.",
+  "inputText": "\"a﻿b\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"a﻿b\"",
+    "export": "\"a﻿b\"\n"
+  }
+}

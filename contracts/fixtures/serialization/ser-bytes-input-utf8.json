@@ -1,0 +1,10 @@
+{
+  "name": "ser-bytes-input-utf8",
+  "description": "The input given as raw UTF-8 bytes (0x22 0xC3 0xA9 0x22) is decoded and written as the literal character.",
+  "inputBytesBase64": "IsOpIg==",
+  "expect": {
+    "valid": true,
+    "compact": "\"é\"",
+    "export": "\"é\"\n"
+  }
+}

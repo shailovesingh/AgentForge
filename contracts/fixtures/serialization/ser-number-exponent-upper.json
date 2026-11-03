@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-exponent-upper",
+  "description": "The number 1E2 is written as 100.",
+  "inputText": "1E2",
+  "expect": {
+    "valid": true,
+    "compact": "100",
+    "export": "100\n"
+  }
+}

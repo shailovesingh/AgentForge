@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-deep-indentation",
+  "description": "Indentation is two spaces per level, through nested objects and arrays.",
+  "inputText": "{\"a\":{\"b\":{\"c\":{\"d\":[1,{\"e\":2}]}}}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\":{\"b\":{\"c\":{\"d\":[1,{\"e\":2}]}}}}",
+    "export": "{\n  \"a\": {\n    \"b\": {\n      \"c\": {\n        \"d\": [\n          1,\n          {\n            \"e\": 2\n          }\n        ]\n      }\n    }\n  }\n}\n"
+  }
+}

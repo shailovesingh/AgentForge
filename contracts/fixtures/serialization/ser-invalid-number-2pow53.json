@@ -1,0 +1,14 @@
+{
+  "name": "ser-invalid-number-2pow53",
+  "description": "An integer one above the largest safe integer is rejected.",
+  "inputText": "9007199254740992",
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "value.unsafe-integer",
+        "path": ""
+      }
+    ]
+  }
+}

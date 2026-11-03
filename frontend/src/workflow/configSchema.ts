@@ -1,6 +1,8 @@
 import type { ErrorCode } from './errors'
 import type { ConfigProperty, ConfigSchema } from './types'
-import { findPolicyViolations } from './valuePolicy'
+import { strictParse } from './strictJson'
+import { POLICY_MESSAGES, findPolicyViolations } from './valuePolicy'
+import type { PolicyCode } from './valuePolicy'
 
 const CONFIG_PARENT_DEPTH = 4
 
@@ -58,11 +60,16 @@ export function parseConfigInput(
   if (prop.type === 'number') {
     value = raw.trim() === '' ? NaN : Number(raw)
   } else if (prop.type === 'object') {
-    try {
-      value = JSON.parse(raw)
-    } catch {
-      return { ok: false, error: 'must be valid JSON' }
+    // The strict parser (not the built-in one): a duplicate key, an unsafe number or NUL typed here
+    // is flagged instead of being silently collapsed or rounded.
+    const parsed = strictParse(raw)
+    if (!parsed.ok) {
+      const { code, message } = parsed.error
+      if (code === 'doc.not-json') return { ok: false, error: 'must be valid JSON' }
+      // Policy problems keep the wording used for typed values; a duplicate key shows the parser's bounded message.
+      return { ok: false, error: Object.hasOwn(POLICY_MESSAGES, code) ? POLICY_MESSAGES[code as PolicyCode] : message }
     }
+    value = parsed.value
   }
   const error = validateConfigValue(prop, value)
   if (error) return { ok: false, error }

@@ -1,0 +1,14 @@
+{
+  "name": "ser-invalid-duplicate-key",
+  "description": "A duplicate key is rejected while parsing, at the second occurrence.",
+  "inputText": "{\"a\":1,\"a\":2}",
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "doc.duplicate-key",
+        "path": "/a"
+      }
+    ]
+  }
+}

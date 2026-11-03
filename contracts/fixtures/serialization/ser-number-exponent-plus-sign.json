@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-exponent-plus-sign",
+  "description": "The number 1e+2 is written as 100.",
+  "inputText": "1e+2",
+  "expect": {
+    "valid": true,
+    "compact": "100",
+    "export": "100\n"
+  }
+}

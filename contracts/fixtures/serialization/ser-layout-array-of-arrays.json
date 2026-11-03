@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-array-of-arrays",
+  "description": "Nested arrays put every element on its own line at the deeper indentation.",
+  "inputText": "[[1,2],[3,[4]]]",
+  "expect": {
+    "valid": true,
+    "compact": "[[1,2],[3,[4]]]",
+    "export": "[\n  [\n    1,\n    2\n  ],\n  [\n    3,\n    [\n      4\n    ]\n  ]\n]\n"
+  }
+}

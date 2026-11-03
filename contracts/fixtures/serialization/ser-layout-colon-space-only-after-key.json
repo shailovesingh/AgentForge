@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-colon-space-only-after-key",
+  "description": "The export has one space after a key colon and no space before it, and no trailing spaces.",
+  "inputText": "{\"k\":\"v: with colon\",\"j\":null}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"j\":null,\"k\":\"v: with colon\"}",
+    "export": "{\n  \"j\": null,\n  \"k\": \"v: with colon\"\n}\n"
+  }
+}

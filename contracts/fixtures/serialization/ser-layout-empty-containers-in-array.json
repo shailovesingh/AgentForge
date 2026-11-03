@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-empty-containers-in-array",
+  "description": "Empty containers as array elements are inline, one per line.",
+  "inputText": "[{},[]]",
+  "expect": {
+    "valid": true,
+    "compact": "[{},[]]",
+    "export": "[\n  {},\n  []\n]\n"
+  }
+}

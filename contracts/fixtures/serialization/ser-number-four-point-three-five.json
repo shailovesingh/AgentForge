@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-four-point-three-five",
+  "description": "The number 4.35 is written as 4.35.",
+  "inputText": "4.35",
+  "expect": {
+    "valid": true,
+    "compact": "4.35",
+    "export": "4.35\n"
+  }
+}

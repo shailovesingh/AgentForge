@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-literal-emoji",
+  "description": "A literal astral character stays literal.",
+  "inputText": "\"😀\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"😀\"",
+    "export": "\"😀\"\n"
+  }
+}

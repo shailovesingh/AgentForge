@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-nested-objects-sorted-recursively",
+  "description": "Objects are sorted at every level.",
+  "inputText": "{\"b\":{\"y\":1,\"x\":2},\"a\":{\"d\":{\"f\":1,\"e\":2},\"c\":0}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\":{\"c\":0,\"d\":{\"e\":2,\"f\":1}},\"b\":{\"x\":2,\"y\":1}}",
+    "export": "{\n  \"a\": {\n    \"c\": 0,\n    \"d\": {\n      \"e\": 2,\n      \"f\": 1\n    }\n  },\n  \"b\": {\n    \"x\": 2,\n    \"y\": 1\n  }\n}\n"
+  }
+}

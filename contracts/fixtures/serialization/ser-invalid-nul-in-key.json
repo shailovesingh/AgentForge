@@ -1,0 +1,14 @@
+{
+  "name": "ser-invalid-nul-in-key",
+  "description": "U+0000 in a key is rejected.",
+  "inputText": "{\"a\\u0000\":1}",
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "value.nul-character",
+        "path": "/a\u0000"
+      }
+    ]
+  }
+}

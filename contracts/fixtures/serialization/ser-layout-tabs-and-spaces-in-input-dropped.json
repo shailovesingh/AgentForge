@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-tabs-and-spaces-in-input-dropped",
+  "description": "Tabs and extra spaces between tokens in the input are not carried over.",
+  "inputText": "\t{ \"b\" :\t[ 1 , 2 ] ,\n\t\"a\" : { } }",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\":{},\"b\":[1,2]}",
+    "export": "{\n  \"a\": {},\n  \"b\": [\n    1,\n    2\n  ]\n}\n"
+  }
+}

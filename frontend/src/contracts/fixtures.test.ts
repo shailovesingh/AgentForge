@@ -5,24 +5,29 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { getLatestNodeDefinition, nodeDefinitions } from '../catalog'
+import { canonicalCompact, exportPretty } from '../workflow/canonicalJson'
 import { validateConfig } from '../workflow/configSchema'
 import { checkConnection } from '../workflow/connections'
 import { ERROR_CODES, jsonPointer } from '../workflow/errors'
-import { importWorkflow } from '../workflow/serialize'
+import { importWorkflow, serializeWorkflow } from '../workflow/serialize'
+import { strictParse } from '../workflow/strictJson'
 import type { Workflow } from '../workflow/types'
 
 // ---------------------------------------------------------------------------
 // Shape checker (pure; unit-tested below with deliberately bad examples)
 // ---------------------------------------------------------------------------
 
-type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config'
+type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config' | 'serialization'
 
 const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   'workflow/valid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
   'workflow/invalid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
   connection: ['nodes', 'edges', 'source', 'target', 'expect'],
   config: ['nodeType', 'config', 'configText', 'expect'],
+  serialization: ['inputText', 'inputBytesBase64', 'expect'],
 }
+
+const isBase64 = (b: unknown): boolean => typeof b === 'string' && b.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(b)
 
 const KNOWN_CODES: readonly string[] = ERROR_CODES
 
@@ -91,10 +96,7 @@ export function checkShape(file: string, value: unknown): string[] {
     if (present.length > 1) return bad(`has more than one of ${INPUT_FIELDS.join(', ')} (${present.join(', ')}); use exactly one`)
     if (present[0] === 'inputText' && typeof value.inputText !== 'string') bad('inputText must be a string')
     if (present[0] === 'inputBytesBase64') {
-      const b = value.inputBytesBase64
-      if (typeof b !== 'string' || b.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(b)) {
-        bad('inputBytesBase64 must be a base64 string (standard alphabet, padded)')
-      }
+      if (!isBase64(value.inputBytesBase64)) bad('inputBytesBase64 must be a base64 string (standard alphabet, padded)')
       return
     }
     if (present[0] !== 'inputRepeat') return
@@ -131,6 +133,26 @@ export function checkShape(file: string, value: unknown): string[] {
         bad('expect must be { "valid": false, "errors": [...] }')
       } else expectationList(expected.errors, false)
       break
+    case 'serialization': {
+      // Arbitrary JSON text in, exact text out: exactly one of inputText / inputBytesBase64.
+      const present = ['inputText', 'inputBytesBase64'].filter((k) => Object.hasOwn(value, k))
+      if (present.length !== 1) bad(`needs exactly one of inputText, inputBytesBase64 (has ${present.length})`)
+      else if (present[0] === 'inputText' && typeof value.inputText !== 'string') bad('inputText must be a string')
+      else if (present[0] === 'inputBytesBase64' && !isBase64(value.inputBytesBase64)) {
+        bad('inputBytesBase64 must be a base64 string (standard alphabet, padded)')
+      }
+      if (isObject(expected) && expected.valid === true) {
+        if (!hasExactKeys(expected, ['valid', 'compact', 'export'])) bad('expect must be exactly { "valid": true, "compact": "...", "export": "..." }')
+        else if (typeof expected.compact !== 'string' || typeof expected.export !== 'string') bad('expect.compact and expect.export must be strings')
+        else if (!expected.export.endsWith('\n') || expected.export.endsWith('\n\n')) bad('expect.export must end with exactly one LF')
+        else if (expected.compact.includes('\n') || expected.export.includes('\r')) bad('expect.compact must contain no LF and expect.export no CR')
+      } else if (isObject(expected) && expected.valid === false) {
+        if (!hasExactKeys(expected, ['valid', 'errors'])) bad('expect must be { "valid": false, "errors": [ { code, path } ] }')
+        else if (!Array.isArray(expected.errors) || expected.errors.length !== 1) bad('expect.errors must be an array with exactly one { code, path } (the parser reports the first problem only)')
+        else expectation(expected.errors[0], 'expect.errors[0]')
+      } else bad('expect must be { "valid": true, "compact", "export" } or { "valid": false, "errors": [...] }')
+      break
+    }
     case 'config':
       if (!isNonEmptyString(value.nodeType)) bad('nodeType must be a non-empty string')
       oneOf('config', isObject, 'a JSON object')
@@ -215,16 +237,23 @@ interface ConfigCase extends CaseBase {
   expect: Expected[]
 }
 
+interface SerializationCase extends CaseBase {
+  inputText?: string
+  inputBytesBase64?: string
+  expect: { valid: true; compact: string; export: string } | { valid: false; errors: Expected[] }
+}
+
 interface Corpus {
   problems: string[]
   valid: WorkflowCase[]
   invalid: WorkflowCase[]
   connection: ConnectionCase[]
   config: ConfigCase[]
+  serialization: SerializationCase[]
 }
 
 function loadCorpus(): Corpus {
-  const corpus: Corpus = { problems: [], valid: [], invalid: [], connection: [], config: [] }
+  const corpus: Corpus = { problems: [], valid: [], invalid: [], connection: [], config: [], serialization: [] }
   if (!existsSync(FIXTURES_DIR)) {
     corpus.problems.push('contracts/fixtures does not exist')
     return corpus
@@ -258,6 +287,7 @@ function loadCorpus(): Corpus {
     if (family === 'workflow/valid') corpus.valid.push(withFile as WorkflowCase)
     else if (family === 'workflow/invalid') corpus.invalid.push(withFile as WorkflowCase)
     else if (family === 'connection') corpus.connection.push(withFile as ConnectionCase)
+    else if (family === 'serialization') corpus.serialization.push(withFile as SerializationCase)
     else corpus.config.push(withFile as ConfigCase)
   }
   corpus.problems.push(...checkUniqueNames(names))
@@ -317,7 +347,10 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
   }
 }
 
-const MIN_COUNTS = { total: 153, valid: 19, invalid: 97, connection: 22, config: 15 }
+const MIN_COUNTS = { total: 262, valid: 19, invalid: 97, connection: 22, config: 15, serialization: 109, serializationInvalid: 9 }
+
+// What the serialization family must keep covering: the rejection codes an exporter or a hasher could meet.
+const SERIALIZATION_REJECTIONS = ['value.unsafe-integer', 'value.not-finite', 'doc.not-json', 'doc.duplicate-key', 'value.invalid-unicode', 'value.nul-character']
 
 describe('fixture corpus', () => {
   test('format.json declares fixtureFormat 1', () => {
@@ -335,6 +368,13 @@ describe('fixture corpus', () => {
     expect(ERROR_CODES.filter((code) => !covered.has(code)), 'codes with no workflow/invalid fixture').toEqual([])
   })
 
+  test('the serialization family covers its rejection codes and has valid cases', () => {
+    const invalid = corpus.serialization.filter((c) => !c.expect.valid)
+    const covered = new Set(invalid.flatMap((c) => (c.expect.valid ? [] : c.expect.errors)).map((e) => e.code))
+    expect(SERIALIZATION_REJECTIONS.filter((code) => !covered.has(code)), 'rejection codes with no serialization fixture').toEqual([])
+    expect(invalid.length, 'serialization invalid cases').toBeGreaterThanOrEqual(MIN_COUNTS.serializationInvalid)
+  })
+
   test('every connection.* code is the expected result of at least one connection fixture', () => {
     const covered = new Set(corpus.connection.map((c) => c.expect))
     const missing = ERROR_CODES.filter((code) => code.startsWith('connection.') && !covered.has(code))
@@ -344,14 +384,15 @@ describe('fixture corpus', () => {
   // Floors: deleting fixtures must fail the run. Raise them when you add cases; never lower them.
   test('no fixtures have been deleted (minimum counts)', () => {
     const counts = {
-      total: corpus.valid.length + corpus.invalid.length + corpus.connection.length + corpus.config.length,
+      total: corpus.valid.length + corpus.invalid.length + corpus.connection.length + corpus.config.length + corpus.serialization.length,
       valid: corpus.valid.length,
       invalid: corpus.invalid.length,
       connection: corpus.connection.length,
       config: corpus.config.length,
+      serialization: corpus.serialization.length,
     }
     expect(counts.total, 'total cases').toBeGreaterThanOrEqual(MIN_COUNTS.total)
-    for (const family of ['valid', 'invalid', 'connection', 'config'] as const) {
+    for (const family of ['valid', 'invalid', 'connection', 'config', 'serialization'] as const) {
       expect(counts[family], `${family} cases`).toBeGreaterThanOrEqual(MIN_COUNTS[family])
     }
   })
@@ -399,6 +440,52 @@ describe('workflow/invalid fixtures', () => {
       expect(result.ok, `${c.file}: expected import to fail`).toBe(false)
       if (result.ok) return
       expect(asMultiset(result.errors), `${c.file}: errors ({code, path}, order-insensitive)`).toEqual(asMultiset(c.expect.errors ?? []))
+    })
+  }
+})
+
+/** Bytes become text without dropping a leading BOM: the strict parser, not the decoder, decides about it. */
+const serializationText = (c: SerializationCase): string =>
+  c.inputBytesBase64 !== undefined
+    ? new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(Buffer.from(c.inputBytesBase64, 'base64'))
+    : (c.inputText ?? '')
+
+describe('serialization fixtures (exact text, both profiles)', () => {
+  for (const c of corpus.serialization) {
+    test(c.name, () => {
+      const parsed = strictParse(serializationText(c))
+      if (c.expect.valid) {
+        expect(parsed.ok, `${c.file}: expected the input to parse, got ${JSON.stringify(parsed.ok ? null : parsed.error)}`).toBe(true)
+        if (!parsed.ok) return
+        expect(canonicalCompact(parsed.value), `${c.file}: canonical-json/1 text`).toBe(c.expect.compact)
+        expect(exportPretty(parsed.value), `${c.file}: export-json/1 text`).toBe(c.expect.export)
+      } else {
+        expect(parsed.ok, `${c.file}: expected the input to be rejected`).toBe(false)
+        if (parsed.ok) return
+        expect(asMultiset([parsed.error]), `${c.file}: error ({code, path})`).toEqual(asMultiset(c.expect.errors))
+      }
+    })
+  }
+})
+
+describe('workflow/valid fixtures: export round trip', () => {
+  for (const c of corpus.valid) {
+    test(c.name, () => {
+      const first = importWorkflow(workflowInput(c), nodeDefinitions)
+      expect(first.ok, `${c.file}: expected a valid workflow`).toBe(true)
+      if (!first.ok) return
+      const exported = serializeWorkflow(first.workflow)
+      // export(import(export(x))) is byte-identical to export(x)
+      const second = importWorkflow(exported, nodeDefinitions)
+      expect(second.ok, `${c.file}: the export did not import again`).toBe(true)
+      if (!second.ok) return
+      expect(serializeWorkflow(second.workflow), `${c.file}: second export differs from the first`).toBe(exported)
+      // canonical(parse(export(x))) equals canonical(x)
+      const reparsed = strictParse(exported)
+      expect(reparsed.ok).toBe(true)
+      if (reparsed.ok) expect(canonicalCompact(reparsed.value), `${c.file}: canonical form changed by the export`).toBe(canonicalCompact(first.workflow))
+      expect(exported.includes('\r'), `${c.file}: export contains a CR`).toBe(false)
+      expect(exported.endsWith('\n') && !exported.endsWith('\n\n'), `${c.file}: export must end with exactly one LF`).toBe(true)
     })
   }
 })
@@ -453,12 +540,14 @@ describe('checkShape', () => {
       expect: 'connection.self-loop',
     },
     config: { name: 'a', description: 'd', nodeType: 'llm.prompt', config: {}, expect: [{ code: 'schema.required', path: '/provider' }] },
+    serialization: { name: 'a', description: 'd', inputText: '{"b":1,"a":[]}', expect: { valid: true, compact: '{"a":[],"b":1}', export: '{\n  "a": [],\n  "b": 1\n}\n' } },
   }
   const files = {
     invalid: 'workflow/invalid/a.json',
     valid: 'workflow/valid/a.json',
     connection: 'connection/a.json',
     config: 'config/a.json',
+    serialization: 'serialization/a.json',
   }
 
   test.each(Object.keys(good) as (keyof typeof good)[])('a well-formed %s fixture has no problems', (family) => {
@@ -538,6 +627,49 @@ describe('checkShape', () => {
     test('together with another input field', () => {
       some(checkShape(files.invalid, { ...withBytes('e30='), inputText: '{}' }), 'has more than one of')
       some(checkShape(files.invalid, { ...good.invalid, inputBytesBase64: 'e30=' }), 'has more than one of')
+    })
+  })
+
+  describe('serialization', () => {
+    const file = files.serialization
+    const withExpect = (expect: unknown) => ({ ...good.serialization, expect })
+    const rejection = { valid: false, errors: [{ code: 'doc.not-json', path: '' }] }
+
+    test('a valid case, an input by bytes and a rejection case have no problems', () => {
+      expect(checkShape(file, withExpect(rejection))).toEqual([])
+      const { inputText: _text, ...noText } = good.serialization
+      expect(checkShape(file, { ...noText, inputBytesBase64: 'e30=' })).toEqual([])
+    })
+    test('exactly one of inputText and inputBytesBase64', () => {
+      const { inputText: _text, ...noText } = good.serialization
+      some(checkShape(file, noText), 'needs exactly one of inputText, inputBytesBase64')
+      some(checkShape(file, { ...good.serialization, inputBytesBase64: 'e30=' }), 'needs exactly one of inputText, inputBytesBase64')
+      some(checkShape(file, { ...noText, inputBytesBase64: 'e30' }), 'inputBytesBase64 must be a base64 string')
+      some(checkShape(file, { ...good.serialization, inputText: 5 }), 'inputText must be a string')
+    })
+    test('the family does not accept the workflow input fields', () => {
+      some(checkShape(file, { ...good.serialization, input: {} }), 'unknown field "input"')
+      some(checkShape(file, { ...good.serialization, inputRepeat: { unit: 'x', times: 1 } }), 'unknown field "inputRepeat"')
+    })
+    test('a valid expectation needs compact and export strings with the right line endings', () => {
+      const ok = good.serialization.expect
+      some(checkShape(file, withExpect({ valid: true, compact: 'x' })), 'expect must be exactly { "valid": true, "compact"')
+      some(checkShape(file, withExpect({ ...ok, compact: 1 })), 'must be strings')
+      some(checkShape(file, withExpect({ ...ok, export: 'x' })), 'must end with exactly one LF')
+      some(checkShape(file, withExpect({ ...ok, export: 'x\n\n' })), 'must end with exactly one LF')
+      some(checkShape(file, withExpect({ ...ok, export: 'x\r\n' })), 'no CR')
+      some(checkShape(file, withExpect({ ...ok, compact: 'x\n' })), 'no LF')
+    })
+    test('a rejection needs exactly one { code, path } with a known code', () => {
+      some(checkShape(file, withExpect({ valid: false, errors: [] })), 'exactly one { code, path }')
+      some(checkShape(file, withExpect({ valid: false, errors: [rejection.errors[0], rejection.errors[0]] })), 'exactly one { code, path }')
+      some(checkShape(file, withExpect({ valid: false, errors: [{ code: 'nope', path: '' }] })), 'not a known error code')
+      some(checkShape(file, withExpect({ valid: false, errors: [{ code: 'doc.not-json', path: 'x' }] })), 'JSON Pointer')
+      some(checkShape(file, withExpect({ valid: false })), 'expect must be { "valid": false')
+    })
+    test('an expectation that is neither valid nor invalid', () => {
+      some(checkShape(file, withExpect(null)), 'expect must be { "valid": true')
+      some(checkShape(file, withExpect({ valid: 'yes' })), 'expect must be { "valid": true')
     })
   })
 

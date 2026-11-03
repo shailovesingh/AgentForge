@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-paragraph-separator-literal",
+  "description": "U+2029 inside a string stays literal (JCS does not escape it).",
+  "inputText": "\"a b\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"a b\"",
+    "export": "\"a b\"\n"
+  }
+}

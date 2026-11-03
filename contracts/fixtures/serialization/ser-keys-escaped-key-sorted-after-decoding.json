@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-escaped-key-sorted-after-decoding",
+  "description": "A key written as an escape is sorted by its decoded text: the escape for a sorts before b.",
+  "inputText": "{\"b\":1,\"\\u0061\":2}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\":2,\"b\":1}",
+    "export": "{\n  \"a\": 2,\n  \"b\": 1\n}\n"
+  }
+}

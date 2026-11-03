@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-empty-object",
+  "description": "An empty object is written as {} inline.",
+  "inputText": "{}",
+  "expect": {
+    "valid": true,
+    "compact": "{}",
+    "export": "{}\n"
+  }
+}

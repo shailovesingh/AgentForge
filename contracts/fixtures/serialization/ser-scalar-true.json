@@ -1,0 +1,10 @@
+{
+  "name": "ser-scalar-true",
+  "description": "The root value true is written as true.",
+  "inputText": "true",
+  "expect": {
+    "valid": true,
+    "compact": "true",
+    "export": "true\n"
+  }
+}

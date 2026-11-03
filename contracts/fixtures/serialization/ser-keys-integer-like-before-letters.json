@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-integer-like-before-letters",
+  "description": "Integer-like keys do not jump ahead of letters the way a JavaScript object would order them.",
+  "inputText": "{\"b\":1,\"10\":2,\"a\":3,\"9\":4}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"10\":2,\"9\":4,\"a\":3,\"b\":1}",
+    "export": "{\n  \"10\": 2,\n  \"9\": 4,\n  \"a\": 3,\n  \"b\": 1\n}\n"
+  }
+}

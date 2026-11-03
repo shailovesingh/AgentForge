@@ -1,0 +1,10 @@
+{
+  "name": "ser-escape-control-001f-lowercase-hex",
+  "description": "U+001F given with an uppercase hex digit is written with a lowercase one.",
+  "inputText": "\"\\u001F\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"\\u001f\"",
+    "export": "\"\\u001f\"\n"
+  }
+}

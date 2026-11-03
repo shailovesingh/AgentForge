@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-1e15-writes-all-digits",
+  "description": "The number 1e15 is written as 1000000000000000.",
+  "inputText": "1e15",
+  "expect": {
+    "valid": true,
+    "compact": "1000000000000000",
+    "export": "1000000000000000\n"
+  }
+}

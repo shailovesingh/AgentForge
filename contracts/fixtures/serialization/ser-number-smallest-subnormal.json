@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-smallest-subnormal",
+  "description": "The number 5e-324 is written as 5e-324.",
+  "inputText": "5e-324",
+  "expect": {
+    "valid": true,
+    "compact": "5e-324",
+    "export": "5e-324\n"
+  }
+}

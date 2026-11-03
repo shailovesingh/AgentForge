@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-array-of-primitives-one-per-line",
+  "description": "Each array element is on its own line in the export; the compact form has none of that.",
+  "inputText": "[1,\"two\",true,null,2.5]",
+  "expect": {
+    "valid": true,
+    "compact": "[1,\"two\",true,null,2.5]",
+    "export": "[\n  1,\n  \"two\",\n  true,\n  null,\n  2.5\n]\n"
+  }
+}

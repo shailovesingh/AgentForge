@@ -1,0 +1,10 @@
+{
+  "name": "ser-workflow-integer-like-keys-in-config-and-metadata",
+  "description": "Integer-like keys in a config payload and in metadata sort by code unit (10 before 9), not numerically.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_int\",\"name\":\"Integer keys\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"T\",\"config\":{\"payload\":{\"b\":1,\"10\":2,\"a\":3,\"9\":4,\"1\":5}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"2\":\"two\",\"10\":\"ten\",\"a\":\"x\"}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"description\":\"\",\"edges\":[],\"id\":\"wf_int\",\"metadata\":{\"10\":\"ten\",\"2\":\"two\",\"a\":\"x\"},\"name\":\"Integer keys\",\"nodes\":[{\"config\":{\"payload\":{\"1\":5,\"10\":2,\"9\":4,\"a\":3,\"b\":1}},\"id\":\"t\",\"label\":\"T\",\"position\":{\"x\":0,\"y\":0},\"type\":\"trigger.manual\",\"typeVersion\":1}],\"schemaVersion\":\"1.0\"}",
+    "export": "{\n  \"description\": \"\",\n  \"edges\": [],\n  \"id\": \"wf_int\",\n  \"metadata\": {\n    \"10\": \"ten\",\n    \"2\": \"two\",\n    \"a\": \"x\"\n  },\n  \"name\": \"Integer keys\",\n  \"nodes\": [\n    {\n      \"config\": {\n        \"payload\": {\n          \"1\": 5,\n          \"10\": 2,\n          \"9\": 4,\n          \"a\": 3,\n          \"b\": 1\n        }\n      },\n      \"id\": \"t\",\n      \"label\": \"T\",\n      \"position\": {\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"type\": \"trigger.manual\",\n      \"typeVersion\": 1\n    }\n  ],\n  \"schemaVersion\": \"1.0\"\n}\n"
+  }
+}

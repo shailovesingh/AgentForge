@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-threshold-1e-7-uses-exponent",
+  "description": "The number 0.0000001 is written as 1e-7.",
+  "inputText": "0.0000001",
+  "expect": {
+    "valid": true,
+    "compact": "1e-7",
+    "export": "1e-7\n"
+  }
+}

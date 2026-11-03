@@ -1,0 +1,10 @@
+{
+  "name": "ser-workflow-agent-escaped-unicode-instructions",
+  "description": "Escapes for e-acute, a surrogate pair and a slash inside an agent instruction are decoded and written literally.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_agent\",\"name\":\"Agent\",\"description\":\"\",\"nodes\":[{\"id\":\"a\",\"type\":\"agent.autonomous\",\"typeVersion\":1,\"label\":\"Agent\",\"config\":{\"provider\":\"ollama\",\"model\":\"\",\"instructions\":\"Be \\u00e9l\\u00E9gant \\ud83d\\ude80 \\/ ok\",\"maxIterations\":10},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"description\":\"\",\"edges\":[],\"id\":\"wf_agent\",\"metadata\":{},\"name\":\"Agent\",\"nodes\":[{\"config\":{\"instructions\":\"Be élégant 🚀 / ok\",\"maxIterations\":10,\"model\":\"\",\"provider\":\"ollama\"},\"id\":\"a\",\"label\":\"Agent\",\"position\":{\"x\":0,\"y\":0},\"type\":\"agent.autonomous\",\"typeVersion\":1}],\"schemaVersion\":\"1.0\"}",
+    "export": "{\n  \"description\": \"\",\n  \"edges\": [],\n  \"id\": \"wf_agent\",\n  \"metadata\": {},\n  \"name\": \"Agent\",\n  \"nodes\": [\n    {\n      \"config\": {\n        \"instructions\": \"Be élégant 🚀 / ok\",\n        \"maxIterations\": 10,\n        \"model\": \"\",\n        \"provider\": \"ollama\"\n      },\n      \"id\": \"a\",\n      \"label\": \"Agent\",\n      \"position\": {\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"type\": \"agent.autonomous\",\n      \"typeVersion\": 1\n    }\n  ],\n  \"schemaVersion\": \"1.0\"\n}\n"
+  }
+}

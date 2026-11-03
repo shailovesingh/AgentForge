@@ -1,0 +1,10 @@
+{
+  "name": "ser-escape-control-000b-no-short-form",
+  "description": "U+000B (vertical tab) has no short form and is written as a six-character escape.",
+  "inputText": "\"\\u000B\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"\\u000b\"",
+    "export": "\"\\u000b\"\n"
+  }
+}

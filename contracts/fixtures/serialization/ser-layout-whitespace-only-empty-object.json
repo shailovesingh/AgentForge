@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-whitespace-only-empty-object",
+  "description": "Whitespace inside empty braces is dropped.",
+  "inputText": "{   }",
+  "expect": {
+    "valid": true,
+    "compact": "{}",
+    "export": "{}\n"
+  }
+}

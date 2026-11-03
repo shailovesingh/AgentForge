@@ -1,0 +1,14 @@
+{
+  "name": "ser-invalid-lone-high-surrogate",
+  "description": "A lone high surrogate escape is rejected.",
+  "inputText": "\"\\ud800\"",
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "value.invalid-unicode",
+        "path": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-escape-e-acute-decodes",
+  "description": "An escaped e-acute (lowercase hex) is written as the literal character.",
+  "inputText": "\"\\u00e9\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"é\"",
+    "export": "\"é\"\n"
+  }
+}

@@ -28,6 +28,17 @@ test.describe('export', () => {
     expect(workflow.nodes.find((n) => n.type === 'trigger.manual')!.config.payload).toEqual({ city: 'Paris' })
   })
 
+  test('writes the top-level keys in alphabetical order (export-json/1), schemaVersion last', async ({ editor }) => {
+    await editor.buildPipeline()
+    const { text } = await editor.exportWorkflow()
+    const keys = Object.keys(JSON.parse(text) as object)
+    expect(keys[0]).toBe('description')
+    expect(keys[keys.length - 1]).toBe('schemaVersion')
+    expect(keys).toEqual(['description', 'edges', 'id', 'metadata', 'name', 'nodes', 'schemaVersion'])
+    expect(text.endsWith('}\n') && !text.endsWith('\n\n')).toBe(true)
+    expect(text.includes('\r')).toBe(false)
+  })
+
   test('contains no React Flow fields', async ({ editor }) => {
     await editor.buildPipeline()
     const { text } = await editor.exportWorkflow()

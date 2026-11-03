@@ -1,0 +1,10 @@
+{
+  "name": "ser-scalar-false",
+  "description": "The root value false is written as false.",
+  "inputText": "false",
+  "expect": {
+    "valid": true,
+    "compact": "false",
+    "export": "false\n"
+  }
+}

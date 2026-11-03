@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-object-prototype-names-are-ordinary",
+  "description": "The keys constructor, toString, hasOwnProperty and __proto__ are ordinary keys, sorted like any other.",
+  "inputText": "{\"toString\":1,\"constructor\":2,\"__proto__\":3,\"hasOwnProperty\":4}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"__proto__\":3,\"constructor\":2,\"hasOwnProperty\":4,\"toString\":1}",
+    "export": "{\n  \"__proto__\": 3,\n  \"constructor\": 2,\n  \"hasOwnProperty\": 4,\n  \"toString\": 1\n}\n"
+  }
+}

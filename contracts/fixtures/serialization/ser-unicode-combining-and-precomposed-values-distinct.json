@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-combining-and-precomposed-values-distinct",
+  "description": "e plus U+0301 and the precomposed e-acute stay two different values (no normalization).",
+  "inputText": "[\"é\",\"é\"]",
+  "expect": {
+    "valid": true,
+    "compact": "[\"é\",\"é\"]",
+    "export": "[\n  \"é\",\n  \"é\"\n]\n"
+  }
+}

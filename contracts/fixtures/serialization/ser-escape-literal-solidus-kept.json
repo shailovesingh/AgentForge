@@ -1,0 +1,10 @@
+{
+  "name": "ser-escape-literal-solidus-kept",
+  "description": "A literal slash stays a plain slash.",
+  "inputText": "\"a/b\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"a/b\"",
+    "export": "\"a/b\"\n"
+  }
+}

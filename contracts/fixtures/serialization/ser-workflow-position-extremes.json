@@ -1,0 +1,10 @@
+{
+  "name": "ser-workflow-position-extremes",
+  "description": "Tiny, huge and negative positions are written as ECMAScript number text (1e-7 style below 1e-6, plain digits for 1e15).",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_pos\",\"name\":\"Positions\",\"description\":\"\",\"nodes\":[{\"id\":\"a\",\"type\":\"output.result\",\"typeVersion\":1,\"label\":\"A\",\"config\":{\"format\":\"text\"},\"position\":{\"x\":-1.5e-7,\"y\":1e15}},{\"id\":\"b\",\"type\":\"output.result\",\"typeVersion\":1,\"label\":\"B\",\"config\":{\"format\":\"json\"},\"position\":{\"x\":-1234.5,\"y\":0.1e-6}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"description\":\"\",\"edges\":[],\"id\":\"wf_pos\",\"metadata\":{},\"name\":\"Positions\",\"nodes\":[{\"config\":{\"format\":\"text\"},\"id\":\"a\",\"label\":\"A\",\"position\":{\"x\":-1.5e-7,\"y\":1000000000000000},\"type\":\"output.result\",\"typeVersion\":1},{\"config\":{\"format\":\"json\"},\"id\":\"b\",\"label\":\"B\",\"position\":{\"x\":-1234.5,\"y\":1e-7},\"type\":\"output.result\",\"typeVersion\":1}],\"schemaVersion\":\"1.0\"}",
+    "export": "{\n  \"description\": \"\",\n  \"edges\": [],\n  \"id\": \"wf_pos\",\n  \"metadata\": {},\n  \"name\": \"Positions\",\n  \"nodes\": [\n    {\n      \"config\": {\n        \"format\": \"text\"\n      },\n      \"id\": \"a\",\n      \"label\": \"A\",\n      \"position\": {\n        \"x\": -1.5e-7,\n        \"y\": 1000000000000000\n      },\n      \"type\": \"output.result\",\n      \"typeVersion\": 1\n    },\n    {\n      \"config\": {\n        \"format\": \"json\"\n      },\n      \"id\": \"b\",\n      \"label\": \"B\",\n      \"position\": {\n        \"x\": -1234.5,\n        \"y\": 1e-7\n      },\n      \"type\": \"output.result\",\n      \"typeVersion\": 1\n    }\n  ],\n  \"schemaVersion\": \"1.0\"\n}\n"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ser-scalar-null",
+  "description": "The root value null is written as null.",
+  "inputText": "null",
+  "expect": {
+    "valid": true,
+    "compact": "null",
+    "export": "null\n"
+  }
+}

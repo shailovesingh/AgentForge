@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-escape-uppercase-hex-decodes",
+  "description": "An escaped e-acute with uppercase hex digits is written as the literal character.",
+  "inputText": "\"\\u00E9\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"é\"",
+    "export": "\"é\"\n"
+  }
+}

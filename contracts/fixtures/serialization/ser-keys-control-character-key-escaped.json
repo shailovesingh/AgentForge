@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-control-character-key-escaped",
+  "description": "A key containing a newline is written with the short escape, never a raw newline.",
+  "inputText": "{\"a\\nb\":1}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\\nb\":1}",
+    "export": "{\n  \"a\\nb\": 1\n}\n"
+  }
+}

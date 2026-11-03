@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-zero",
+  "description": "The number 0 is written as 0.",
+  "inputText": "0",
+  "expect": {
+    "valid": true,
+    "compact": "0",
+    "export": "0\n"
+  }
+}

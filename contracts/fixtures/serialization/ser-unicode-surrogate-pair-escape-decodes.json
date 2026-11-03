@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-surrogate-pair-escape-decodes",
+  "description": "A surrogate pair written as two escapes is written as the literal astral character.",
+  "inputText": "\"\\ud83d\\ude00\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"😀\"",
+    "export": "\"😀\"\n"
+  }
+}

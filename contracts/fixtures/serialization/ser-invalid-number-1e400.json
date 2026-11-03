@@ -1,0 +1,14 @@
+{
+  "name": "ser-invalid-number-1e400",
+  "description": "A number beyond the double range is not finite.",
+  "inputText": "1e400",
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "value.not-finite",
+        "path": ""
+      }
+    ]
+  }
+}

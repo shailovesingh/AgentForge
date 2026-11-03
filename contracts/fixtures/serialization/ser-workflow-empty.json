@@ -1,0 +1,10 @@
+{
+  "name": "ser-workflow-empty",
+  "description": "An empty workflow keeps empty nodes, edges and metadata inline.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"Empty\",\"description\":\"\",\"nodes\":[],\"edges\":[],\"metadata\":{}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"description\":\"\",\"edges\":[],\"id\":\"wf_1\",\"metadata\":{},\"name\":\"Empty\",\"nodes\":[],\"schemaVersion\":\"1.0\"}",
+    "export": "{\n  \"description\": \"\",\n  \"edges\": [],\n  \"id\": \"wf_1\",\n  \"metadata\": {},\n  \"name\": \"Empty\",\n  \"nodes\": [],\n  \"schemaVersion\": \"1.0\"\n}\n"
+  }
+}

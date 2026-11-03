@@ -5,7 +5,7 @@ import type { ChangeEvent } from 'react'
 import { nodeDefinitions } from '../catalog'
 import { useEditorStore } from '../store/editorStore'
 import type { ValidationError } from '../workflow/errors'
-import { MAX_IMPORT_BYTES, importTooLarge, importWorkflow, serializeWorkflow } from '../workflow/serialize'
+import { MAX_IMPORT_BYTES, exportWorkflowText, importTooLarge, importWorkflow } from '../workflow/serialize'
 import { shorten } from './shorten'
 import styles from './Toolbar.module.css'
 
@@ -20,14 +20,23 @@ function downloadName(name: string): string {
 export function Toolbar() {
   const name = useEditorStore((s) => s.workflow.name)
   const setWorkflowName = useEditorStore((s) => s.setWorkflowName)
-  const [importErrors, setImportErrors] = useState<ValidationError[]>([])
+  const [problem, setProblem] = useState<{ heading: string; errors: ValidationError[] } | null>(null)
+  const setImportErrors = (errors: ValidationError[]) =>
+    setProblem(errors.length > 0 ? { heading: 'Import failed. The current workflow was not changed.', errors } : null)
   const fileInput = useRef<HTMLInputElement>(null)
   const nameId = useId()
   const { fitView } = useReactFlow()
 
   const onExport = () => {
     const { workflow } = useEditorStore.getState()
-    const url = URL.createObjectURL(new Blob([serializeWorkflow(workflow)], { type: 'application/json' }))
+    const exported = exportWorkflowText(workflow)
+    if (!exported.ok) {
+      // Refused before anything is written, so no file is created.
+      setProblem({ heading: 'Export failed. No file was created.', errors: exported.errors })
+      return
+    }
+    setProblem(null)
+    const url = URL.createObjectURL(new Blob([exported.text], { type: 'application/json' }))
     const link = document.createElement('a')
     link.href = url
     link.download = downloadName(workflow.name)
@@ -89,16 +98,16 @@ export function Toolbar() {
         />
       </div>
 
-      {importErrors.length > 0 && (
+      {problem && (
         <div className={styles.errors} role="alert">
           <div className={styles.errorsHeader}>
-            <strong>Import failed. The current workflow was not changed.</strong>
-            <button type="button" onClick={() => setImportErrors([])}>
+            <strong>{problem.heading}</strong>
+            <button type="button" onClick={() => setProblem(null)}>
               Dismiss
             </button>
           </div>
           <ul>
-            {importErrors.map((error, i) => (
+            {problem.errors.map((error, i) => (
               <li key={i}>
                 <code>{error.code}</code> {shorten(error.message, MAX_SHOWN)}{' '}
                 <span className={styles.path}>

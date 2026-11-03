@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-string-with-newline-stays-on-one-line",
+  "description": "A newline inside a string is written as the two-character escape, so the line structure is unchanged.",
+  "inputText": "{\"s\":\"line1\\nline2\"}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"s\":\"line1\\nline2\"}",
+    "export": "{\n  \"s\": \"line1\\nline2\"\n}\n"
+  }
+}

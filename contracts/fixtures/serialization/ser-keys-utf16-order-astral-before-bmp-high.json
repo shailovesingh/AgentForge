@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-utf16-order-astral-before-bmp-high",
+  "description": "UTF-16 code unit order puts U+1F600 (high surrogate D83D) BEFORE U+E000; code point order would not.",
+  "inputText": "{\"\":1,\"😀\":2}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"😀\":2,\"\":1}",
+    "export": "{\n  \"😀\": 2,\n  \"\": 1\n}\n"
+  }
+}

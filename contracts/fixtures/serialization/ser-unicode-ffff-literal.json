@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-ffff-literal",
+  "description": "A literal U+FFFF stays literal.",
+  "inputText": "\"￿\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"￿\"",
+    "export": "\"￿\"\n"
+  }
+}

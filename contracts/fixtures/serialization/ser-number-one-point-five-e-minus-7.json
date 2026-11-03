@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-one-point-five-e-minus-7",
+  "description": "The number 1.5e-7 is written as 1.5e-7.",
+  "inputText": "1.5e-7",
+  "expect": {
+    "valid": true,
+    "compact": "1.5e-7",
+    "export": "1.5e-7\n"
+  }
+}

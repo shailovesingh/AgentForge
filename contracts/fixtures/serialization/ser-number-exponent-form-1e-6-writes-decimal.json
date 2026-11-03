@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-exponent-form-1e-6-writes-decimal",
+  "description": "The number 1e-6 is written as 0.000001.",
+  "inputText": "1e-6",
+  "expect": {
+    "valid": true,
+    "compact": "0.000001",
+    "export": "0.000001\n"
+  }
+}

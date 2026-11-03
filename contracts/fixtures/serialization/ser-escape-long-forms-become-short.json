@@ -1,0 +1,10 @@
+{
+  "name": "ser-escape-long-forms-become-short",
+  "description": "Long-form escapes of the five short-escape controls are written in short form.",
+  "inputText": "\"\\u0008\\u0009\\u000a\\u000c\\u000d\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"\\b\\t\\n\\f\\r\"",
+    "export": "\"\\b\\t\\n\\f\\r\"\n"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ser-workflow-number-spellings-in-config-and-position",
+  "description": "Unusual number spellings in a config payload, a position and typeVersion are all written in the shortest ECMAScript form.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_num\",\"name\":\"Numbers\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1.0,\"label\":\"T\",\"config\":{\"payload\":{\"a\":1.0,\"b\":1e2,\"c\":-0,\"d\":0.0000001,\"e\":2.5e-5,\"f\":123e-20,\"g\":9007199254740991,\"h\":-9007199254740991}},\"position\":{\"x\":-0.0,\"y\":1E2}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"description\":\"\",\"edges\":[],\"id\":\"wf_num\",\"metadata\":{},\"name\":\"Numbers\",\"nodes\":[{\"config\":{\"payload\":{\"a\":1,\"b\":100,\"c\":0,\"d\":1e-7,\"e\":0.000025,\"f\":1.23e-18,\"g\":9007199254740991,\"h\":-9007199254740991}},\"id\":\"t\",\"label\":\"T\",\"position\":{\"x\":0,\"y\":100},\"type\":\"trigger.manual\",\"typeVersion\":1}],\"schemaVersion\":\"1.0\"}",
+    "export": "{\n  \"description\": \"\",\n  \"edges\": [],\n  \"id\": \"wf_num\",\n  \"metadata\": {},\n  \"name\": \"Numbers\",\n  \"nodes\": [\n    {\n      \"config\": {\n        \"payload\": {\n          \"a\": 1,\n          \"b\": 100,\n          \"c\": 0,\n          \"d\": 1e-7,\n          \"e\": 0.000025,\n          \"f\": 1.23e-18,\n          \"g\": 9007199254740991,\n          \"h\": -9007199254740991\n        }\n      },\n      \"id\": \"t\",\n      \"label\": \"T\",\n      \"position\": {\n        \"x\": 0,\n        \"y\": 100\n      },\n      \"type\": \"trigger.manual\",\n      \"typeVersion\": 1\n    }\n  ],\n  \"schemaVersion\": \"1.0\"\n}\n"
+  }
+}

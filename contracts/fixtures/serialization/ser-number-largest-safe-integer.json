@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-largest-safe-integer",
+  "description": "The number 9007199254740991 is written as 9007199254740991.",
+  "inputText": "9007199254740991",
+  "expect": {
+    "valid": true,
+    "compact": "9007199254740991",
+    "export": "9007199254740991\n"
+  }
+}

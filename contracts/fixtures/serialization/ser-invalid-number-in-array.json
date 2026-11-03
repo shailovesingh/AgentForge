@@ -1,0 +1,14 @@
+{
+  "name": "ser-invalid-number-in-array",
+  "description": "An unsafe number inside an array is reported at its element pointer.",
+  "inputText": "[1,[2,9007199254740993]]",
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "value.unsafe-integer",
+        "path": "/1/1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "ser-invalid-number-nan-token",
+  "description": "The NaN token is not JSON.",
+  "inputText": "NaN",
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "doc.not-json",
+        "path": ""
+      }
+    ]
+  }
+}

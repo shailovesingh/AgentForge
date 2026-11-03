@@ -3,7 +3,8 @@ import { nodeDefinitions } from '../catalog'
 import { parseConfigInput } from './configSchema'
 import { ERROR_CODES } from './errors'
 import { MIGRATIONS, migrate } from './migrate'
-import { MAX_IMPORT_BYTES, importWorkflow, serializeWorkflow } from './serialize'
+import { MAX_IMPORT_BYTES, exportWorkflowText, importWorkflow, serializeWorkflow } from './serialize'
+import configSchemaSource from './configSchema.ts?raw'
 import serializeSource from './serialize.ts?raw'
 import strictJsonSource from './strictJson.ts?raw'
 import migrateSource from './migrate.ts?raw'
@@ -63,6 +64,103 @@ describe('export / import round trip', () => {
     const shuffled = JSON.stringify({ ...sample, nodes: reordered })
     const imported = imp(shuffled)
     expect(imported.ok && serializeWorkflow(imported.workflow)).toBe(serializeWorkflow(sample))
+  })
+})
+
+describe('export key order (export-json/1)', () => {
+  test('every level is sorted: the top level is alphabetical and schemaVersion comes last', () => {
+    const text = serializeWorkflow(sample)
+    expect(Object.keys(JSON.parse(text) as object)).toEqual(['description', 'edges', 'id', 'metadata', 'name', 'nodes', 'schemaVersion'])
+    expect(text.startsWith('{\n  "description": "desc",\n  "edges": [')).toBe(true)
+    expect(text.endsWith('  "schemaVersion": "1.0"\n}\n')).toBe(true)
+    const nodeKeys = Object.keys((JSON.parse(text) as { nodes: object[] }).nodes[0])
+    expect(nodeKeys).toEqual(['config', 'id', 'label', 'position', 'type', 'typeVersion'])
+  })
+
+  test('a Phase 1 export (schemaVersion first) still imports and is re-exported in the new order', () => {
+    const phase1 = JSON.stringify(sample, null, 2) + '\n'
+    expect(phase1.startsWith('{\n  "schemaVersion"')).toBe(true)
+    const imported = imp(phase1)
+    expect(imported.ok).toBe(true)
+    if (!imported.ok) return
+    const exported = serializeWorkflow(imported.workflow)
+    expect(exported).not.toBe(phase1)
+    expect(exported.startsWith('{\n  "description"')).toBe(true)
+    expect(JSON.parse(exported)).toEqual(JSON.parse(phase1))
+    const again = imp(exported)
+    expect(again.ok && serializeWorkflow(again.workflow)).toBe(exported)
+  })
+
+  test('the export is the pretty profile: LF only, one trailing LF, no CR', () => {
+    const text = serializeWorkflow({ ...sample, name: 'a\r\nb' })
+    expect(text.includes('\r')).toBe(false)
+    expect(text.endsWith('}\n') && !text.endsWith('\n\n')).toBe(true)
+  })
+})
+
+describe('exportWorkflowText (the export guard)', () => {
+  const withName = (name: string): Workflow => ({ ...sample, name })
+  const toPairs = (r: ReturnType<typeof exportWorkflowText>) => (r.ok ? null : r.errors.map(({ code, path }) => ({ code, path })))
+  const NUL = String.fromCharCode(0)
+
+  test('a valid workflow gives exactly the pretty export text', () => {
+    expect(exportWorkflowText(sample)).toEqual({ ok: true, text: serializeWorkflow(sample) })
+  })
+
+  test('a name containing NUL is refused with a structured error and no text', () => {
+    const r = exportWorkflowText(withName('a' + NUL + 'b'))
+    expect(r.ok).toBe(false)
+    expect(toPairs(r)).toEqual([{ code: 'value.nul-character', path: '/name' }])
+    if (!r.ok) expect(r.errors[0].message).toMatch(/NUL/)
+  })
+
+  test('a node label with a lone surrogate is refused', () => {
+    const wf = structuredClone(sample)
+    wf.nodes[1].label = 'Hi ' + String.fromCharCode(0xd800)
+    expect(toPairs(exportWorkflowText(wf))).toEqual([{ code: 'value.invalid-unicode', path: '/nodes/1/label' }])
+  })
+
+  test('config values, positions and metadata are checked too', () => {
+    const wf = structuredClone(sample)
+    wf.nodes[1].config = { ...wf.nodes[1].config, temperature: Infinity }
+    wf.nodes[0].position = { x: 2 ** 53, y: 0 }
+    wf.metadata = { ['k' + NUL]: 1 }
+    expect(toPairs(exportWorkflowText(wf))).toEqual([
+      { code: 'value.unsafe-integer', path: '/nodes/0/position/x' },
+      { code: 'value.not-finite', path: '/nodes/1/config/temperature' },
+      { code: 'value.nul-character', path: '/metadata/k' + NUL },
+    ])
+  })
+
+  test('nesting deeper than the limit is refused (a config object sits at depth 5)', () => {
+    const wf = structuredClone(sample)
+    const nest = (levels: number): unknown => (levels <= 1 ? {} : { a: nest(levels - 1) })
+    wf.nodes[0].config = { payload: nest(60) }
+    expect(exportWorkflowText(wf).ok).toBe(true)
+    wf.nodes[0].config = { payload: nest(61) }
+    const r = exportWorkflowText(wf)
+    expect(r.ok).toBe(false)
+    expect(toPairs(r)?.[0].code).toBe('doc.too-deep')
+  })
+
+  test('the text must not be longer than the import limit, counted in UTF-8 bytes', () => {
+    const overhead = serializeWorkflow(withName('')).length // ASCII only, so characters = bytes
+    const ok = exportWorkflowText(withName('x'.repeat(MAX_IMPORT_BYTES - overhead)))
+    expect(ok.ok).toBe(true)
+    if (ok.ok) {
+      expect(ok.text.length).toBe(MAX_IMPORT_BYTES)
+      // the promise behind the guard: what can be exported can be imported again
+      expect(imp(ok.text).ok).toBe(true)
+    }
+    const over = exportWorkflowText(withName('x'.repeat(MAX_IMPORT_BYTES - overhead + 1)))
+    expect(over.ok).toBe(false)
+    expect(over.ok ? null : over.errors).toEqual([{ code: 'doc.too-large', path: '', message: expect.stringMatching(/too large to export.*5,000,000 bytes/) }])
+  })
+
+  test('bytes are counted, not characters: 2,500,001 two-byte characters are over the limit', () => {
+    const name = 'é'.repeat(MAX_IMPORT_BYTES / 2 + 1)
+    expect(name.length).toBeLessThan(MAX_IMPORT_BYTES)
+    expect(toPairs(exportWorkflowText(withName(name)))).toEqual([{ code: 'doc.too-large', path: '' }])
   })
 })
 
@@ -290,6 +388,32 @@ describe('parseConfigInput', () => {
     expect(parseConfigInput(payload, '{"a":1}')).toEqual({ ok: true, value: { a: 1 } })
     expect(parseConfigInput(payload, '{a')).toEqual({ ok: false, error: 'must be valid JSON' })
     expect(parseConfigInput(payload, '[1]')).toEqual({ ok: false, error: 'must be a JSON object' })
+  })
+
+  test('a duplicate key typed into a JSON setting is flagged and not committed', () => {
+    const r = parseConfigInput(payload, '{"a":1,"a":2}')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toBe('Duplicate object key "a".')
+    // also when the two spellings differ only by an escape (backslash, u, 0, 0, 6, 1)
+    expect(parseConfigInput(payload, '{"a":1,"' + String.fromCharCode(92) + 'u0061":2}').ok).toBe(false)
+    // the same key in sibling objects is fine
+    expect(parseConfigInput(payload, '{"x":{"a":1},"y":{"a":2}}').ok).toBe(true)
+  })
+
+  test('an unsafe number typed into a JSON setting is flagged by the strict parser', () => {
+    const r = parseConfigInput(payload, '{"n":9007199254740993}')
+    expect(r).toEqual({ ok: false, error: 'has a number outside the supported range (-9007199254740991 to 9007199254740991)' })
+  })
+
+  test('a typed __proto__ key is an ordinary key of the committed value', () => {
+    const r = parseConfigInput(payload, '{"__proto__":{"x":1}}')
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(Object.hasOwn(r.value as object, '__proto__')).toBe(true)
+  })
+
+  test('the typed-JSON path no longer uses the built-in parser', () => {
+    expect(configSchemaSource.includes('JSON.parse(')).toBe(false)
+    expect(configSchemaSource).toContain('strictParse(')
   })
 
   test('strings and enums', () => {

@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-bom-char-escape-decodes",
+  "description": "An escaped U+FEFF is written as the literal character.",
+  "inputText": "\"\\ufeff\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"﻿\"",
+    "export": "\"﻿\"\n"
+  }
+}

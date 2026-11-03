@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-crlf-input-gives-lf-output",
+  "description": "A pretty-printed input with CRLF line endings is written with LF only, with one trailing LF.",
+  "inputText": "{\r\n  \"b\": [1,\r\n 2],\r\n  \"a\": \"x\"\r\n}\r\n",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\":\"x\",\"b\":[1,2]}",
+    "export": "{\n  \"a\": \"x\",\n  \"b\": [\n    1,\n    2\n  ]\n}\n"
+  }
+}

@@ -1,9 +1,11 @@
+import { exportPretty } from './canonicalJson'
 import type { ValidationError } from './errors'
 import { migrate } from './migrate'
 import { strictParse } from './strictJson'
 import type { NodeDefinition, Workflow } from './types'
 import { validateWorkflow } from './validate'
 import type { ValidateResult } from './validate'
+import { findPolicyViolations } from './valuePolicy'
 
 // Imported files are untrusted input. AgentForge policy (decision C2): at most 5,000,000 UTF-8
 // BYTES (not characters), checked before parsing.
@@ -16,30 +18,23 @@ export const importTooLarge = (): ValidationError => ({
   message: `File is too large to import (the limit is ${MAX_IMPORT_BYTES.toLocaleString('en-US')} bytes).`,
 })
 
-/** Serializes a workflow to the exported JSON text. Key order is fixed by the Workflow shape. */
+/**
+ * The error for an export over the size limit. The limit is the import limit: a workflow the editor
+ * lets you export must always be importable again (decision D-031).
+ */
+export const exportTooLarge = (): ValidationError => ({
+  code: 'doc.too-large',
+  path: '',
+  message: `Workflow is too large to export (the limit is ${MAX_IMPORT_BYTES.toLocaleString('en-US')} bytes, the same as for import, so the file could not be imported again).`,
+})
+
+/**
+ * Serializes a workflow to the exported JSON text (profile `export-json/1`: keys sorted at every level,
+ * so the top level is alphabetical). Throws for values that are not valid JSON data; the UI calls
+ * `exportWorkflowText`, which checks first and returns structured errors instead.
+ */
 export function serializeWorkflow(workflow: Workflow): string {
-  const { schemaVersion, id, name, description, nodes, edges, metadata } = workflow
-  const canonical: Workflow = {
-    schemaVersion,
-    id,
-    name,
-    description,
-    nodes: nodes.map((n) => ({
-      id: n.id,
-      type: n.type,
-      typeVersion: n.typeVersion,
-      label: n.label,
-      config: n.config,
-      position: { x: n.position.x, y: n.position.y },
-    })),
-    edges: edges.map((e) => ({
-      id: e.id,
-      source: { nodeId: e.source.nodeId, port: e.source.port },
-      target: { nodeId: e.target.nodeId, port: e.target.port },
-    })),
-    metadata,
-  }
-  return JSON.stringify(canonical, null, 2) + '\n'
+  return exportPretty(workflow)
 }
 
 /** UTF-8 byte length of a string without encoding it; stops counting once the limit is passed. */
@@ -55,6 +50,19 @@ function utf8Length(text: string, limit: number): number {
     } else bytes += 3 // a lone surrogate encodes as U+FFFD (3 bytes)
   }
   return bytes
+}
+
+/**
+ * The export guard: checks the whole workflow against the value policy (name, labels, config values,
+ * metadata) and the size limit BEFORE a file is written, and returns structured errors instead of
+ * throwing. A workflow that passes can always be imported again.
+ */
+export function exportWorkflowText(workflow: Workflow): { ok: true; text: string } | { ok: false; errors: ValidationError[] } {
+  const violations = findPolicyViolations(workflow, 0)
+  if (violations.length > 0) return { ok: false, errors: violations }
+  const text = exportPretty(workflow)
+  if (utf8Length(text, MAX_IMPORT_BYTES) > MAX_IMPORT_BYTES) return { ok: false, errors: [exportTooLarge()] }
+  return { ok: true, text }
 }
 
 const BOM = String.fromCharCode(0xfeff) // built at run time so the source holds no invisible character

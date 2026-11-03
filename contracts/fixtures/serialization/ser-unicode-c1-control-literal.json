@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-c1-control-literal",
+  "description": "An escaped U+0085 (a C1 control, not C0) is written literally.",
+  "inputText": "\"\\u0085\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"\"",
+    "export": "\"\"\n"
+  }
+}

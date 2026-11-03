@@ -1,0 +1,10 @@
+{
+  "name": "ser-workflow-http-headers-escaping-and-order",
+  "description": "Header keys are sorted (Accept before X-Key); a slash escape decodes, quotes and control characters are escaped on output.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_http\",\"name\":\"HTTP\",\"description\":\"\",\"nodes\":[{\"id\":\"h\",\"type\":\"http.request\",\"typeVersion\":1,\"label\":\"Call\",\"config\":{\"method\":\"POST\",\"url\":\"https://example.com/a?b=1&c=2\",\"headers\":{\"X-Key\":\"a\\\"b\",\"Accept\":\"*\\/*\"},\"body\":\"line1\\nline2\\ttab\"},\"position\":{\"x\":5,\"y\":6}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"description\":\"\",\"edges\":[],\"id\":\"wf_http\",\"metadata\":{},\"name\":\"HTTP\",\"nodes\":[{\"config\":{\"body\":\"line1\\nline2\\ttab\",\"headers\":{\"Accept\":\"*/*\",\"X-Key\":\"a\\\"b\"},\"method\":\"POST\",\"url\":\"https://example.com/a?b=1&c=2\"},\"id\":\"h\",\"label\":\"Call\",\"position\":{\"x\":5,\"y\":6},\"type\":\"http.request\",\"typeVersion\":1}],\"schemaVersion\":\"1.0\"}",
+    "export": "{\n  \"description\": \"\",\n  \"edges\": [],\n  \"id\": \"wf_http\",\n  \"metadata\": {},\n  \"name\": \"HTTP\",\n  \"nodes\": [\n    {\n      \"config\": {\n        \"body\": \"line1\\nline2\\ttab\",\n        \"headers\": {\n          \"Accept\": \"*/*\",\n          \"X-Key\": \"a\\\"b\"\n        },\n        \"method\": \"POST\",\n        \"url\": \"https://example.com/a?b=1&c=2\"\n      },\n      \"id\": \"h\",\n      \"label\": \"Call\",\n      \"position\": {\n        \"x\": 5,\n        \"y\": 6\n      },\n      \"type\": \"http.request\",\n      \"typeVersion\": 1\n    }\n  ],\n  \"schemaVersion\": \"1.0\"\n}\n"
+  }
+}

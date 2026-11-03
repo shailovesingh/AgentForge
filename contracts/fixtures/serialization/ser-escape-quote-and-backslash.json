@@ -1,0 +1,10 @@
+{
+  "name": "ser-escape-quote-and-backslash",
+  "description": "A quote and a backslash are written as escaped quote and escaped backslash.",
+  "inputText": "\"\\\"\\\\\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"\\\"\\\\\"",
+    "export": "\"\\\"\\\\\"\n"
+  }
+}

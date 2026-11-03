@@ -1,0 +1,10 @@
+{
+  "name": "ser-number-123e-20-writes-1-23e-18",
+  "description": "The number 123e-20 is written as 1.23e-18.",
+  "inputText": "123e-20",
+  "expect": {
+    "valid": true,
+    "compact": "1.23e-18",
+    "export": "1.23e-18\n"
+  }
+}

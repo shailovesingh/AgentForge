@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-empty-array",
+  "description": "An empty array is written as [] inline.",
+  "inputText": "[]",
+  "expect": {
+    "valid": true,
+    "compact": "[]",
+    "export": "[]\n"
+  }
+}

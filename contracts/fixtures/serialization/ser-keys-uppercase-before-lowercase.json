@@ -1,0 +1,10 @@
+{
+  "name": "ser-keys-uppercase-before-lowercase",
+  "description": "Code unit order puts B (0x42) before a (0x61).",
+  "inputText": "{\"a\":1,\"B\":2}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"B\":2,\"a\":1}",
+    "export": "{\n  \"B\": 2,\n  \"a\": 1\n}\n"
+  }
+}

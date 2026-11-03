@@ -1,0 +1,10 @@
+{
+  "name": "ser-layout-input-with-trailing-newline",
+  "description": "A trailing LF in the input is not carried over: compact has none, export has exactly one.",
+  "inputText": "{\"a\":1}\n",
+  "expect": {
+    "valid": true,
+    "compact": "{\"a\":1}",
+    "export": "{\n  \"a\": 1\n}\n"
+  }
+}

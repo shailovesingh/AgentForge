@@ -1,0 +1,10 @@
+{
+  "name": "ser-unicode-line-separator-literal",
+  "description": "U+2028 inside a string stays literal (JCS does not escape it).",
+  "inputText": "\"a b\"",
+  "expect": {
+    "valid": true,
+    "compact": "\"a b\"",
+    "export": "\"a b\"\n"
+  }
+}

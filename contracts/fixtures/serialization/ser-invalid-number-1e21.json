@@ -1,0 +1,14 @@
+{
+  "name": "ser-invalid-number-1e21",
+  "description": "An integral number far above the safe range is rejected.",
+  "inputText": "1e21",
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "value.unsafe-integer",
+        "path": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ser-workflow-non-ascii-name-and-labels",
+  "description": "Non-ASCII names, labels and escaped descriptions are written as literal UTF-8; U+2028 and U+2029 stay literal; no normalization.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_uni\",\"name\":\"Café — 日本語\",\"description\":\"caf\\u00E9 \\ud83d\\ude80\",\"nodes\":[{\"id\":\"a\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Démarrer 🚀\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}},{\"id\":\"b\",\"type\":\"output.result\",\"typeVersion\":1,\"label\":\"é    \",\"config\":{\"format\":\"text\"},\"position\":{\"x\":1,\"y\":1}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {
+    "valid": true,
+    "compact": "{\"description\":\"café 🚀\",\"edges\":[],\"id\":\"wf_uni\",\"metadata\":{},\"name\":\"Café — 日本語\",\"nodes\":[{\"config\":{\"payload\":{}},\"id\":\"a\",\"label\":\"Démarrer 🚀\",\"position\":{\"x\":0,\"y\":0},\"type\":\"trigger.manual\",\"typeVersion\":1},{\"config\":{\"format\":\"text\"},\"id\":\"b\",\"label\":\"é    \",\"position\":{\"x\":1,\"y\":1},\"type\":\"output.result\",\"typeVersion\":1}],\"schemaVersion\":\"1.0\"}",
+    "export": "{\n  \"description\": \"café 🚀\",\n  \"edges\": [],\n  \"id\": \"wf_uni\",\n  \"metadata\": {},\n  \"name\": \"Café — 日本語\",\n  \"nodes\": [\n    {\n      \"config\": {\n        \"payload\": {}\n      },\n      \"id\": \"a\",\n      \"label\": \"Démarrer 🚀\",\n      \"position\": {\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"type\": \"trigger.manual\",\n      \"typeVersion\": 1\n    },\n    {\n      \"config\": {\n        \"format\": \"text\"\n      },\n      \"id\": \"b\",\n      \"label\": \"é    \",\n      \"position\": {\n        \"x\": 1,\n        \"y\": 1\n      },\n      \"type\": \"output.result\",\n      \"typeVersion\": 1\n    }\n  ],\n  \"schemaVersion\": \"1.0\"\n}\n"
+  }
+}
