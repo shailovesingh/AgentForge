@@ -16,7 +16,7 @@
 | **Understood** | The Product Owner has answered check questions or explained the concept back, and the answers showed real understanding. **The evidence is recorded in `LEARNING_GUIDE.md`.** |
 | **Needs Revision** | Answers showed gaps; the topic is scheduled for re-teaching |
 
-**Rules.** (1) A module is never marked Understood because something was *explained*; only because the Product Owner's answers *demonstrated* it. (2) Only the Principal Architect changes a status, and only with evidence already written in `LEARNING_GUIDE.md`. (3) Teaching follows `.claude/agents/tutor.md`: simple language first, then terminology, with examples from AgentForge.
+**Rules.** (1) A module is never marked Understood because something was *explained*; only because the Product Owner's answers *demonstrated* it. (2) Only the Principal Architect changes a status, and only after evaluating the Product Owner's submitted answers. (3) Teaching follows `.claude/agents/tutor.md`: simple language first, then terminology, with examples from AgentForge. (4) **Evaluation protocol (D-029):** each lesson ends with a Knowledge Check / Interview Questions section; the Product Owner answers all questions, plus the per-module questions below, in one dedicated learning session at the end of the project. Until then every status stays at most In Progress and the focus is building.
 
 ## Overview
 

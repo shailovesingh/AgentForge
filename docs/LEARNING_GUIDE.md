@@ -233,13 +233,13 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 # Part 2: Teaching record
 
 > **What this part is.** A record of the lessons actually taught and what the Product Owner demonstrated. It is separate from the primer above (reference material) and from implementation progress.
-> **Rule.** A concept is only called **Understood** when the Product Owner's own answers show it, and the evidence is written in the tables below. Until then it is **Explained (no evidence)**. The curriculum and statuses live in `docs/LEARNING.md`.
+> **Rule (D-029).** Every lesson ends with a **Knowledge Check / Interview Questions** section. You answer all of them in one dedicated learning session at the end of the project and submit the answers for evaluation. **Only then** are statuses updated. Until then every concept is **Explained (no evidence)**. The curriculum and statuses live in `docs/LEARNING.md`.
 
 ## Lesson index
 
 | Lesson | After task | Modules | Taught | Check questions | Status |
 |---|---|---|---|---|---|
-| **L1** | Phase 1.1 T1: Playwright and CI | 12 (testing and CI) | 2026-11-03 | 3 asked, **0 answered** | Explained, awaiting answers |
+| **L1** | Phase 1.1 T1: Playwright and CI | 12 (testing and CI) | 2026-11-03 | 5 (answered at the end of the project) | Explained; evaluation pending |
 
 ## Concept index
 
@@ -355,18 +355,12 @@ Every product team keeps a small E2E "smoke" suite in CI and treats flaky tests 
 1. **A green test can be meaningless (a "vacuous" test).** The independent reviewer found that our test "a duplicate connection is rejected" still passed if we *deleted* the duplicate rule, because a different rule (the input is already occupied) rejected the same connection. The test was green but proved nothing about the rule in its title. The fix builds a situation where only the rule under test can reject, and we **proved** it by deleting the rule and watching the test fail. This technique, deliberately breaking the code to see whether a test notices, is called **fault injection** (or mutation testing).
 2. **Understand your tools before asserting exact numbers.** Our first drag test failed because the node moved 90% of the mouse distance: the canvas library uses the first mouse movement to *start* the drag. The honest fix was to change what we assert (the exported position matches where the node really is), not to loosen the numbers until the test passed.
 
-### Check questions for the Product Owner
+### Knowledge Check / Interview Questions
 
-*(To be asked in conversation. Short answers are fine.)*
+*Answers are not given here. Study this lesson and `docs/LEARNING.md`, then answer all questions in the dedicated learning session at the end of the project.*
 
-1. We pinned the CI actions to a long commit code instead of a version like `v7`. In your own words, why?
-2. A test said "duplicate connections are rejected" and was green, but stayed green after we deleted the duplicate rule. What does that tell you about a green test, and how can we make sure a test is able to fail?
+1. We pinned the CI actions to a long commit code instead of a version tag like `v7`. In your own words, why? What attack does it defend against?
+2. A test called "duplicate connections are rejected" stayed green after we deleted the duplicate rule. What does that tell you about a green test, and how do you check that a test is able to fail?
 3. Give one kind of bug an end-to-end test would catch that a unit test of the connection rules would not, and one kind the unit test catches better.
-
-### Evidence (filled in only from the Product Owner's actual answers)
-
-| Question | Product Owner's answer (summary) | Assessment | Date |
-|---|---|---|---|
-| L1-1 | *no answer yet* | n/a | n/a |
-| L1-2 | *no answer yet* | n/a | n/a |
-| L1-3 | *no answer yet* | n/a | n/a |
+4. What is "auto-waiting" in Playwright, and why is it better than waiting a fixed two seconds?
+5. Locally and in CI we run the same single command (`npm run verify`). Why is that useful, and what does it consist of?

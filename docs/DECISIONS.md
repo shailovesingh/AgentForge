@@ -32,9 +32,10 @@
 | D-023 | Secret detection with warning and explicit export confirmation (not blocking) | **Approved as revised**; backend enforcement separate |
 | D-024 | Extensible provider architecture mechanism (Ollama stays the default) | **Approved** |
 | D-025 | Absent required config keys are a completeness concern (C1) | **Approved** |
-| D-026 | Phase 1.1 implementation authorization, C1 to C5 clarifications, binding T4 safeguards, Git restrictions | **Approved** |
+| D-026 | Phase 1.1 implementation authorization, C1 to C5 clarifications, binding T4 safeguards, Git restrictions | **Approved** (the per-task PO review rule is superseded by D-029; everything else stands) |
 | D-027 | Team model: Claude as Principal Architect, Sonnet 5.5 implements, Opus 5.5 reviews, user is Product Owner | **Approved** |
-| D-028 | Learning requirement: curriculum, teaching record, tutor agent, evidence rule (permanent) | **Approved** |
+| D-028 | Learning requirement: curriculum, teaching record, tutor agent, evidence rule (permanent; evaluation protocol amended by D-029) | **Approved** |
+| D-029 | Review cadence (Opus reviews every task, Architect accepts, PO at milestones) and learning-check protocol (Knowledge Check at the end of each lesson; one evaluation session at the end) | **Approved** |
 
 ---
 
@@ -236,3 +237,10 @@
   - The step "Teach" is part of the team loop (`CLAUDE.md` section 16) and of the Definition of Done.
 - **Consequences:** each task report ends with a lesson and check questions; learning content must be grounded in the code that actually exists (planned code is labelled planned); curriculum modules for unbuilt phases are taught when the code lands.
 - **Limits worth knowing:** lessons are written by the same model family that built the code, so the Reviewer spot-checks a module's lessons for accuracy when the module is completed.
+
+## D-029 — Review cadence and learning-check protocol
+- **Status:** Approved (Product Owner, 2026-11-03, Session 8). Amends D-026 (review cadence), D-027 (review flow) and D-028 (evaluation protocol).
+- **Review cadence:** the Opus reviewer reviews **every** task; the Principal Architect **accepts** a task after review and triage; the Product Owner reviews at **milestones** and may stop or redirect at any time. A new phase needs explicit Product Owner approval. All other D-026 rules stand: local commits only, no push, fetch, pull, remote change or history rewrite without explicit permission; no Phase 2 work.
+- **Milestones for Phase 1.1 (proposed by the Principal Architect, adjustable by the Product Owner):** **MS-A** after T3 (structured errors and shared fixtures: the validation foundation); **MS-B** after T6 (strict and canonical JSON, JSON Schema configs, node migrations: the contract complete); **MS-C** after T10 (warnings, secret detection, documentation: Phase 1.1 complete, which is also the gate to any Phase 2 discussion).
+- **T1 acceptance:** the Product Owner reports the GitHub Actions run green (all 48 unit tests and 26 Playwright tests passed). This is **PO-reported**; Claude cannot see GitHub and the commit that was run was not specified.
+- **Learning-check protocol:** every lesson in `docs/LEARNING_GUIDE.md` ends with a **Knowledge Check / Interview Questions** section as its very last part. There are no per-lesson questions in conversation. At the end of the project the Product Owner studies `LEARNING.md` and `LEARNING_GUIDE.md`, answers all questions in a dedicated learning session and submits the answers for evaluation; **only then** are learning statuses updated. Until then no topic is above In Progress. For now the focus is building.

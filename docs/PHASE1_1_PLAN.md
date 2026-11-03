@@ -390,7 +390,7 @@ interface Warning { code: string; severity: 'warning'; nodeId?: string; port?: s
 
 Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`npm run verify` once T1 exists) and a documentation update.
 
-### T1 — Playwright harness and ported checks (M) — **IMPLEMENTED (commit `382d6a4`, review fixes in Session 7); acceptance pending the first green GitHub CI run.** Results in `docs/DEVELOPMENT_LOG.md` Sessions 6 and 7.
+### T1 — Playwright harness and ported checks (M) — **DONE** (commits `382d6a4` and review fixes `f4cc801`; Opus-reviewed; CI reported green by the PO). Results in `docs/DEVELOPMENT_LOG.md` Sessions 6 and 7.
 - **Dependencies:** none. **Do this first.**
 - **Files:** `frontend/package.json` and `package-lock.json`, `frontend/playwright.config.ts`, `frontend/e2e/{fixtures,editor}.ts`, `frontend/e2e/{library,canvas-editing,connections,config-panel,import-export}.e2e.ts`, `frontend/tsconfig.e2e.json` (or edit `tsconfig.node.json`), `frontend/README.md`, `.gitignore`, `.github/workflows/ci.yml`.
 - **Architecture change:** none (tests only).
@@ -521,6 +521,17 @@ Approve **T1 to T10**, executed in this order, **one task per commit**, with `np
 
 **Explicitly out of scope:** any backend or Phase 2 work; credential storage or `credentialRef`; Python code; rich array and nested-object editors; the optional extra warnings (disabled by W1); changing the toolchain.
 
+### 6.4 Milestones for Product Owner review (D-029)
+
+Opus reviews every task and the Principal Architect accepts it. The Product Owner reviews at these milestones and may stop or redirect at any time:
+
+| Milestone | After | What the Product Owner can then see |
+|---|---|---|
+| **MS-A** | T3 | Structured validation errors and the shared fixture suite: the validation foundation |
+| **MS-B** | T6 | Strict and canonical JSON, JSON Schema configs with explicit defaults, `groq`, node migrations: the workflow contract complete |
+| **MS-C** | T10 | Warnings, secret detection with export confirmation, final documentation and the D-013 contract review: Phase 1.1 complete. This is also the gate before any Phase 2 discussion |
+
+These milestones are the Principal Architect's proposal; the Product Owner can move or add them.
 ## 7. Definition of done for Phase 1.1
 
 Tasks T1 to T10 meet their acceptance criteria; `npm run verify` (type check, lint, unit tests, build, Playwright) passes locally and in GitHub Actions; the shared fixtures run green in Vitest; PROJECT_BRAIN, ROADMAP, DECISIONS, ARCHITECTURE and DEVELOPMENT_LOG match the repository; D-013 is resolved; limitations are listed. **Phase 2 begins only after separate explicit approval.**

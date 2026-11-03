@@ -147,8 +147,8 @@ Status legend: **Implemented** = code exists. **Tested** = verified as stated in
 
 Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, auto-layout, NL generation, authentication, repo-based E2E tests.
 
-### Phase 1.1 — Contract hardening, warnings, Playwright (APPROVED FOR IMPLEMENTATION; T1 implemented, acceptance pending; T2 to T10 not started)
-- [ ] T1 Playwright harness, 49 of 52 ad hoc checks ported (26 tests), `npm run verify`, GitHub Actions CI workflow with SHA-pinned actions — **implemented and tested locally, independently reviewed (Opus: PASS WITH FINDINGS), review fixes applied in Session 7; acceptance criterion "CI runs green on GitHub" is NOT confirmed** (pushed; result unknown to Claude). Not marked done until it is.
+### Phase 1.1 — Contract hardening, warnings, Playwright (APPROVED; T1 done; T2 to T10 not started; PO reviews at milestones MS-A after T3, MS-B after T6, MS-C after T10)
+- [x] T1 Playwright harness, 49 of 52 ad hoc checks ported (26 tests), `npm run verify`, GitHub Actions CI workflow with SHA-pinned actions — **done**: independently reviewed (Opus: PASS WITH FINDINGS), review fixes in `f4cc801`, and the **PO reported the GitHub Actions run green** (48 unit, 26 e2e; PO-reported, not verified by Claude, commit not specified)
 - [ ] T2 Structured validation errors `{code, path, message}`
 - [ ] T3 Shared JSON fixtures in `contracts/` with a Vitest runner (H2, approved)
 - [ ] T4 Strict parsing (duplicate keys rejected), canonical JSON (compact, hashing) and export JSON (pretty), 120+ fixtures (H5, P7 revised)
@@ -205,7 +205,7 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 implemented, reviewed and fixed, acceptance pending a green GitHub CI run and PO review; T2 next only after approval.** Phase 2 is **proposed only** and unauthorized.
+- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 done; T2 next.** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones. Phase 2 is **proposed only** and unauthorized.
 - **Last completed task:** Session 7: team model and learning system; T1 reviewed (Opus) and fixed (`f4cc801`). T1 itself (Session 6): Playwright harness, 26 e2e tests, CI workflow, commit `382d6a4`. Documentation commits `b7e5cbc`, `db451da`, `cf738b5` were made and pushed by others.
 - **Last code commit:** `35fe3bc`.
 
@@ -297,12 +297,12 @@ The six original questions are all decided (see `docs/PHASE1_REVIEW.md` §4 and 
 - **Implemented changes:** test, CI and config hardening (`f4cc801`); governance, learning documents and agent definitions. **No application source changed** (`git diff 382d6a4 f4cc801 -- frontend/src` empty).
 - **Tests:** `npm run verify` exit 0 (48 unit, 26 e2e), run by Claude and by the reviewer. GitHub CI result: **unknown to Claude**.
 - **Git:** `382d6a4` was pushed by someone else; Claude ran no push, fetch, pull or remote operation.
-- **Learning:** Lesson L1 delivered; three check questions await the Product Owner; nothing marked Understood.
+- **Learning:** Lesson L1 delivered with a Knowledge Check section (5 questions, answered at the end of the project); nothing marked Understood.
 - **Next task:** PO review of T1; PO answers L1 questions; PO decides review cadence.
 
 ## 12. Next Recommended Action
 
-1. **PO:** review T1 and the team model; tell Claude the **GitHub Actions result** for the T1 commits (Claude cannot see GitHub); answer the three Lesson L1 questions (in conversation); decide whether per-task PO review (D-026) continues or becomes per-milestone with the Opus review as the per-task gate.
+1. **PO:** milestones: review at MS-A (after T3), MS-B (after T6) and MS-C (after T10) (D-029); tell Claude when a pushed commit fails CI.
 2. **After approval:** Phase 1.1 **T2** (structured validation errors), briefed by the Principal Architect, implemented by the Sonnet implementer, reviewed by Opus, then taught by the tutor (Lesson L2).
 3. **PO:** decide how commits and pushes are coordinated; move `Downloads\CLAUDE.md` out of the AgentForge parent path; install Docker Desktop before Phase 2 step 6.
 4. **No Phase 2 or backend work.**
@@ -328,7 +328,7 @@ Do not invent implementation status, test results, commit IDs, or decisions.
 - **Concepts explained:**
   - **L1 (taught 2026-11-03):** end-to-end versus unit tests, fixtures and helpers, auto-waiting assertions, flaky tests and retries, vacuous tests and fault injection, continuous integration, supply-chain pinning by commit SHA.
   - **Primer (reference only, no lesson, no evidence):** workflow, node, port, edge, catalog, config schema, `schemaVersion` versus `typeVersion`, validation versus warnings, DAG, credentials.
-- **Topics understood:** **none yet.** No answers have been recorded.
+- **Topics understood:** **none yet.** By design (D-029) answers are collected in one dedicated learning session at the end of the project; no per-lesson questions are asked in conversation.
 - **Topics requiring revision:** none recorded.
-- **Next learning objective:** the Product Owner answers the three check questions of Lesson L1; then Lesson L2 (Module 1, the architecture of what already exists) taught from the Phase 1 code.
+- **Next learning objective:** keep building; each completed task gets a lesson ending in a Knowledge Check (next: Lesson L2 after T2). The evaluation session happens at the end of the project.
 - **Module status summary:** Module 12 In Progress; Modules 1 to 11 Not Started.
