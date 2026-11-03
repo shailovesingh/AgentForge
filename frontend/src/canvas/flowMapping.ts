@@ -5,7 +5,9 @@ import type { PortRef, WorkflowEdge, WorkflowNode } from '../workflow/types'
 // React Flow types stay inside canvas/ and nodes/.
 
 export type FlowNode = Node<{ node: WorkflowNode }, 'workflow'>
-export type Measured = Record<string, { width: number; height: number }>
+// A Map, not a Record: node ids come from imported files, so "constructor" or "__proto__"
+// must not resolve to inherited properties.
+export type Measured = Map<string, { width: number; height: number }>
 
 export function toFlowNodes(nodes: WorkflowNode[], selectedIds: string[], measured: Measured): FlowNode[] {
   const selected = new Set(selectedIds)
@@ -16,7 +18,7 @@ export function toFlowNodes(nodes: WorkflowNode[], selectedIds: string[], measur
     data: { node },
     selected: selected.has(node.id),
     // Controlled flows must hand measured sizes back, or moved nodes lose them and flicker.
-    measured: measured[node.id],
+    measured: measured.get(node.id),
   }))
 }
 

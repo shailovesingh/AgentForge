@@ -23,7 +23,7 @@ export function Canvas() {
   const selectedNodeIds = useEditorStore((s) => s.selectedNodeIds)
   const selectedEdgeIds = useEditorStore((s) => s.selectedEdgeIds)
   const { screenToFlowPosition } = useReactFlow()
-  const [measured, setMeasured] = useState<Measured>({})
+  const [measured, setMeasured] = useState<Measured>(() => new Map())
 
   const flowNodes = useMemo(
     () => toFlowNodes(nodes, selectedNodeIds, measured),
@@ -36,7 +36,7 @@ export function Canvas() {
     const selection = new Set(store.selectedNodeIds)
     let selectionChanged = false
     const removed: string[] = []
-    const sizes: Measured = {}
+    const sizes: Measured = new Map()
 
     for (const change of changes) {
       switch (change.type) {
@@ -52,7 +52,7 @@ export function Canvas() {
           removed.push(change.id)
           break
         case 'dimensions':
-          if (change.dimensions) sizes[change.id] = change.dimensions
+          if (change.dimensions) sizes.set(change.id, change.dimensions)
           break
       }
     }
@@ -65,7 +65,7 @@ export function Canvas() {
         live.selectedEdgeIds,
       )
     }
-    if (Object.keys(sizes).length > 0) setMeasured((prev) => ({ ...prev, ...sizes }))
+    if (sizes.size > 0) setMeasured((prev) => new Map([...prev, ...sizes]))
   }, [])
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {

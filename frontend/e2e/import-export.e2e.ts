@@ -53,6 +53,34 @@ test.describe('import', () => {
     expect((await editor.exportWorkflow()).text).toBe(first)
   })
 
+  test('imports a workflow whose node and edge ids match Object.prototype members', async ({ editor }) => {
+    const workflow = {
+      schemaVersion: '1.0',
+      id: 'wf_proto',
+      name: 'Prototype ids',
+      description: '',
+      nodes: [
+        { id: 'constructor', type: 'trigger.manual', typeVersion: 1, label: 'Start', config: { payload: {} }, position: { x: 80, y: 120 } },
+        { id: '__proto__', type: 'output.result', typeVersion: 1, label: 'Result', config: { format: 'text' }, position: { x: 420, y: 120 } },
+      ],
+      edges: [
+        { id: 'toString', source: { nodeId: 'constructor', port: 'data' }, target: { nodeId: '__proto__', port: 'input' } },
+      ],
+      metadata: {},
+    }
+
+    await editor.importText(JSON.stringify(workflow))
+    await expect(editor.nodes).toHaveCount(2)
+    await expect(editor.edges).toHaveCount(1)
+
+    const exported = JSON.parse((await editor.exportWorkflow()).text) as {
+      nodes: { id: string }[]
+      edges: { id: string }[]
+    }
+    expect(exported.nodes.map((n) => n.id)).toEqual(['constructor', '__proto__'])
+    expect(exported.edges.map((e) => e.id)).toEqual(['toString'])
+  })
+
   test('rejects malformed JSON and leaves the current graph untouched', async ({ editor }) => {
     await editor.buildPipeline()
 
