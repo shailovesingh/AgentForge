@@ -21,6 +21,28 @@ export function validateConfigValue(prop: ConfigProperty, value: unknown): strin
   }
 }
 
+/**
+ * Parses raw form text into a config value for the property and validates it.
+ * Used by the config panel so invalid input is flagged and never committed.
+ */
+export function parseConfigInput(
+  prop: ConfigProperty,
+  raw: string,
+): { ok: true; value: unknown } | { ok: false; error: string } {
+  let value: unknown = raw
+  if (prop.type === 'number') {
+    value = raw.trim() === '' ? NaN : Number(raw)
+  } else if (prop.type === 'object') {
+    try {
+      value = JSON.parse(raw)
+    } catch {
+      return { ok: false, error: 'must be valid JSON' }
+    }
+  }
+  const error = validateConfigValue(prop, value)
+  return error ? { ok: false, error } : { ok: true, value }
+}
+
 /** Validates a node config against its schema. Returns errors keyed by property name. */
 export function validateConfig(
   schema: ConfigSchema,

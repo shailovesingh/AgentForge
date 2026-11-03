@@ -1,6 +1,28 @@
 :root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #d5d9e0;
+  --text: #1c2330;
+  --text-muted: #5d6675;
+  --accent: #4f6bed;
+  --ok: #1f9d55;
+  --danger: #d1344b;
+
   font-family: system-ui, sans-serif;
   color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141821;
+    --surface: #1d2230;
+    --border: #384056;
+    --text: #e6e9f0;
+    --text-muted: #9aa3b5;
+    --accent: #7b92ff;
+    --ok: #3ccf7e;
+    --danger: #ff6b81;
+  }
 }
 
 html,
@@ -8,4 +30,9 @@ body,
 #root {
   height: 100%;
   margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
 }

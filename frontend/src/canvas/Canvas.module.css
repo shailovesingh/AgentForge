@@ -1,0 +1,14 @@
+.canvas {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+/* Live feedback while dragging a connection: green = allowed, red = rejected. */
+.canvas :global(.react-flow__handle.connectingto.valid) {
+  background: var(--ok);
+}
+
+.canvas :global(.react-flow__handle.connectingto:not(.valid)) {
+  background: var(--danger);
+}

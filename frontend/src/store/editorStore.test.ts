@@ -42,13 +42,14 @@ describe('editor store', () => {
     expect(nb).toMatchObject({ id: b, label: 'Output', position: { x: 0, y: 0 } })
   })
 
-  test('connect adds an edge and ignores exact duplicates', () => {
+  test('connect adds valid edges and rejects ones that break the connection rules', () => {
     const a = store().addNode('trigger.manual', { x: 0, y: 0 })
     const b = store().addNode('output.result', { x: 0, y: 0 })
     const src = { nodeId: a, port: 'data' }
     const dst = { nodeId: b, port: 'input' }
     expect(store().connect(src, dst)).not.toBeNull()
-    expect(store().connect(src, dst)).toBeNull()
+    expect(store().connect(src, dst)).toBeNull() // duplicate
+    expect(store().connect(src, { nodeId: a, port: 'nope' })).toBeNull() // unknown port
     expect(wf().edges).toHaveLength(1)
   })
 

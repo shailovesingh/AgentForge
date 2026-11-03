@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { getLatestNodeDefinition } from '../catalog'
+import { getLatestNodeDefinition, nodeDefinitions } from '../catalog'
+import { checkConnection } from '../workflow/connections'
 import { SCHEMA_VERSION } from '../workflow/types'
 import type { PortRef, Position, Workflow, WorkflowEdge } from '../workflow/types'
 
@@ -17,7 +18,7 @@ export interface EditorState {
   updateNodeLabel: (nodeId: string, label: string) => void
   moveNode: (nodeId: string, position: Position) => void
   removeNodes: (nodeIds: string[]) => void
-  /** Adds an edge. Returns the new edge, or null if an identical edge already exists. */
+  /** Adds an edge if it passes the connection rules. Returns the new edge, or null if rejected. */
   connect: (source: PortRef, target: PortRef) => WorkflowEdge | null
   removeEdges: (edgeIds: string[]) => void
   setSelection: (nodeIds: string[], edgeIds: string[]) => void
@@ -114,14 +115,8 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   connect: (source, target) => {
     const { workflow } = get()
-    const duplicate = workflow.edges.some(
-      (e) =>
-        e.source.nodeId === source.nodeId &&
-        e.source.port === source.port &&
-        e.target.nodeId === target.nodeId &&
-        e.target.port === target.port,
-    )
-    if (duplicate) return null
+    // The canvas already filters live drags with the same rules; this is the last gate.
+    if (checkConnection(workflow, nodeDefinitions, source, target)) return null
     const edge: WorkflowEdge = { id: newId('e'), source, target }
     set({ workflow: { ...workflow, edges: [...workflow.edges, edge] } })
     return edge
