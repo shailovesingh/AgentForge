@@ -1,9 +1,13 @@
 import { describe, expect, test } from 'vitest'
 import { nodeDefinitions } from '../catalog'
 import { parseConfigInput } from './configSchema'
+import { ERROR_CODES } from './errors'
 import { MIGRATIONS, migrate } from './migrate'
 import { MAX_IMPORT_BYTES, importWorkflow, serializeWorkflow } from './serialize'
 import serializeSource from './serialize.ts?raw'
+import strictJsonSource from './strictJson.ts?raw'
+import migrateSource from './migrate.ts?raw'
+import validateSource from './validate.ts?raw'
 import type { Workflow } from './types'
 
 const node = (id: string, type: string, config: Record<string, unknown> = {}) => ({
@@ -169,7 +173,9 @@ describe('importWorkflow: bytes, size limit and the strict parser', () => {
   const bytes = (t: string) => new TextEncoder().encode(t)
 
   test('the import path does not use the built-in JSON parser', () => {
-    expect(serializeSource).not.toContain('JSON.parse(')
+    const sources = { 'serialize.ts': serializeSource, 'strictJson.ts': strictJsonSource, 'migrate.ts': migrateSource, 'validate.ts': validateSource }
+    const offenders = Object.entries(sources).filter(([, src]) => src.includes('JSON.parse(')).map(([file]) => file)
+    expect(offenders, `JSON.parse( found in: ${offenders.join(', ')}`).toEqual([])
     expect(serializeSource).toContain('strictParse(')
   })
 
@@ -182,7 +188,7 @@ describe('importWorkflow: bytes, size limit and the strict parser', () => {
 
   test('a leading byte order mark is tolerated (bytes and text), but only one', () => {
     expect(importWorkflow(new Uint8Array([0xef, 0xbb, 0xbf, ...bytes(text)]), nodeDefinitions).ok).toBe(true)
-    expect(imp('﻿' + text).ok).toBe(true)
+    expect(imp(String.fromCharCode(0xfeff) + text).ok).toBe(true)
     const twice = importWorkflow(new Uint8Array([0xef, 0xbb, 0xbf, 0xef, 0xbb, 0xbf, ...bytes(text)]), nodeDefinitions)
     expect(twice.ok).toBe(false)
     if (!twice.ok) expect(twice.errors[0]).toMatchObject({ code: 'doc.not-json', path: '' })
@@ -208,9 +214,14 @@ describe('importWorkflow: bytes, size limit and the strict parser', () => {
     expect(errorsOf(multibyte)[0].code).toBe('doc.too-large')
     // Exactly at the limit in bytes: not too large (the text is not JSON, which is a different error).
     expect(errorsOf('é'.repeat(MAX_IMPORT_BYTES / 2))[0].code).toBe('doc.not-json')
-    // 4-byte characters (surrogate pairs) and a lone surrogate (3 bytes) are counted too.
+    // A valid surrogate pair counts as 4 bytes: exactly at the limit is fine, one more is too large.
+    expect(errorsOf('😀'.repeat(MAX_IMPORT_BYTES / 4))[0].code).toBe('doc.not-json')
     expect(errorsOf('😀'.repeat(MAX_IMPORT_BYTES / 4 + 1))[0].code).toBe('doc.too-large')
-    expect(errorsOf('�'.repeat(MAX_IMPORT_BYTES / 3 + 1))[0].code).toBe('doc.too-large')
+    // A lone surrogate (built at run time: it cannot be stored in a UTF-8 source file) counts as 3 bytes.
+    // The at-limit case is the one that tells 3 from 4: 1,666,666 x 3 = 4,999,998 bytes (x 4 would be over).
+    const lone = String.fromCharCode(0xd800)
+    expect(errorsOf(lone.repeat(Math.floor(MAX_IMPORT_BYTES / 3)))[0].code).toBe('doc.not-json')
+    expect(errorsOf(lone.repeat(Math.floor(MAX_IMPORT_BYTES / 3) + 1))[0].code).toBe('doc.too-large')
   })
 
   test('a duplicate key is reported with its pointer, not silently collapsed', () => {
@@ -221,7 +232,14 @@ describe('importWorkflow: bytes, size limit and the strict parser', () => {
 
   test('truncating the file at every byte never throws and never imports', () => {
     const doc = bytes(JSON.stringify({ ...sample, name: 'café 😀' }))
-    for (let i = 0; i < doc.length; i++) expect(importWorkflow(doc.subarray(0, i), nodeDefinitions).ok).toBe(false)
+    for (let i = 0; i < doc.length; i++) {
+      const r = importWorkflow(doc.subarray(0, i), nodeDefinitions)
+      expect(r.ok).toBe(false)
+      if (r.ok) continue
+      expect(r.errors).toHaveLength(1)
+      expect(ERROR_CODES).toContain(r.errors[0].code)
+      expect(typeof r.errors[0].path).toBe('string')
+    }
   })
 })
 

@@ -55,6 +55,17 @@ export function classifyNumber(token: string): 'ok' | 'value.unsafe-integer' | '
   return Math.abs(converted) > MAX_SAFE_MAGNITUDE ? 'value.unsafe-integer' : 'ok'
 }
 
+// Attacker-controlled text (an object key) echoed in a MESSAGE is cut to this many characters. The
+// error's `path` stays exact: it is a contract value.
+const MAX_ECHO = 100
+
+// Cuts text to `max` characters plus "...", never leaving half of a surrogate pair behind.
+function shorten(text: string, max: number): string {
+  if (text.length <= max) return text
+  const half = text.charCodeAt(max - 1) >= 0xd800 && text.charCodeAt(max - 1) <= 0xdbff
+  return text.slice(0, half ? max - 1 : max) + '...'
+}
+
 // Internal: thrown to unwind the recursion on the first problem, always caught in strictParse.
 class Stop extends Error {
   problem: ValidationError
@@ -219,7 +230,7 @@ export function strictParse(text: string): StrictParseResult {
       const key = parseString()
       path.push(key)
       checkString(key)
-      if (seen.has(key)) stop('doc.duplicate-key', `Duplicate object key ${JSON.stringify(key)}.`, path)
+      if (seen.has(key)) stop('doc.duplicate-key', `Duplicate object key ${shorten(JSON.stringify(key), MAX_ECHO)}.`, path)
       seen.add(key)
       skipWhitespace()
       if (text[pos] !== ':') {

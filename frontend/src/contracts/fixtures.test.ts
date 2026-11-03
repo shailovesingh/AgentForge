@@ -288,9 +288,11 @@ const workflowInput = (c: WorkflowCase): string | Uint8Array => {
   return c.inputText ?? JSON.stringify(c.input)
 }
 
+const LEADING_BOM = new RegExp('^' + String.fromCharCode(0xfeff)) // built at run time: no invisible character in source
+
 /** The JSON text behind an input, for comparing a valid result (a BOM is tolerated, so it is dropped). */
 const asText = (input: string | Uint8Array): string =>
-  typeof input === 'string' ? input.replace(/^﻿/, '') : new TextDecoder('utf-8').decode(input) // the decoder drops one leading BOM
+  typeof input === 'string' ? input.replace(LEADING_BOM, '') : new TextDecoder('utf-8').decode(input) // the decoder drops one leading BOM
 
 function connectionWorkflow(c: ConnectionCase): Workflow {
   return {

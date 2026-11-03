@@ -57,6 +57,7 @@ function utf8Length(text: string, limit: number): number {
   return bytes
 }
 
+const BOM = String.fromCharCode(0xfeff) // built at run time so the source holds no invisible character
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }) // ignoreBOM: keep a BOM (we strip exactly one by hand)
 
 /**
@@ -68,7 +69,7 @@ export function importWorkflow(input: string | Uint8Array, catalog: NodeDefiniti
   let text: string
   if (typeof input === 'string') {
     if (utf8Length(input, MAX_IMPORT_BYTES) > MAX_IMPORT_BYTES) return { ok: false, errors: [importTooLarge()] }
-    text = input.startsWith('﻿') ? input.slice(1) : input
+    text = input.startsWith(BOM) ? input.slice(1) : input
   } else {
     if (input.byteLength > MAX_IMPORT_BYTES) return { ok: false, errors: [importTooLarge()] }
     const hasBom = input.byteLength >= 3 && input[0] === 0xef && input[1] === 0xbb && input[2] === 0xbf

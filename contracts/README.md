@@ -95,7 +95,8 @@ Import text is parsed by a strict RFC 8259 parser, **not** the platform's built-
 - **Depth:** at most **64**, with the root value at depth **1**: an array or object adds one level when it
   opens, scalars add none. The 65th level is rejected when it opens (`doc.too-deep`, path = that container).
 - **Duplicate keys** are `doc.duplicate-key`, path = the **second** occurrence. Keys are compared after escapes
-  are decoded (`"a"` and `"a"` collide).
+  are decoded: a key written as the letter a and the same key written with the six-character escape for the
+  letter a (backslash, u, 0, 0, 6, 1) are the same key.
 - **Strings and keys:** U+0000 is `value.nul-character` (AgentForge/PostgreSQL rule, not an RFC 8785 rule); an
   unpaired surrogate, however it is written, is `value.invalid-unicode`. A pair written as two escapes is fine.
 - **Numbers:** the magnitude of every number must be at most **2^53 - 1** (9007199254740991). A token whose
@@ -104,7 +105,8 @@ Import text is parsed by a strict RFC 8259 parser, **not** the platform's built-
   token just below 2^53 that rounds to 2^53 (such as `9007199254740991.7`) is also rejected. Zero in any
   spelling and tiny values (`5e-324`) are accepted.
 - **Grammar errors** (`NaN`, `Infinity`, leading zeros, `+1`, `.5`, `1.`, trailing commas, comments, raw control
-  characters in strings, invalid escapes, trailing garbage, empty input) are `doc.not-json`.
+  characters in strings, invalid escapes, trailing garbage, empty input) are `doc.not-json`. The "at position N"
+  in a `Not valid JSON` message counts UTF-16 code units, after any leading byte order mark has been removed.
 - A key named `__proto__` is an ordinary key.
 
 TypeScript runs these fixtures only; **no Python parity is claimed** until a Python runner exists.

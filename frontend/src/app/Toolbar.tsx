@@ -6,7 +6,11 @@ import { nodeDefinitions } from '../catalog'
 import { useEditorStore } from '../store/editorStore'
 import type { ValidationError } from '../workflow/errors'
 import { MAX_IMPORT_BYTES, importTooLarge, importWorkflow, serializeWorkflow } from '../workflow/serialize'
+import { shorten } from './shorten'
 import styles from './Toolbar.module.css'
+
+// A path or message longer than this is cut when shown, so a huge key cannot flood the alert panel.
+const MAX_SHOWN = 200
 
 function downloadName(name: string): string {
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
@@ -96,8 +100,10 @@ export function Toolbar() {
           <ul>
             {importErrors.map((error, i) => (
               <li key={i}>
-                <code>{error.code}</code> {error.message}{' '}
-                <span className={styles.path}>{error.path === '' ? '(whole document)' : `at ${error.path}`}</span>
+                <code>{error.code}</code> {shorten(error.message, MAX_SHOWN)}{' '}
+                <span className={styles.path}>
+                  {error.path === '' ? '(whole document)' : `at ${shorten(error.path, MAX_SHOWN)}`}
+                </span>
               </li>
             ))}
           </ul>

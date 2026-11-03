@@ -115,6 +115,17 @@ describe('duplicate keys', () => {
     expect(error(text)).toMatchObject({ code: 'doc.duplicate-key', path })
   })
 
+  test('a huge duplicate key gives a short message but an exact path', () => {
+    const key = 'k'.repeat(2_000_000)
+    const e = error(`{"${key}":1,"${key}":2}`)
+    expect(e.code).toBe('doc.duplicate-key')
+    expect(e.path).toBe('/' + key)
+    expect(e.message.length).toBeLessThanOrEqual(150)
+    expect(e.message).toContain('...')
+    // A key at the cut-off is echoed whole.
+    expect(error('{"' + 'k'.repeat(98) + '":1,"' + 'k'.repeat(98) + '":2}').message).toBe(`Duplicate object key "${'k'.repeat(98)}".`)
+  })
+
   test('the same key in sibling objects, and keys that differ by case, are fine', () => {
     expect(value('{"a":{"k":1},"b":{"k":2},"k":3,"K":4}')).toEqual({ a: { k: 1 }, b: { k: 2 }, k: 3, K: 4 })
     expect(value('[{"k":1},{"k":2}]')).toEqual([{ k: 1 }, { k: 2 }])
@@ -257,7 +268,8 @@ describe('numbers', () => {
   }
 
   test('classifyNumber verdicts around 2^53, including tokens that only round to it', () => {
-    // 2^53 + 1 converts to 2^53; only the digits can tell it from a number that merely rounds there.
+    // Both 2^53 + 1 and a token that merely rounds up to 2^53 are rejected. Analysing the token text
+    // and analysing the converted number give the same verdicts, so this pins the rejection only.
     expect(classifyNumber('9007199254740993')).toBe('value.unsafe-integer')
     expect(classifyNumber('9007199254740991.7')).toBe('value.unsafe-integer')
     expect(classifyNumber('9007199254740991.3')).toBe('ok') // rounds to 2^53 - 1: within the limit
@@ -329,7 +341,8 @@ function generate(rand: () => number, depth: number): unknown {
     if (shape === 0) return Math.floor(rand() * 2 ** 32) - 2 ** 31
     if (shape === 1) return Math.trunc((rand() * 2 - 1) * Number.MAX_SAFE_INTEGER)
     if (shape === 2) return (rand() - 0.5) * 10 ** Math.floor(rand() * 12 - 6)
-    return pick([0, -0, 1e-7, 5e-324, 123e-20, 0.1, 1e21 / 1e10, Number.MAX_SAFE_INTEGER, -Number.MAX_SAFE_INTEGER])
+    // No -0 here: JSON.stringify writes it as 0. The hand-written "-0.0" and "-0" cases cover negative zero.
+    return pick([0, 1e-7, 5e-324, 123e-20, 0.1, 1e21 / 1e10, Number.MAX_SAFE_INTEGER, -Number.MAX_SAFE_INTEGER])
   }
   if (kind < 5) return pick(STRING_POOL)
   if (kind < 6) return Array.from({ length: Math.floor(rand() * 5) }, () => generate(rand, depth + 1))

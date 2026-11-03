@@ -23,7 +23,7 @@ describe('constants', () => {
 describe('stringProblem', () => {
   test.each([
     ['', null],
-    ['plain é \u{1f600}   ﻿ ￿', null],
+    ['plain é ' + String.fromCodePoint(0x1f600) + ' ' + String.fromCharCode(0x2028, 0xfeff, 0xffff), null], // line separator, BOM and U+FFFF are allowed
     ['a\u0000b', 'value.nul-character'],
     ['\ud800', 'value.invalid-unicode'],
     ['\udc00', 'value.invalid-unicode'],

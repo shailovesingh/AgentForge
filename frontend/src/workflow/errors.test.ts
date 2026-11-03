@@ -53,7 +53,7 @@ const CASES: Record<ErrorCode, { path: string; input: () => string | Uint8Array 
   'doc.not-json': { path: '', input: () => '{nope' },
   'doc.not-object': { path: '', input: () => '[]' },
   'doc.too-large': { path: '', input: () => ' '.repeat(MAX_IMPORT_BYTES + 1) },
-  // 65 nested arrays inside metadata: metadata is depth 2, so the 63rd array (depth 65) is the first too deep.
+  // 63 nested arrays inside metadata: metadata is depth 2, so the 63rd array (depth 65) is the first too deep.
   'doc.too-deep': {
     path: '/metadata' + '/a'.repeat(1) + '/0'.repeat(62),
     input: () => withMetadata(`{"a":${'['.repeat(63)}${']'.repeat(63)}}`),
