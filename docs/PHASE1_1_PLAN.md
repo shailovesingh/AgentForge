@@ -1,7 +1,7 @@
 # PHASE 1.1 PLAN — CONTRACT HARDENING, WARNINGS, PLAYWRIGHT (APPROVED FOR IMPLEMENTATION)
 
 > **Status (2026-11-03, Session 6): APPROVED FOR IMPLEMENTATION** by the Product Owner and Principal Architect (final authorization, D-026). Task order **T1 → T2 → T3 → T4 → T5 → T6 → T8 → T7 → T9 → T10**; one local commit per task; `npm run verify` after each; PO review after each task before the next. **T1 is implemented (Session 6); T2 to T10 are not started.** No push, fetch, pull or remote operation without explicit permission.
-> **Phase 2 is not started and not authorized.** No application code changes until the implementation scope is approved.
+> **Phase 2 is not started and not authorized.** Application code changes only through the approved tasks (D-026).
 > Inputs: the PO's review decisions (Q1–Q6, H1–H5, P1–P7, S1, W1, V1, G1) · `docs/PHASE1_REVIEW.md` · `docs/DECISIONS.md` (D-012 to D-025).
 > History: Session 4 first draft. Session 5 (this version): P1 explicit defaults, P7 canonical JSON, S1 secret detection revised as the PO required.
 
@@ -390,9 +390,9 @@ interface Warning { code: string; severity: 'warning'; nodeId?: string; port?: s
 
 Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`npm run verify` once T1 exists) and a documentation update.
 
-### T1 — Playwright harness and ported checks (M) — **IMPLEMENTED in Session 6, committed locally; awaiting PO review.** Results in `docs/DEVELOPMENT_LOG.md` Session 6.
+### T1 — Playwright harness and ported checks (M) — **IMPLEMENTED (commit `382d6a4`, review fixes in Session 7); acceptance pending the first green GitHub CI run.** Results in `docs/DEVELOPMENT_LOG.md` Sessions 6 and 7.
 - **Dependencies:** none. **Do this first.**
-- **Files:** `frontend/package.json` and `package-lock.json`, `frontend/playwright.config.ts`, `frontend/e2e/{fixtures,helpers}.ts`, `frontend/e2e/{library,canvas-editing,connections,config-panel,import-export}.e2e.ts`, `frontend/tsconfig.e2e.json` (or edit `tsconfig.node.json`), `frontend/README.md`, `.gitignore`, `.github/workflows/ci.yml`.
+- **Files:** `frontend/package.json` and `package-lock.json`, `frontend/playwright.config.ts`, `frontend/e2e/{fixtures,editor}.ts`, `frontend/e2e/{library,canvas-editing,connections,config-panel,import-export}.e2e.ts`, `frontend/tsconfig.e2e.json` (or edit `tsconfig.node.json`), `frontend/README.md`, `.gitignore`, `.github/workflows/ci.yml`.
 - **Architecture change:** none (tests only).
 - **Acceptance:** `npm run verify` passes on a clean clone; 49 checks run as automated tests; a deliberately broken selector or behaviour makes a test fail (demonstrated once and recorded); CI runs green on GitHub with every action pinned to a verified commit SHA (G1).
 - **Tests:** the e2e suite itself, plus all existing 48 unit tests unchanged.

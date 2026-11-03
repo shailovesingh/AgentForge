@@ -10,8 +10,9 @@
 - **Product:** Visual AI Agent Builder
 - **Status:** Architecture approved (D-001 to D-011). Phase 1 (visual builder) **accepted as functionally complete by the PO (D-020), subject to Phase 1.1**. Workflow contract **pending final code review** (D-013). **Phase 1.1 is APPROVED for implementation (final authorization 2026-11-03, D-026). T1 (Playwright harness and CI) is implemented and committed locally; T2 to T10 are not started.** **Phase 2 is proposed only, not approved**; no backend exists.
 - **Product Owner:** User
-- **Principal Architect:** ChatGPT
-- **Implementation Engineer:** Claude Code
+- **Principal Architect:** Claude (main session, Sonnet 5.5). ChatGPT held this role until 2026-11-03 (D-027).
+- **Implementation Engineer:** Sonnet 5.5 subagent (`implementer`)
+- **Reviewer:** Opus 5.5 subagent (`reviewer`)
 
 ## 2. Product Vision
 
@@ -79,11 +80,11 @@ Branch `main`. Commits:
 | `5af36e5` | Phase 1 steps 2–3: Workflow v1 types, catalog, store |
 | `35fe3bc` | Phase 1 steps 4–9: canvas, library, config panel, connection rules, import/export |
 
-Last commit made by someone else: **`cf738b5`**, equal to the local `origin/main` ref. **Claude's T1 commit sits on top of it, local only and unpushed** (see `git log`; the PO authorized local commits but no push, fetch, pull or remote operation).
+Latest commit when this was written: **`382d6a4`** (Claude's Phase 1.1 T1 commit). Per the local `origin/main` reflog it was **pushed at 13:21:06 +0530, 51 seconds after it was committed, by someone other than Claude**; the actor is not verifiable locally. Claude did not push and cannot see GitHub, so **the CI result for `382d6a4` is unknown to Claude** (the PO is asked to report it). T1 review-fix commits (Session 7) follow it; check `git status -sb` and `git log` for their current state.
 
 **GitHub remote:** `origin` = `https://github.com/shailovesingh/AgentForge.git` (account `shailovesingh`). All history up to `cf738b5` is on it.
 
-**Three commit-and-push pairs were not made by Claude:** `b7e5cbc` (12:16:35 / pushed 12:17:05), `db451da` (12:37:04 / 12:37:28) and `cf738b5` (12:56:14 / 12:56:37), each with the editor-style message `git commit -m "docs: ..."`, each preceded by a `FETCH_HEAD` write 3 seconds before the push. Claude never ran `git push`, `fetch`, `pull` or `remote add`. Evidence and its limits are in `docs/DEVELOPMENT_LOG.md` Sessions 5 and 6; the actor and credential are not verifiable locally. Claude ran two read-only network commands: `git ls-remote origin HEAD` once (a slip: it should have asked first; disclosed in Session 6) and `git ls-remote --tags` against three public action repositories (with the PO's permission, for C5).
+**Three commit-and-push pairs were made by others, and a fourth push carried Claude's own T1 commit:** `b7e5cbc` (12:16:35 / pushed 12:17:05), `db451da` (12:37:04 / 12:37:28) and `cf738b5` (12:56:14 / 12:56:37), each with the editor-style message `git commit -m "docs: ..."`, each preceded by a `FETCH_HEAD` write 3 seconds before the push. Claude never ran `git push`, `fetch`, `pull` or `remote add`. Evidence and its limits are in `docs/DEVELOPMENT_LOG.md` Sessions 5 and 6; the actor and credential are not verifiable locally. Claude ran two read-only network commands: `git ls-remote origin HEAD` once (a slip: it should have asked first; disclosed in Session 6) and `git ls-remote --tags` against three public action repositories (with the PO's permission, for C5).
 ### Repository layout (actual)
 
 ```
@@ -92,9 +93,9 @@ AgentForge/
   .claude/rules/{architecture,frontend,backend}.md
   docs/{PROJECT_BRAIN,ARCHITECTURE,DECISIONS,ROADMAP,DEVELOPMENT_LOG}.md
   docs/PHASE1_REVIEW.md   (review package: contract review, six questions, Playwright proposal; PO decisions in §4)
-  docs/PHASE1_1_PLAN.md   (Phase 1.1 plan, APPROVED FOR IMPLEMENTATION; T1 done, T2 to T10 pending)
+  docs/PHASE1_1_PLAN.md   (Phase 1.1 plan, APPROVED FOR IMPLEMENTATION; T1 implemented (acceptance pending CI), T2 to T10 pending)
   docs/PHASE2_PLAN.md     (PROPOSED, not approved)
-  .github/workflows/ci.yml   (CI: runs npm run verify; actions pinned to SHAs; written and YAML-parsed, NOT yet run on GitHub)
+  .github/workflows/ci.yml   (CI: runs npm run verify; actions pinned to SHAs; pushed with 382d6a4; GitHub run result unknown to Claude)
   frontend/
     README.md  playwright.config.ts  tsconfig.e2e.json
     e2e/         (26 Playwright tests in 5 specs, editor helpers, console-error fixture)
@@ -146,8 +147,8 @@ Status legend: **Implemented** = code exists. **Tested** = verified as stated in
 
 Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, auto-layout, NL generation, authentication, repo-based E2E tests.
 
-### Phase 1.1 — Contract hardening, warnings, Playwright (APPROVED FOR IMPLEMENTATION; T1 done, T2 to T10 not started)
-- [x] T1 Playwright harness, 49 of 52 ad hoc checks ported (26 tests), `npm run verify`, GitHub Actions CI workflow with SHA-pinned actions — **implemented and tested locally; the CI workflow itself has NOT run on GitHub**
+### Phase 1.1 — Contract hardening, warnings, Playwright (APPROVED FOR IMPLEMENTATION; T1 implemented, acceptance pending; T2 to T10 not started)
+- [ ] T1 Playwright harness, 49 of 52 ad hoc checks ported (26 tests), `npm run verify`, GitHub Actions CI workflow with SHA-pinned actions — **implemented and tested locally, independently reviewed (Opus: PASS WITH FINDINGS), review fixes applied in Session 7; acceptance criterion "CI runs green on GitHub" is NOT confirmed** (pushed; result unknown to Claude). Not marked done until it is.
 - [ ] T2 Structured validation errors `{code, path, message}`
 - [ ] T3 Shared JSON fixtures in `contracts/` with a Vitest runner (H2, approved)
 - [ ] T4 Strict parsing (duplicate keys rejected), canonical JSON (compact, hashing) and export JSON (pretty), 120+ fixtures (H5, P7 revised)
@@ -204,8 +205,8 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 done and committed locally, awaiting PO review; T2 next only after approval.** Phase 2 is **proposed only** and unauthorized.
-- **Last completed task:** Phase 1.1 T1 (Session 6): Playwright harness, 26 e2e tests, CI workflow. Documentation commits `b7e5cbc`, `db451da`, `cf738b5` were made and pushed by others.
+- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 implemented, reviewed and fixed, acceptance pending a green GitHub CI run and PO review; T2 next only after approval.** Phase 2 is **proposed only** and unauthorized.
+- **Last completed task:** Session 7: team model and learning system; T1 reviewed (Opus) and fixed (`f4cc801`). T1 itself (Session 6): Playwright harness, 26 e2e tests, CI workflow, commit `382d6a4`. Documentation commits `b7e5cbc`, `db451da`, `cf738b5` were made and pushed by others.
 - **Last code commit:** `35fe3bc`.
 
 ### Verification results (actual, run 2026-11-03)
@@ -236,7 +237,7 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 | `npm run verify` | **exit 0** |
 | Clean-room run (67 files, no `node_modules`, `npm ci` then `verify`) | **exit 0**. Windows only; Chromium download was already cached |
 | Fault injection (3 temporary source faults, restored) | all three caught by the intended tests; `git diff -- frontend/src` empty afterwards |
-| `.github/workflows/ci.yml` | YAML parses; every `uses:` is a 40-character SHA; **never run on GitHub** |
+| `.github/workflows/ci.yml` | YAML parses; every `uses:` is a 40-character SHA. Pushed with `382d6a4` by someone else; **the GitHub run result is unknown to Claude** |
 
 Pinned actions: `actions/checkout` v7.0.1 `3d3c42e5aac5ba805825da76410c181273ba90b1`; `actions/setup-node` v7.1.0 `949feb2413d6458794dcd2491c4babbbce0c15c1`; `actions/upload-artifact` v7.0.2 `cf430e030ddbb5b0abf93d22962f4752f3646cd9` (resolved with `git ls-remote --tags`; tag existence verified, not GitHub Release objects).
 **Re-run in Session 3 (code unchanged vs `HEAD`):** `npx tsc -b` exit 0; `npm run lint` exit 0; `npm test` 6 files / 48 tests passed; `npm run build` exit 0.
@@ -274,7 +275,7 @@ Small implementation choices made in Session 2 without a decision entry (flagged
 14. **Workflow contract concerns for Phase 2** (5 high, 9 medium, 7 low) are listed in `docs/PHASE1_REVIEW.md` §1.4. The high ones (H1 config schema is a hand-rolled subset, H2 rules exist only in TypeScript, H3 no `typeVersion` migration, H4 branching not expressible, H5 JSONB key order vs byte-identical export) need decisions before the Pydantic models are written.
 15. The provider enum lacks `groq` (D-014); added in Phase 1.1 T5.
 16. **Unattributed commits and pushes.** `b7e5cbc` and `db451da` reached GitHub from outside Claude's shell; the actor and credential are not verifiable locally (see DEVELOPMENT_LOG Session 5). Both commits contained review documents that the PO had asked to keep uncommitted pending approval.
-17. **CI is untested.** The workflow can only run after a push (not authorized). The input names used with the v7 actions (`node-version`, `cache`, `cache-dependency-path`, `persist-credentials`, `name`, `path`, `retention-days`, `if-no-files-found`) were not checked against each action's `action.yml` (only tag listings were permitted); they are long-standing inputs but unverified for these versions. Linux behaviour of the e2e suite is unverified (runs were on Windows).
+17. **CI result unconfirmed.** `382d6a4` was pushed (13:21:06), so the workflow has very probably run once on GitHub, but Claude cannot see the result. The input names used with the v7 actions (`node-version`, `cache`, `cache-dependency-path`, `persist-credentials`, `name`, `path`, `retention-days`, `if-no-files-found`) were not checked against each action's `action.yml` (only tag listings were permitted). Linux behaviour of the e2e suite is unverified (local runs were Windows). The e2e suite tests the Vite dev server, not the production build.
 18. **E2E is Chromium only** and the 5 consecutive green runs are a small stability sample. Playwright prints a harmless Node `NO_COLOR`/`FORCE_COLOR` warning; the dev server prints a harmless React Flow attribution `console.warn` (the e2e fixture fails only on console errors).
 
 ## 10. Open Questions
@@ -291,17 +292,18 @@ The six original questions are all decided (see `docs/PHASE1_REVIEW.md` §4 and 
 **Blocked:** T2 onward waits for T1 review. Phase 2 step 2 onward waits for Phase 1.1 and D-013. Phase 2 step 6 onward waits for Docker Desktop (PO will install).
 ## 11. Last Session Handoff
 
-- **Date:** 2026-11-03 (Session 6)
-- **Last task:** Phase 1.1 **T1**: Playwright harness (26 tests covering 49 of the 52 ad hoc checks), `npm run verify`, CI workflow with SHA-pinned actions, README; D-026 recorded.
-- **Implemented changes:** test and tooling only; **no application source changed**. Files listed in `docs/DEVELOPMENT_LOG.md` Session 6.
-- **Tests:** `npm run verify` exit 0 (48 unit, 26 e2e); clean-room run passed; three injected faults caught. The CI workflow has not run.
-- **Git:** one local commit for T1, **unpushed**. Three earlier commit-and-push pairs were made by others.
-- **Next task:** PO review of T1. T2 (structured validation errors) only after approval.
+- **Date:** 2026-11-03 (Session 7)
+- **Last task:** Team model and learning system set up (Claude as Principal Architect; Sonnet implementer, Opus reviewer, Sonnet tutor; D-027, D-028); independent Opus review of Phase 1.1 T1 (PASS WITH FINDINGS), triage, and fix commit `f4cc801` by the Sonnet implementer, independently verified.
+- **Implemented changes:** test, CI and config hardening (`f4cc801`); governance, learning documents and agent definitions. **No application source changed** (`git diff 382d6a4 f4cc801 -- frontend/src` empty).
+- **Tests:** `npm run verify` exit 0 (48 unit, 26 e2e), run by Claude and by the reviewer. GitHub CI result: **unknown to Claude**.
+- **Git:** `382d6a4` was pushed by someone else; Claude ran no push, fetch, pull or remote operation.
+- **Learning:** Lesson L1 delivered; three check questions await the Product Owner; nothing marked Understood.
+- **Next task:** PO review of T1; PO answers L1 questions; PO decides review cadence.
 
 ## 12. Next Recommended Action
 
-1. **PO:** review T1 (handoff in the report and `docs/DEVELOPMENT_LOG.md` Session 6). Decide whether and when to push so CI can run for the first time.
-2. **After approval:** Phase 1.1 **T2** (structured validation errors `{code, path, message}`), then T3, in the authorized order, one local commit each.
+1. **PO:** review T1 and the team model; tell Claude the **GitHub Actions result** for the T1 commits (Claude cannot see GitHub); answer the three Lesson L1 questions (in conversation); decide whether per-task PO review (D-026) continues or becomes per-milestone with the Opus review as the per-task gate.
+2. **After approval:** Phase 1.1 **T2** (structured validation errors), briefed by the Principal Architect, implemented by the Sonnet implementer, reviewed by Opus, then taught by the tutor (Lesson L2).
 3. **PO:** decide how commits and pushes are coordinated; move `Downloads\CLAUDE.md` out of the AgentForge parent path; install Docker Desktop before Phase 2 step 6.
 4. **No Phase 2 or backend work.**
 ## 13. Update Rules
@@ -317,3 +319,16 @@ After every meaningful implementation task:
 7. Update the last-session handoff.
 
 Do not invent implementation status, test results, commit IDs, or decisions.
+
+## 14. Learning Progress
+
+> Tracked **separately from implementation progress** (D-028). The curriculum is `docs/LEARNING.md`; the evidence is in `docs/LEARNING_GUIDE.md`. A topic is Understood only with evidence from the Product Owner's answers.
+
+- **Current learning module:** Module 12, Security, Testing and Deployment (testing and CI part), via **Lesson L1**. Recommended next: Modules 1, 2 and 3 (they describe code that already exists).
+- **Concepts explained:**
+  - **L1 (taught 2026-11-03):** end-to-end versus unit tests, fixtures and helpers, auto-waiting assertions, flaky tests and retries, vacuous tests and fault injection, continuous integration, supply-chain pinning by commit SHA.
+  - **Primer (reference only, no lesson, no evidence):** workflow, node, port, edge, catalog, config schema, `schemaVersion` versus `typeVersion`, validation versus warnings, DAG, credentials.
+- **Topics understood:** **none yet.** No answers have been recorded.
+- **Topics requiring revision:** none recorded.
+- **Next learning objective:** the Product Owner answers the three check questions of Lesson L1; then Lesson L2 (Module 1, the architecture of what already exists) taught from the Phase 1 code.
+- **Module status summary:** Module 12 In Progress; Modules 1 to 11 Not Started.

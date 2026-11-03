@@ -3,7 +3,7 @@
 > Decision log. Only entries with **Status: Approved** are binding.
 > **Proposed** entries are recommendations awaiting Product Owner / Principal Architect review. **Pending** entries are accepted in direction but blocked on a named review step.
 > Never change an Approved decision silently. Supersede it with a new entry instead.
-> D-019 to D-025 were recorded in Sessions 4 and 5 and are in commits `db451da` and `cf738b5` (pushed, not by Claude). D-026 (final authorization, Session 6) is a **local, unpushed** change committed with T1.
+> D-019 to D-025 were recorded in Sessions 4 and 5 and are in commits `db451da` and `cf738b5` (pushed, not by Claude). D-026 (final authorization, Session 6) is in commit `382d6a4`, which was pushed (not by Claude) at 13:21:06 +0530. D-027 and D-028 (Session 7) are uncommitted working-tree changes until committed.
 
 | ID | Title | Status |
 |---|---|---|
@@ -33,6 +33,8 @@
 | D-024 | Extensible provider architecture mechanism (Ollama stays the default) | **Approved** |
 | D-025 | Absent required config keys are a completeness concern (C1) | **Approved** |
 | D-026 | Phase 1.1 implementation authorization, C1 to C5 clarifications, binding T4 safeguards, Git restrictions | **Approved** |
+| D-027 | Team model: Claude as Principal Architect, Sonnet 5.5 implements, Opus 5.5 reviews, user is Product Owner | **Approved** |
+| D-028 | Learning requirement: curriculum, teaching record, tutor agent, evidence rule (permanent) | **Approved** |
 
 ---
 
@@ -211,3 +213,26 @@
 - **Binding implementation safeguards for T4:** (1) the strict JSON parser detects unsafe numeric tokens **before** any JavaScript number conversion, never by `JSON.parse` followed by `Number.isSafeInteger`; (2) duplicate keys are detected **after** decoding escaped property names; (3) size and depth limits are enforced safely (size by UTF-8 bytes before parsing, depth with a counter while parsing); (4) shared fixtures are tested in TypeScript only in Phase 1.1, and **Python parity is not claimed until Phase 2 implements and runs a Python fixture runner**; (5) compact canonical JSON is for hashing and pretty export JSON is a separate deterministic profile.
 - **Git restrictions:** local commits for approved Phase 1.1 tasks only. **No push, fetch, pull, remote change or force-push, and no other remote operation without explicit permission** (read-only lookups of public repositories were permitted once, for C5, for three named repositories).
 - **Scope restrictions:** Phase 2 is unauthorized. No FastAPI, Pydantic, PostgreSQL, Redis, credentials, Python parity, workflow execution or other Phase 2 functionality.
+
+## D-027 — Team model and learning guide
+- **Status:** Approved (Product Owner, 2026-11-03, Session 7)
+- **Decision:**
+  - ChatGPT is removed from the Principal Architect role. **Claude (the main session, Sonnet 5.5) is the Principal Architect.** Implementation is done by a **Sonnet 5.5** subagent and independent review by an **Opus 5.5** subagent. The user is the **Product Owner (client)**.
+  - Every task follows the loop in `CLAUDE.md` section 16: brief, implement (one local commit), independent review, triage, record and report.
+  - The Principal Architect may decide architecture and technical matters inside the approved scope and records them here. Scope, priorities, new major technologies or paid services, security-posture changes, remote Git operations and irreversible actions still need the Product Owner.
+  - The learning system (curriculum, teaching record, tutor) is defined in D-028.
+- **Unchanged until the Product Owner says otherwise:** the per-task Product Owner review (D-026), and the Git restrictions (local commits only; no push, fetch, pull, remote change or history rewrite without explicit permission).
+- **Consequences:** reviews and approvals formerly assigned to the Principal Architect (including the D-013 contract code review, planned for Phase 1.1 T10) are now done by the Principal Architect with Opus review. Older documents that name ChatGPT are history and are not rewritten.
+- **Limits worth knowing:** the Principal Architect and the implementer are the same model family, so independence comes from the Opus reviewer and from the Product Owner's review, not from the architect alone.
+
+## D-028 — Learning requirement (permanent)
+- **Status:** Approved (Product Owner, 2026-11-03, Session 7). **Permanent.**
+- **Context:** AgentForge is also a hands-on AI Engineering learning project. The Product Owner wants to understand the architecture, implementation, internal data flow, technology choices and engineering decisions well enough to explain the project independently in technical interviews and engineering discussions.
+- **Decision:**
+  - **Artifacts:** `docs/LEARNING.md` is the curriculum (12 modules, each tracking concepts, why needed, where it appears, related files, learning status, interview questions). `docs/LEARNING_GUIDE.md` is the record: a primer plus the lessons actually taught and the Product Owner's demonstrated understanding. `docs/PROJECT_BRAIN.md` has a **Learning Progress** section.
+  - **Teaching:** after every meaningful task a lesson covers the problem, the concept, why this approach, internals, communication with other components, important code paths, alternatives and trade-offs, and real-world use; simple language first, then terminology; AgentForge examples. Major components get a full data-flow explanation (Mermaid where useful). Completed major modules get a 30-second, a 2-minute and a deeper explanation, 5 interview questions with answers, and one practical scenario.
+  - **Evidence rule:** nothing is marked **Understood** because it was explained; only because the Product Owner's answers showed it, with the evidence recorded. Learning progress is separate from implementation progress.
+  - **Agent:** a `tutor` subagent (Sonnet 5.5, `.claude/agents/tutor.md`) drafts lessons and maintains the learning documents. A subagent cannot converse with the Product Owner, so the Principal Architect asks the check questions and passes the answers back. Only the Principal Architect changes a status.
+  - The step "Teach" is part of the team loop (`CLAUDE.md` section 16) and of the Definition of Done.
+- **Consequences:** each task report ends with a lesson and check questions; learning content must be grounded in the code that actually exists (planned code is labelled planned); curriculum modules for unbuilt phases are taught when the code lands.
+- **Limits worth knowing:** lessons are written by the same model family that built the code, so the Reviewer spot-checks a module's lessons for accuracy when the module is completed.

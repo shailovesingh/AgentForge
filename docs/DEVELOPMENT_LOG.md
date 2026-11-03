@@ -407,3 +407,58 @@ T1 implemented, verified locally and committed locally. **Waiting for PO review 
 
 **Next Task:**
 PO review of T1. Then T2 (structured validation errors), only after approval.
+
+---
+
+### Session: 7 / 2026-11-03
+
+**Phase:**
+Phase 1.1 (T1 review and fixes) and project governance
+
+**Task:**
+(1) The PO removed ChatGPT from the Principal Architect role and appointed Claude (main session, Sonnet 5.5) as Principal Architect, with a Sonnet 5.5 implementer and an Opus 5.5 reviewer; the PO is the client. (2) The PO added a permanent learning requirement (D-028). (3) First use of the new loop on T1: independent review, triage, fixes.
+
+**Governance and learning system (documentation and agent definitions only):**
+- `CLAUDE.md`: section 1 rewritten as a team and roles table with decision rights; section 16 team workflow (brief, implement, review, triage, record, teach); section 17 learning requirement; Definition of Done and documentation map updated; the "ChatGPT handoff" became an "Outside-reviewer handoff".
+- `.claude/agents/implementer.md` (Sonnet), `reviewer.md` (Opus, read-only) and `tutor.md` (Sonnet). **These are new agent files and are only registered by Claude Code at the next session start**; this session I selected the models explicitly (`sonnet`, `opus`) on general-purpose subagents and told each to follow its definition file.
+- `docs/LEARNING.md` (new curriculum, 12 modules, every status Not Started except Module 12 In Progress), `docs/LEARNING_GUIDE.md` (the earlier primer plus a Part 2 teaching record with **Lesson L1**, written by the Principal Architect, not the tutor), and a **Learning Progress** section in `PROJECT_BRAIN.md`. **No topic is marked Understood; no answers have been received.**
+- `DECISIONS.md`: D-027 (team model) and D-028 (learning requirement), both Approved by the PO.
+- The per-task PO review (D-026) and the Git restrictions are **unchanged** until the PO says otherwise.
+
+**Independent review of T1 (Opus 5.5, read-only): PASS WITH FINDINGS, no blockers.** Triage by the Principal Architect:
+
+| # | Finding | Decision |
+|---|---|---|
+| M1 | Docs and commit message said T1 was unpushed and CI never ran; the local refs show it was pushed | **Accepted.** Docs corrected (brain, decisions, roadmap, plan). The commit message of `382d6a4` cannot be changed without rewriting history, so this entry is the correction. |
+| M2 | T1 marked done although "CI runs green on GitHub" is unconfirmed | **Accepted.** T1 is now "implemented; acceptance pending the first green CI run" everywhere. |
+| m1 | `connect()` never checks the pointer reached the target, so negative tests could pass vacuously | **Fixed** (`f4cc801`): asserts `connectingto` before `mouse.up()`. |
+| m2 | The duplicate-connection test passed even with the `duplicate` rule deleted | **Fixed** (`f4cc801`): uses the multiple-connection input `agent.tools`. The implementer reports it proved the fix by removing the rule and seeing the test fail; I did not repeat that run. |
+| m3 | "49 of 52" untraceable; two ported checks weakened | **Partly fixed**: drop test now asserts x and y and the label for all three nodes. Mapping of the 5 follow-up checks to tests: first edge allowed (first step of the cycle test), cycle rejected, occupied input not `valid`, free input `valid`, release creates the edge. The dark-scheme check is not automated (one of the 3 documented exclusions). |
+| m4 | "fresh load starts empty" asserted before the app rendered | **Fixed**: waits for the library to render first. |
+| m5 | Local runs could reuse a stale server on a shared port | **Fixed**: dedicated port 5174, `--strictPort`, `reuseExistingServer: false`. |
+| m6 | `npx tsc -b` can fetch an unrelated package named `tsc` when `node_modules` is missing | **Fixed**: `npm run typecheck`; docs should use it. |
+| nits | `failOnFlakyTests`; CI cancels runs on `main`; `tsconfig.e2e.json` comment and unneeded `DOM` lib; doc typos (`helpers.ts`, a stale plan line, README 120 MB vs review 150 MB) | **Fixed** (`failOnFlakyTests: isCI` exists in Playwright 1.64.1; `cancel-in-progress` skips `main`; tsconfig tidied; docs corrected; the Chromium download measured about 118 MiB, so README's 120 MB is right and the review's 150 MB was an estimate). |
+| nits, **not** fixed | The e2e suite tests the dev server, not the production build; the console-error fixture checks as the test ends, so a very late error could be missed (for example the 50 ms `fitView` timer after an import); the lockfile diff is large only because of re-indentation | **Accepted and recorded** as known limitations. |
+
+**Fix commit `f4cc801`** (Sonnet implementer; nine files only: `.github/workflows/ci.yml`, `frontend/README.md`, `frontend/package.json`, `frontend/playwright.config.ts`, `frontend/tsconfig.e2e.json`, and four `frontend/e2e/*` files). **I verified independently:** `git show --stat` lists exactly those nine files; `git diff 382d6a4 f4cc801 -- frontend/src` is empty; the claimed settings are present; `npm run verify` from `frontend/` exit 0 with **48 unit tests and 26 e2e tests passed**. The implementer also ran `npm ci` first because `frontend/node_modules` was in a broken state (no `.bin`; modified at 13:27 by something other than Claude).
+
+**Corrections to Session 6 statements:**
+- **Pushed:** `382d6a4` was pushed at 13:21:06 +0530 (`origin/main` reflog), 51 seconds after it was committed, by someone other than Claude (actor not verifiable locally). "Local only and unpushed" was true for under a minute and then false. **CI has very probably run on GitHub; Claude cannot see the result.**
+- **Run count:** the stability claim should read: the first green run after the fix, three further consecutive runs and one `CI=1` run, so **5 green runs**, not "four further".
+
+**Process disclosures:**
+- The Opus reviewer ran `npx tsc -b` in the repository while `node_modules` was broken, and `npx` contacted the npm registry and downloaded the unrelated placeholder package `tsc@2.0.4` into npx's own cache (not the repository), which only printed "This is not the tsc command you are looking for". It then used local binaries only. This breaks the reviewer's no-network rule in spirit; it was inadvertent. `npm run typecheck` and the reviewer definition now steer away from bare `npx tsc`.
+- The fix commit has **not had a second independent review**; the Principal Architect verified it, which is weaker. Recommended: include it in the review of T2.
+
+**Verification (commands actually run this session by Claude):** `git show --stat`, `git diff`, `git status -sb`, `git reflog` (local refs only); `npm run verify` in `frontend/` (exit 0; 48 unit, 26 e2e). The Opus reviewer ran `npm run verify`, `npm run lint`, `npm test`, `tsc -b` and e2e (also in CI mode) in the scratch clean-room copy: all green (26 e2e, 48 unit). No remote operation was run by Claude this session.
+
+**Known Issues / unresolved:**
+- **T1 acceptance:** the GitHub Actions result for `382d6a4` (and for `f4cc801` if it is pushed) is unknown. The PO can report it.
+- v7 action input names unverified; Linux e2e behaviour unverified; Chromium only.
+- The Opus review of `f4cc801` has not been done.
+
+**Status:**
+Governance and learning system in place. T1 implemented, reviewed, fixed; acceptance pending CI and PO review. Waiting for PO decisions below.
+
+**Next Task:**
+PO review of T1 and the new team model; decide the review cadence (D-027 keeps per-task PO review until changed). Then T2 only after approval.

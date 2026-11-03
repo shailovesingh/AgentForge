@@ -1,0 +1,210 @@
+# AgentForge Learning Roadmap
+
+> **AgentForge is also a hands-on AI Engineering learning project (D-028, permanent).**
+> The Product Owner wants to understand the architecture, implementation, internal data flow, technology choices and engineering decisions well enough to **explain the project independently in technical interviews and engineering discussions.**
+>
+> **This file is the curriculum**: 12 modules aligned with the development roadmap, with learning status and interview questions.
+> **`docs/LEARNING_GUIDE.md` is the record**: lessons actually taught and the Product Owner's demonstrated understanding.
+> **Learning progress is tracked separately from implementation progress.** A module can be fully built and still be "Not Started" here, and the reverse.
+
+## How status works
+
+| Status | Meaning |
+|---|---|
+| **Not Started** | No lesson has been taught for this module yet |
+| **In Progress** | At least one lesson has been taught; understanding not yet demonstrated |
+| **Understood** | The Product Owner has answered check questions or explained the concept back, and the answers showed real understanding. **The evidence is recorded in `LEARNING_GUIDE.md`.** |
+| **Needs Revision** | Answers showed gaps; the topic is scheduled for re-teaching |
+
+**Rules.** (1) A module is never marked Understood because something was *explained*; only because the Product Owner's answers *demonstrated* it. (2) Only the Principal Architect changes a status, and only with evidence already written in `LEARNING_GUIDE.md`. (3) Teaching follows `.claude/agents/tutor.md`: simple language first, then terminology, with examples from AgentForge.
+
+## Overview
+
+"Available" says when AgentForge contains the thing being taught. Modules whose code does not exist yet are still listed so the roadmap is complete; they are taught when the code lands, so lessons always describe real code.
+
+| # | Module | Built in AgentForge | Learning status | Lessons taught |
+|---|---|---|---|---|
+| 1 | System Architecture | Partly (frontend, contracts, docs) | Not Started | none (primer available) |
+| 2 | Frontend and React Flow | Yes (Phase 1) | Not Started | none (primer available) |
+| 3 | Workflow JSON and State Management | Yes (Phase 1); being hardened in Phase 1.1 | Not Started | none (primer available) |
+| 4 | Backend and FastAPI | No (Phase 2) | Not Started | none |
+| 5 | Workflow Execution Engine | No (Phase 3) | Not Started | none |
+| 6 | Graph Theory and DAG Execution | Partly (cycle rule, Phase 1) | Not Started | none |
+| 7 | Node Registry and Data Propagation | Partly (catalog, port types) | Not Started | none |
+| 8 | LLM Integration | No (Phase 4) | Not Started | none |
+| 9 | LangGraph and Autonomous Agents | No (Phase 4) | Not Started | none |
+| 10 | MCP Integration | No (Phase 6) | Not Started | none |
+| 11 | Natural-Language Workflow Generation | No (Phase 5) | Not Started | none |
+| 12 | Security, Testing and Deployment | Partly (tests, CI) | **In Progress** | L1 (Phase 1.1 T1: testing and CI) |
+
+**Suggested order.** Modules 1, 2 and 3 now (they describe code that exists). Module 12's testing part alongside. Module 6 once the connection rules are understood. Modules 4, 5 and 7 as Phases 2 and 3 are built; then 8 to 11.
+
+---
+
+## Module 1: System Architecture
+
+- **Status:** Not Started
+- **Concepts to learn:** client and server; separation of concerns; contract-first design (a shared data format that everyone agrees on); monorepo; layered architecture; where state lives; architecture decision records (ADRs); API versus internal boundaries; versioning for backward compatibility.
+- **Why it is needed:** AgentForge has an editor, a server, an engine, AI components and a database. Without clear boundaries and one shared contract they would tangle. This is the module that lets you explain *why the system is shaped this way*.
+- **Where it appears:** the browser editor never runs workflows; the Workflow JSON document is the contract between editor, backend, engine and AI; the engine is kept independent of LangGraph; every significant choice is recorded in `docs/DECISIONS.md`.
+- **Related files:** `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` (D-002, D-003, D-004, D-006), `.claude/rules/architecture.md`, the top-level folder layout (`frontend/`, `docs/`, planned `backend/`, `contracts/`).
+- **Interview questions:**
+  1. Why is the workflow stored as a JSON document instead of in the format of the drawing library?
+  2. Why keep the execution engine separate from the AI agent framework?
+  3. What does "contract-first" mean, and where is the contract in AgentForge?
+  4. What goes wrong if the frontend and backend each define their own copy of the workflow format?
+  5. What is an architecture decision record, and why did we write decisions down before coding them?
+
+## Module 2: Frontend and React Flow
+
+- **Status:** Not Started
+- **Concepts to learn:** React components and state; controlled components; hooks; what React Flow is (nodes, edges, handles, viewport); custom node components; HTML5 drag and drop; screen versus canvas coordinates; mapping our data to a library's data; CSS Modules; keyboard accessibility.
+- **Why it is needed:** the editor is the product's face. Understanding how a canvas library is driven from your own state (instead of owning it) is the core frontend skill in AgentForge.
+- **Where it appears:** one generic node component draws all node types from the catalog; the canvas is *controlled* (it renders what the store says); one file translates between our workflow and React Flow's objects.
+- **Related files:** `frontend/src/canvas/Canvas.tsx`, `frontend/src/canvas/flowMapping.ts`, `frontend/src/nodes/WorkflowNode.tsx`, `frontend/src/library/Library.tsx`, `frontend/src/config-panel/ConfigPanel.tsx`, `frontend/src/app/Toolbar.tsx`.
+- **Interview questions:**
+  1. What does it mean that the React Flow canvas is "controlled"? What would break if it were not?
+  2. How does a node dropped from the library end up on the canvas at the cursor?
+  3. Why is there one `WorkflowNode` component instead of one per node type?
+  4. Why does `flowMapping.ts` exist at all?
+  5. How would you make dragging from the library usable without a mouse?
+
+## Module 3: Workflow JSON and State Management
+
+- **Status:** Not Started
+- **Concepts to learn:** JSON documents and schemas; JSON Schema basics; `schemaVersion` versus `typeVersion`; immutable state updates; a store (Zustand) and selectors; validation versus warnings; serialization; import as untrusted input; migrations; canonical (repeatable) JSON; shared test fixtures.
+- **Why it is needed:** the workflow document is the heart of the system. Everything else reads or writes it, so getting its shape, versioning and validation right is the most valuable thing to understand.
+- **Where it appears:** the store holds the document being edited; export writes it; import parses, upgrades, validates and loads it; the catalog describes node types; config schemas describe settings.
+- **Related files:** `frontend/src/workflow/types.ts`, `validate.ts`, `serialize.ts`, `migrate.ts`, `configSchema.ts`, `connections.ts`; `frontend/src/store/editorStore.ts`; `frontend/src/catalog/nodes.ts`. Planned in Phase 1.1: `strictJson.ts`, `canonicalJson.ts`, `nodeMigrations.ts`, `lint.ts`, and `contracts/fixtures/`.
+- **Interview questions:**
+  1. Why are `schemaVersion` and `typeVersion` two separate numbers?
+  2. What is the difference between a validation error and a warning in AgentForge, and why keep them apart?
+  3. Why must an imported file be treated as untrusted input?
+  4. Why do we want the same workflow to always export to byte-identical text?
+  5. Why does the store hold a `Workflow` document instead of React Flow's nodes and edges?
+
+## Module 4: Backend and FastAPI
+
+- **Status:** Not Started *(taught when Phase 2 is built)*
+- **Concepts to learn:** HTTP and REST; FastAPI routes; Pydantic models and validation; async I/O; dependency injection (`get_current_user`); settings from environment variables; PostgreSQL and JSONB; SQLAlchemy and Alembic migrations; Docker Compose; optimistic concurrency; owner-scoped data.
+- **Why it is needed:** the backend owns persistence, validation, execution, AI calls and secrets. The browser is not trusted with any of those.
+- **Where it appears:** planned Phase 2: workflow CRUD, versioned snapshots, `GET /api/catalog`.
+- **Related files (planned):** `backend/app/main.py`, `backend/app/api/`, `backend/app/workflow/models.py`, `backend/app/db/`, `docker-compose.yml`. See `docs/PHASE2_PLAN.md`.
+- **Interview questions:**
+  1. Why use Pydantic models at the API boundary?
+  2. What is an immutable version snapshot, and why store workflows that way?
+  3. How does optimistic concurrency prevent two editors overwriting each other?
+  4. Why scope every query by `owner_id` even in single-user mode?
+  5. Why can the database not be the canonical form of the JSON (hint: JSONB key order)?
+
+## Module 5: Workflow Execution Engine
+
+- **Status:** Not Started *(taught when Phase 3 is built)*
+- **Concepts to learn:** the run lifecycle; an executor interface; run context; node-run records; statuses (succeeded, failed, skipped); timeouts and limits; streaming progress (SSE); background execution; human approval pauses.
+- **Why it is needed:** this is what turns a drawing into behaviour.
+- **Where it appears:** planned Phase 3. The rules for edges, skipping and branching are already specified in `docs/PHASE1_1_PLAN.md` section 3.4.
+- **Related files (planned):** `backend/app/engine/`, `backend/app/catalog/`.
+- **Interview questions:**
+  1. Walk through what happens from "Run" to the final result.
+  2. How does the engine decide a node is ready to run?
+  3. What happens to downstream nodes when a node fails?
+  4. Why does every run record the exact workflow version it executed?
+  5. How do you stop a runaway workflow?
+
+## Module 6: Graph Theory and DAG Execution
+
+- **Status:** Not Started
+- **Concepts to learn:** graphs, nodes and edges; directed and acyclic; reachability; cycle detection; topological order; dependency-based scheduling; concurrency from independent branches; branching and skipped nodes.
+- **Why it is needed:** a workflow is a graph. These ideas decide what can connect, what runs first and what can run in parallel.
+- **Where it appears:** the connection rules reject cycles using a reachability search (built); the engine's scheduling rules are specified (planned build in Phase 3).
+- **Related files:** `frontend/src/workflow/connections.ts` (`isReachable`, the `cycle` rule), `frontend/src/workflow/connections.test.ts`, `docs/PHASE1_1_PLAN.md` section 3.4, `docs/DECISIONS.md` D-006.
+- **Interview questions:**
+  1. What is a DAG and why must a workflow be one?
+  2. How does AgentForge decide that adding an edge would create a cycle?
+  3. How can two nodes run at the same time safely?
+  4. If a Condition takes its `true` branch, what happens to the nodes on the `false` branch?
+  5. Where do loops live in AgentForge, if not in the graph?
+
+## Module 7: Node Registry and Data Propagation
+
+- **Status:** Not Started
+- **Concepts to learn:** the registry pattern; an executor interface (protocol); ports as typed contracts; data type compatibility; how a value travels along an edge; inputs that accept several edges; catalog versus registry consistency; per-node versioning and migration.
+- **Why it is needed:** this is how new node types are added without touching the engine, and how data safely flows between them.
+- **Where it appears:** the catalog and port compatibility rules exist now; the executor registry arrives in Phase 3.
+- **Related files:** `frontend/src/catalog/nodes.ts`, `frontend/src/catalog/index.ts`, `frontend/src/workflow/types.ts` (`PortDefinition`, `DataType`), `frontend/src/workflow/connections.ts`; planned `backend/app/catalog/` and `nodeMigrations.ts`.
+- **Interview questions:**
+  1. How would you add a new node type to AgentForge? What files change?
+  2. What does the `multiple` flag on a port change?
+  3. Why is `text` not allowed to connect to `json`?
+  4. What should happen when an old workflow uses version 1 of a node that is now at version 2?
+  5. Why should the catalog and the executor registry always agree?
+
+## Module 8: LLM Integration
+
+- **Status:** Not Started *(taught when Phase 4 is built)*
+- **Concepts to learn:** chat models; prompts and system prompts; temperature; structured output; providers (Ollama, OpenAI, Anthropic, Groq) and the adapter pattern; tokens and cost; timeouts and retries; testing with fake models; credentials.
+- **Why it is needed:** the LLM node and the Agent are the "intelligence" of AgentForge.
+- **Where it appears:** the `llm.prompt` node definition exists (settings only); the runtime is planned for Phase 4.
+- **Related files:** `frontend/src/catalog/nodes.ts` (`llm.prompt`), `docs/DECISIONS.md` D-014, D-015, D-024; planned `backend/app/integrations/llm.py`.
+- **Interview questions:**
+  1. Why a provider-neutral adapter instead of calling each provider's SDK in the node?
+  2. What does temperature do, and when would you set it to 0?
+  3. How do you test LLM-dependent code without calling a real model?
+  4. Why must API keys never reach the model or the workflow file?
+  5. What is structured output and why does natural-language generation need it?
+
+## Module 9: LangGraph and Autonomous Agents
+
+- **Status:** Not Started *(taught when Phase 4 is built)*
+- **Concepts to learn:** the agent loop (reason, act, observe); tools; state graphs; checkpointers and memory; recursion and tool-call limits; why agents are non-deterministic; why the agent is isolated inside one node.
+- **Why it is needed:** agents are the most powerful and least predictable part of the platform.
+- **Where it appears:** the `agent.autonomous` node definition exists; the LangGraph runtime is planned for Phase 4.
+- **Related files:** `frontend/src/catalog/nodes.ts` (`agent.autonomous`), `docs/ARCHITECTURE.md` section 7, `docs/DECISIONS.md` D-006; planned `backend/app/agents/`.
+- **Interview questions:**
+  1. What is an agent loop? How is it different from a normal workflow?
+  2. Why is LangGraph used only inside the Agent node?
+  3. What stops an agent from looping forever or spending unlimited money?
+  4. How does an agent get its tools?
+  5. What is a checkpointer and what does it give you?
+
+## Module 10: MCP Integration
+
+- **Status:** Not Started *(taught when Phase 6 is built)*
+- **Concepts to learn:** the Model Context Protocol; clients and servers; tool discovery; transports (remote HTTP versus local stdio); trust and security of tool servers; exposing tools as nodes and as agent tools.
+- **Why it is needed:** MCP is how AgentForge reaches the outside world without custom code per tool.
+- **Where it appears:** planned Phase 6; decision D-010 restricts the first version to remote servers.
+- **Related files:** `docs/ARCHITECTURE.md` section 9, `docs/DECISIONS.md` D-010; planned `backend/app/integrations/mcp/`.
+- **Interview questions:**
+  1. What problem does MCP solve?
+  2. Why did we exclude local (stdio) MCP servers at first?
+  3. How are MCP tools discovered at run time?
+  4. Why is a tool's output treated as untrusted data?
+  5. How could an MCP tool be abused for SSRF, and how do we prevent that?
+
+## Module 11: Natural-Language Workflow Generation
+
+- **Status:** Not Started *(taught when Phase 5 is built)*
+- **Concepts to learn:** structured generation of data (not code); prompting with the catalog; the validate-and-repair loop; patch operations versus regeneration; preview and accept; prompt injection; evaluating generation quality.
+- **Why it is needed:** this is the feature that makes AgentForge feel like magic, and the one most likely to go wrong if the output is not strictly validated.
+- **Where it appears:** planned Phase 5; decisions D-007 (patch-based edits) and architecture rule 8 (never executable code).
+- **Related files:** `docs/ARCHITECTURE.md` section 8, `docs/DECISIONS.md` D-007; planned `backend/app/generation/`.
+- **Interview questions:**
+  1. Why must the model produce workflow data and never code?
+  2. What is the validate-and-repair loop?
+  3. Why are edits expressed as patch operations instead of a new workflow?
+  4. How is a user's request treated as untrusted input?
+  5. How would you measure whether generation is getting better?
+
+## Module 12: Security, Testing and Deployment
+
+- **Status:** **In Progress** (Lesson L1 taught: testing and CI; no answers recorded yet)
+- **Concepts to learn:** secrets and credential references; secret detection; SSRF; authorization and owner scoping; sandboxing; limits and timeouts; unit, integration and end-to-end tests; shared fixtures; fault injection (mutation) and vacuous tests; CI with GitHub Actions; supply-chain pinning by commit SHA; Docker and Compose.
+- **Why it is needed:** a platform that runs user-defined workflows with AI and external tools is a security problem first. Tests and CI are what let us change the system without fear.
+- **Where it appears:** unit tests and Playwright tests exist; a CI workflow exists; secret detection is planned (Phase 1.1 T9); backend security and Docker are planned (Phase 2 onward).
+- **Related files:** `frontend/e2e/`, `frontend/playwright.config.ts`, `.github/workflows/ci.yml`, `frontend/src/**/*.test.ts`, `.claude/rules/architecture.md`, `docs/ARCHITECTURE.md` section 11 and 12, `docs/DECISIONS.md` D-016, D-019, D-023.
+- **Interview questions:**
+  1. Why pin GitHub Actions to a commit SHA instead of a version tag?
+  2. What can an end-to-end test catch that a unit test cannot, and the reverse?
+  3. What is a vacuous test? Give an example from this project.
+  4. Why must credentials never appear in a workflow file, and what replaces them?
+  5. Why is a server-side request forgery guard needed when a workflow can call arbitrary URLs?

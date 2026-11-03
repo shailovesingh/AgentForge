@@ -256,7 +256,7 @@ Rough estimate (engineering judgment, not measured): about 300 to 400 lines of t
 |---|---|
 | `frontend/package.json`, `package-lock.json` | `@playwright/test` devDependency, `test:e2e` script |
 | `frontend/playwright.config.ts` | new |
-| `frontend/e2e/{fixtures.ts, helpers.ts, library, canvas-editing, connections, config-panel, import-export}.e2e.ts` | new |
+| `frontend/e2e/{fixtures.ts, editor.ts, library, canvas-editing, connections, config-panel, import-export}.e2e.ts` | new |
 | `frontend/tsconfig.e2e.json` (or edit of `tsconfig.node.json`) | new or small edit |
 | `.gitignore` | two lines |
 | `.github/workflows/frontend.yml` | new |
