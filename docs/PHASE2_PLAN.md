@@ -32,7 +32,8 @@
 | X6 | New dependencies: `asyncpg` (driver, implied by D-009), `json-schema-to-typescript` (frontend dev, step 4) | Approve both |
 | X7 | `GET /api/catalog` response envelope | `{ "nodes": [...] }` rather than a bare array, so metadata can be added later |
 | X8 | Contract size limits (M2) | Choose numbers in step 2 (e.g. max nodes, edges, string lengths) |
-| X9 | Whether Playwright (Phase 1.1) lands before step 10 | Recommended yes |
+| X9 | Whether Playwright (Phase 1.1) lands before step 10 | Recommended yes. **Update:** Playwright is approved as Phase 1.1 task T1 (D-019) |
+| X10 | **Backend secret handling** (kept separate from the local export confirmation of D-023): whether `save` refuses or sanitizes high-confidence secret matches, server-side redaction in logs and events, and `credentialRef` resolution | Recommend: reject high-confidence matches on save with a structured 422 and no override, because the server persists what it receives. **Not decided here** |
 
 ## 3. Dependency order
 

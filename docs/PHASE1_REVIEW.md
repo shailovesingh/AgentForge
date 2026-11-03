@@ -288,3 +288,21 @@ No application code changes. If selectors prove brittle, adding `data-testid` at
 **Still pending:** D-013 (final code review of the contract, which this plan now proposes to change in the catalog layer), final approval of the Phase 1.1 designs (D-022 to D-024), and Phase 2 approval.
 
 **What these decisions change in §1.4:** concerns H1 to H5 are now **assigned to Phase 1.1** with designs (not to Phase 2). M3 (integer typing), M5 (structured errors), M8 (credential exposure) and L6 (groq) are absorbed by the same plan. M1, M2, M4, M6, M7 and M9 remain Phase 2 or later.
+
+### 4.1 Further decisions (Product Owner, 2026-11-03, Session 5)
+
+| Item | Decision | Recorded as |
+|---|---|---|
+| P1 | Schema defaults replace `NodeDefinition.defaults`; defaults **applied explicitly at node creation**; required properties need not have defaults | D-022; plan §3.1; consequence D-025 |
+| P2 | Own documented JSON Schema subset validator with shared fixtures | D-022 |
+| P3, P5 | `agent.autonomous` v2 with a visible report; migrate in memory; never silently overwrite the original | D-022; plan §3.3 |
+| P4 | JSON editor for arrays and nested objects initially | D-022 |
+| P6 | Adopt the branch-selection and skipped-node semantics | D-022; plan §3.4 |
+| P7 | Canonical JSON approved **subject to five revisions** (duplicate keys rejected at parse; NUL is an AgentForge/PostgreSQL rule; compact hashing form separate from pretty export; safe integers are AgentForge policy; cross-language fixtures for every edge case) | D-022; plan §3.5 (revised) |
+| S1 | **Revised**: no unconditional export blocking; prominent warning, explicit confirmation before export, never echo, credential-reference guidance; backend enforcement separate | D-023; plan §3.7 (revised) |
+| W1 | Optional extra warnings stay disabled | D-017 |
+| V1 | Ollama stays the default provider | D-024 |
+| G1 | GitHub Actions CI with actions pinned to verified commit SHAs | D-019 |
+| Toolchain | Keep | D-012 |
+
+The Phase 1.1 plan is `docs/PHASE1_1_PLAN.md`; its implementation scope awaits final approval.

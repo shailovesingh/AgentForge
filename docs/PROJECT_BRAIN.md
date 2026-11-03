@@ -8,7 +8,7 @@
 
 - **Name:** AgentForge
 - **Product:** Visual AI Agent Builder
-- **Status:** Architecture approved (D-001 to D-011). Phase 1 (visual builder) **accepted as functionally complete by the PO (D-020), subject to Phase 1.1**. Workflow contract **pending final code review** (D-013). **Phase 1.1 is planned (`docs/PHASE1_1_PLAN.md`), awaiting final approval.** **Phase 2 is proposed only, not approved**; no backend exists.
+- **Status:** Architecture approved (D-001 to D-011). Phase 1 (visual builder) **accepted as functionally complete by the PO (D-020), subject to Phase 1.1**. Workflow contract **pending final code review** (D-013). **Phase 1.1 plan (`docs/PHASE1_1_PLAN.md`) approved with revisions by the PO on 2026-11-03; its implementation scope awaits final approval; nothing is implemented.** **Phase 2 is proposed only, not approved**; no backend exists.
 - **Product Owner:** User
 - **Principal Architect:** ChatGPT
 - **Implementation Engineer:** Claude Code
@@ -79,11 +79,13 @@ Branch `main`. Commits:
 | `5af36e5` | Phase 1 steps 2–3: Workflow v1 types, catalog, store |
 | `35fe3bc` | Phase 1 steps 4–9: canvas, library, config panel, connection rules, import/export |
 
-Latest commit: **`b7e5cbc`** (`git commit -m "docs: update documentation for project progress and planning"`; the message text is literal, the commit contains the Session 3 review documents). It is **the same commit on `origin/main`** (verified with `git ls-remote origin HEAD`).
+Latest commit: **`db451da`** (`git commit -m "docs: update documentation files`; the text is literal). Local `main` equals `origin/main` (verified with `git ls-remote origin`).
 
-**GitHub remote (added outside the Claude session):** `origin` = `https://github.com/shailovesingh/AgentForge.git`, account `shailovesingh`. All commits `798ab84` to `b7e5cbc` are on it. Claude did not create the remote or push; it observed both in Session 4.
+**GitHub remote:** `origin` = `https://github.com/shailovesingh/AgentForge.git` (account `shailovesingh`). All history is on it.
 
-**Uncommitted working-tree changes (Session 4, not committed until the PO approves):** `docs/DECISIONS.md` (D-019 to D-024), `docs/PROJECT_BRAIN.md`, `docs/ROADMAP.md`, `docs/DEVELOPMENT_LOG.md`, `docs/PHASE1_REVIEW.md` (§4), `docs/PHASE2_PLAN.md` (revision note) and the new `docs/PHASE1_1_PLAN.md`. No application code is modified (`git diff HEAD -- frontend` is empty).
+**Two commits and two pushes were not made by Claude.** `b7e5cbc` (12:16:35 +0530) and `db451da` (12:37:04) were committed, and pushed at 12:17:05 and 12:37:28, from outside Claude's tool shell. Claude never ran `git push`, `fetch`, `pull` or `remote add`. Local evidence (reflogs, `FETCH_HEAD`, `COMMIT_EDITMSG`, config; commit metadata cannot identify the actor) is in `docs/DEVELOPMENT_LOG.md` Session 5; the actor and the credential used are **not verifiable locally**. Nothing was rewritten, force-pushed or changed remotely.
+
+**Uncommitted working-tree changes (Session 5, not committed until the PO approves):** `docs/DECISIONS.md`, `docs/PHASE1_1_PLAN.md`, `docs/PHASE1_REVIEW.md`, `docs/PHASE2_PLAN.md`, `docs/PROJECT_BRAIN.md`, `docs/ROADMAP.md`, `docs/DEVELOPMENT_LOG.md`. No application code is modified (`git diff HEAD -- frontend` is empty).
 ### Repository layout (actual)
 
 ```
@@ -92,7 +94,7 @@ AgentForge/
   .claude/rules/{architecture,frontend,backend}.md
   docs/{PROJECT_BRAIN,ARCHITECTURE,DECISIONS,ROADMAP,DEVELOPMENT_LOG}.md
   docs/PHASE1_REVIEW.md   (review package: contract review, six questions, Playwright proposal; PO decisions in §4)
-  docs/PHASE1_1_PLAN.md   (PROPOSED Phase 1.1 plan, uncommitted)
+  docs/PHASE1_1_PLAN.md   (Phase 1.1 plan, APPROVED WITH REVISIONS; implementation scope awaiting final approval; revised in Session 5, uncommitted)
   docs/PHASE2_PLAN.md     (PROPOSED, not approved)
   frontend/
     src/
@@ -143,16 +145,16 @@ Status legend: **Implemented** = code exists. **Tested** = verified as stated in
 
 Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, auto-layout, NL generation, authentication, repo-based E2E tests.
 
-### Phase 1.1 — Contract hardening, warnings, Playwright (PROPOSED; plan in `docs/PHASE1_1_PLAN.md`; none of it is implemented)
+### Phase 1.1 — Contract hardening, warnings, Playwright (PLAN APPROVED WITH REVISIONS; implementation scope awaiting final approval; none of it is implemented)
 - [ ] T1 Playwright harness, 49 ported checks, GitHub Actions CI, `npm run verify`
 - [ ] T2 Structured validation errors `{code, path, message}`
 - [ ] T3 Shared JSON fixtures in `contracts/` with a Vitest runner (H2, approved)
-- [ ] T4 Canonical JSON serialization (H5)
-- [ ] T5 JSON Schema subset for `configSchema`, UI hints separated, `groq` and a single `PROVIDERS` constant (H1)
+- [ ] T4 Strict parsing (duplicate keys rejected), canonical JSON (compact, hashing) and export JSON (pretty), 120+ fixtures (H5, P7 revised)
+- [ ] T5 JSON Schema subset for `configSchema`, UI hints separated, explicit `applyDefaults`, `groq` and a single `PROVIDERS` constant (H1, P1 revised)
 - [ ] T6 Versioned node migrations; `agent.autonomous` v2 as the first real migration (H3)
 - [ ] T7 Non-blocking editor warnings, category- and direction-aware (D-017, D-018)
 - [ ] T8 Branch semantics specification and the optional `PortDefinition.branch` field (H4)
-- [ ] T9 Secret guard for HTTP headers and free-text config (D-023)
+- [ ] T9 Secret detection, prominent warnings and explicit export confirmation (D-023 as revised)
 - [ ] T10 Documentation, decision records and acceptance report
 
 ### Phase 2 — Backend (not started)
@@ -201,8 +203,8 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1 — accepted as functionally complete (D-020), subject to Phase 1.1. Phase 1.1 (`docs/PHASE1_1_PLAN.md`) is **proposed, awaiting final approval**; Phase 2 is **proposed only**.
-- **Last completed task:** Session 4 (Phase 1.1 plan and decision records, uncommitted); Session 3 review documents are committed in `b7e5cbc`; Session 2 delivered Phase 1 steps 0–10.
+- **Current phase:** Phase 1 — accepted as functionally complete (D-020), subject to Phase 1.1. The **Phase 1.1 plan is approved with revisions; implementation scope awaits final approval.** Phase 2 is **proposed only**.
+- **Last completed task:** Session 5 (Phase 1.1 plan revised per the PO's decisions; git investigation; documentation only, uncommitted). Session 3 and 4 review documents are committed (`b7e5cbc`, `db451da`); Session 2 delivered Phase 1 steps 0–10.
 - **Last code commit:** `35fe3bc`.
 
 ### Verification results (actual, run 2026-11-03)
@@ -229,7 +231,7 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 8. Technical Decisions
 
-Full log: `docs/DECISIONS.md`. **D-001 to D-012 and D-019 to D-021 are Approved.** D-022 (Phase 1.1 contract hardening) is **H2 Approved, directions of H1/H3/H4/H5 Approved, designs Proposed**; D-023 (secret guard) and D-024 (provider extensibility mechanism) are **Proposed**. Session 3 review decisions (recorded but uncommitted): D-012 keep TypeScript 7 / Vite 8 / Oxlint / Vitest 5 (Approved); **D-013 Workflow JSON v1 and catalog architecture: Pending final code review**; D-014 providers Groq, OpenAI, Anthropic, Ollama (Approved, catalog not yet updated); D-015 provider-neutral adapter (Approved, not implemented); D-016 no credentials in workflow JSON (Approved, holds today); D-017 non-blocking editor warnings (Approved, not implemented); D-018 errors separate from warnings (Approved, not implemented). D-006 carries the PO clarification (dependency-based DAG executor with branching, skipping and concurrency-capable design; cycles rejected in v1; LangGraph handles loops inside the Agent node).
+Full log: `docs/DECISIONS.md`. **D-001 to D-012 and D-019 to D-024 are Approved** (D-022 H1 to H5 with P7 subject to revisions that are now applied; D-023 secret detection **as revised**: prominent warning plus explicit export confirmation, not blocking; D-024 providers mechanism, Ollama stays default). **D-025** (absent required config keys are a completeness concern, consequence of the P1 revision) is **Proposed**. **D-013** (workflow contract final code review) is still **pending**. Session 3 review decisions (recorded but uncommitted): D-012 keep TypeScript 7 / Vite 8 / Oxlint / Vitest 5 (Approved); **D-013 Workflow JSON v1 and catalog architecture: Pending final code review**; D-014 providers Groq, OpenAI, Anthropic, Ollama (Approved, catalog not yet updated); D-015 provider-neutral adapter (Approved, not implemented); D-016 no credentials in workflow JSON (Approved, holds today); D-017 non-blocking editor warnings (Approved, not implemented); D-018 errors separate from warnings (Approved, not implemented). D-006 carries the PO clarification (dependency-based DAG executor with branching, skipping and concurrency-capable design; cycles rejected in v1; LangGraph handles loops inside the Agent node).
 
 Small implementation choices made in Session 2 without a decision entry (flagged for architect review):
 - Followed Vite template defaults: **oxlint** instead of ESLint, **TypeScript 7**, Vite 8, Vitest 5.
@@ -252,47 +254,42 @@ Small implementation choices made in Session 2 without a decision entry (flagged
 10. **Edge stroke is low-contrast in dark mode** (cosmetic; React Flow default colours).
 11. Node ids are 8-character random strings; collision risk is negligible at editor scale but unchecked.
 12. **No CI yet.** The GitHub remote exists but there is no `.github/workflows/`; the first workflow is part of Phase 1.1 task T1. Note: history on GitHub still contains the first commit's damaged `PROJECT_BRAIN.md`/`DECISIONS.md` encoding (repaired in later commits); history was not rewritten.
-13. **HTTP Request `headers` is free-form JSON** and could hold a pasted secret; only its description warns against this (D-016). No technical guard yet.
+13. **HTTP Request `headers` is free-form JSON** and could hold a pasted secret; only its description warns against this (D-016). No technical guard yet. Planned (D-023, T9): detection, prominent warning and explicit confirmation before export (not blocking).
 14. **Workflow contract concerns for Phase 2** (5 high, 9 medium, 7 low) are listed in `docs/PHASE1_REVIEW.md` §1.4. The high ones (H1 config schema is a hand-rolled subset, H2 rules exist only in TypeScript, H3 no `typeVersion` migration, H4 branching not expressible, H5 JSONB key order vs byte-identical export) need decisions before the Pydantic models are written.
-15. The provider enum lacks `groq` (D-014); it is not changed during the review because the contract is frozen.
+15. The provider enum lacks `groq` (D-014); added in Phase 1.1 T5.
+16. **Unattributed commits and pushes.** `b7e5cbc` and `db451da` reached GitHub from outside Claude's shell; the actor and credential are not verifiable locally (see DEVELOPMENT_LOG Session 5). Both commits contained review documents that the PO had asked to keep uncommitted pending approval.
 
 ## 10. Open Questions
 
-The six original questions were **all decided by the PO on 2026-11-03** (Session 4). Full text and reasoning: `docs/PHASE1_REVIEW.md` §2 and §4.
+The six original questions were all decided on 2026-11-03 (see `docs/PHASE1_REVIEW.md` §2, §4 and §4.1): providers Groq, OpenAI, Anthropic, Ollama (D-014); Playwright approved (D-019); toolchain kept (D-012); Phase 1 accepted subject to Phase 1.1 (D-020); single-user local mode with a `get_current_user()` boundary (D-021); category- and direction-aware non-blocking warnings (D-017). **No original question is open.**
 
-| # | Question | Decision |
-|---|---|---|
-| 1 | **LLM providers.** Which are first-class in Phase 4? | Groq, OpenAI, Anthropic, Ollama (D-014). `groq` is not yet in the catalog; added in Phase 1.1 T5. |
-| 2 | **Repo-based E2E tests.** Add Playwright now or defer? | Approved as a Phase 1.1 task (D-019), first task T1. |
-| 3 | **Toolchain.** Accept TypeScript 7 / Vite 8 / oxlint, or ESLint? | Keep (D-012). |
-| 4 | **Phase 1 acceptance.** Accept as complete? | Accepted as functionally complete, subject to Phase 1.1 (D-020). |
-| 5 | **Auth.** Hard requirement before deployment, or single-user local mode until Phase 7? | Single-user local mode; `get_current_user()` boundary; never beyond localhost without proper auth (D-021). |
-| 6 | **Editor-side validation UX.** Warnings before Phase 3? | Yes, non-blocking, aware of node categories and port direction (D-017 amended). |
+**Decided in Session 5** (details in `docs/PHASE1_1_PLAN.md` §1.1): P1 (revised), P2, P3, P4, P5, P6, P7 (subject to revisions, applied), W1, V1, G1, toolchain; S1 was **revised** by the PO (warning plus explicit confirmation, not blocking).
 
-**Pending decisions (need PO / architect approval; none resolved yet):**
-- **Phase 1.1 plan** (`docs/PHASE1_1_PLAN.md`): final approval of the H1, H3, H4, H5 designs (D-022), the secret guard (D-023), the provider mechanism (D-024), and the recommendations P1 to P7, S1, W1, V1, G1 listed in its §6.
-- **D-013:** final code review of the Workflow contract (`types.ts`, `nodes.ts`, `connections.ts`, `validate.ts`), best done together with the Phase 1.1 plan because the plan changes the catalog layer.
-- **Phase 2:** approval of `docs/PHASE2_PLAN.md` and its decisions X1 to X9 (X1, X2, X3 are largely resolved by Phase 1.1 if approved).
+**Pending decisions (need PO / architect approval):**
+- **Final approval of the Phase 1.1 implementation scope** (tasks T1 to T10, one task per commit, `npm run verify` green after each; `docs/PHASE1_1_PLAN.md` §6.3).
+- **C1:** absent required config keys are completeness warnings, not structural import errors (consequence of the P1 revision; D-025). **C2:** policy values (nesting depth 64, document size 5,000,000 characters). **C3:** export confirmation shown on every export with a high-confidence match, Cancel default, no "don't ask again". **C4:** backend secret handling is a separate Phase 2 decision (X10). **C5:** CI action SHA-pinning procedure.
+- **D-013:** final code review of the Workflow contract, best done together with the Phase 1.1 plan.
+- **Phase 2:** approval of `docs/PHASE2_PLAN.md` and its decisions X1 to X10 (X1, X2, X3 largely resolved by Phase 1.1 if its scope is approved).
+- **Git:** how future commits and pushes should be coordinated, given that two review-document commits were pushed before approval (no action taken; for the PO).
 
 **Blocked:**
-- Phase 2 step 2 onward: blocked on Phase 1.1 and D-013.
-- Phase 2 step 6 onward: blocked on Docker Desktop (PO will install).
-- Phase 1.1 T1 can start only after approval of the plan; CI can run now that the remote exists.
+- Phase 1.1 implementation: awaits final scope approval. CI can run: the remote exists.
+- Phase 2 step 2 onward: blocked on Phase 1.1 and D-013. Phase 2 step 6 onward: blocked on Docker Desktop (PO will install).
 ## 11. Last Session Handoff
 
-- **Date:** 2026-11-03 (Session 4)
-- **Last task:** Recorded the PO's review decisions (D-019 to D-024, D-017 amendment) and prepared the revised **Phase 1.1 plan**: H1 to H5 designs, which of them change Workflow JSON v1 (none change the document structure), warning rules, secret guard, provider mechanism, Playwright with local and CI runs, ten tasks with dependencies, files, acceptance criteria, tests and risks.
-- **Implemented changes:** documentation only. No application code, contract, dependency or configuration change (`git diff HEAD -- frontend` empty).
-- **Tests:** unchanged code; last full run (Session 3, `tsc`, `oxlint`, 48 Vitest tests, `vite build`) all passed. Session 4 ran only small standalone Node and Python snippets to verify JavaScript-versus-Python serialization differences used in the H5 design.
-- **Repository events observed:** `b7e5cbc` committed and pushed to `origin/main` (GitHub `shailovesingh/AgentForge`) outside the Claude session.
-- **Next task:** PO and architect final approval of the Phase 1.1 plan.
+- **Date:** 2026-11-03 (Session 5)
+- **Last task:** Applied the PO's Phase 1.1 decisions and required revisions (P1 explicit defaults; P7 canonical JSON; S1 warning plus explicit export confirmation); investigated how commits reached `origin/main` (read-only); updated plan, decisions (D-017/D-019 amended, D-022 to D-024 rewritten, D-025 added), review, Phase 2 plan, roadmap, brain and log.
+- **Implemented changes:** documentation only. No application code, contract, dependency or configuration change (`git diff HEAD -- frontend` is empty).
+- **Tests:** none re-run (no code changed; last full run in Session 3 passed). Session 5 ran standalone Node and Python snippets to verify the cross-language number, key-order and Unicode behaviour used in the P7 specification.
+- **Git:** HEAD `db451da` equals `origin/main`; evidence about the two unattributed commits and pushes is in `docs/DEVELOPMENT_LOG.md` Session 5. Claude ran no push, fetch, pull or remote-add.
+- **Next task:** final approval of the Phase 1.1 implementation scope.
 
 ## 12. Next Recommended Action
 
-1. **PO and Principal Architect:** review `docs/PHASE1_1_PLAN.md`; answer §6 (P1 to P7, S1, W1, V1, G1); complete the D-013 code review alongside it.
-2. **After approval:** commit these documents, then start Phase 1.1 **T1 (Playwright harness and CI)**, one task per commit.
-3. **PO:** move `Downloads\CLAUDE.md` out of the AgentForge parent path; install Docker Desktop before Phase 2 step 6.
-4. **No Phase 2 or backend work begins** until Phase 1.1 is complete and Phase 2 is separately approved.
+1. **PO and Principal Architect:** review `docs/PHASE1_1_PLAN.md` (revised §3.1, §3.5, §3.7); decide C1 to C5; approve the implementation scope (§6.3); complete the D-013 review.
+2. **After approval:** commit the Session 5 documents, then start Phase 1.1 **T1 (Playwright and CI)**, one task per commit.
+3. **PO:** decide how commits and pushes are coordinated from here on; move `Downloads\CLAUDE.md` out of the AgentForge parent path; install Docker Desktop before Phase 2 step 6.
+4. **No Phase 2 or backend work** until Phase 1.1 is complete and Phase 2 is separately approved.
 ## 13. Update Rules
 
 After every meaningful implementation task:

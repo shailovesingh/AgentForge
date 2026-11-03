@@ -1,8 +1,9 @@
-# PHASE 1.1 PLAN — CONTRACT HARDENING, WARNINGS, PLAYWRIGHT (PROPOSED)
+# PHASE 1.1 PLAN — CONTRACT HARDENING, WARNINGS, PLAYWRIGHT (APPROVED WITH REVISIONS)
 
-> **Status: PROPOSED, awaiting final approval from the Product Owner and Principal Architect. Nothing here is implemented.**
-> Prepared 2026-11-03 (Session 4). **Phase 2 is not started and not authorized.** This plan changes no application code until approved.
-> Inputs: the PO's review decisions of 2026-11-03 (Q1–Q6, H1–H5, additional requirements) · `docs/PHASE1_REVIEW.md` · `docs/DECISIONS.md` (D-012 to D-024).
+> **Status (2026-11-03, Session 5): the Product Owner approved most decisions and required revisions to P1, P7 and S1. This version applies those revisions. The implementation scope still awaits final approval. Nothing here is implemented.**
+> **Phase 2 is not started and not authorized.** No application code changes until the implementation scope is approved.
+> Inputs: the PO's review decisions (Q1–Q6, H1–H5, P1–P7, S1, W1, V1, G1) · `docs/PHASE1_REVIEW.md` · `docs/DECISIONS.md` (D-012 to D-025).
+> History: Session 4 first draft. Session 5 (this version): P1 explicit defaults, P7 canonical JSON, S1 secret detection revised as the PO required.
 
 ---
 
@@ -23,6 +24,22 @@
 | H5 | Deterministic serialization: recursively sorted keys, array order preserved; same across TypeScript, Python, PostgreSQL JSONB | §3.5, task T4 |
 | Extra | Review HTTP header credential exposure; credentials stay outside workflow JSON; extensible providers; warnings never block editing; add Playwright with reproducible local and CI runs | §3.7, §3.8, §3.9 |
 
+### 1.1 Approvals and required revisions (Session 5)
+
+| Item | PO decision | Status in this plan |
+|---|---|---|
+| P1 | Schema defaults replace `NodeDefinition.defaults`, but defaults must be **explicitly applied during node creation**. Do **not** require every required property to have a default. | Approved **with revision**, applied in §3.1 (consequence C1 in §6) |
+| P2 | Own documented JSON Schema subset validator, with shared fixtures | Approved |
+| P3 | `agent.autonomous` v2 with a visible migration report | Approved |
+| P4 | JSON editor for arrays and nested objects initially | Approved |
+| P5 | Migrate imported workflows **in memory**, show the upgrade report, never silently overwrite the original | Approved |
+| P6 | Branch-selection and skipped-node semantics as proposed | Approved |
+| P7 | Canonical JSON, **subject to five revisions** (reject duplicate keys at parse; NUL is an AgentForge/PostgreSQL rule; separate compact hashing form from pretty export; safe integers are AgentForge policy; cross-language fixtures for every numeric, Unicode and key-order edge case) | Approved subject to revisions, **applied in §3.5** |
+| S1 | **Not approved as proposed.** No unconditional export blocking. High-confidence matches: prominent warning, never echo the value, **explicit user confirmation before export**, explain replacing the value with a credential reference. Backend credential-storage enforcement is separate from the local export UX. | **Revised**, applied in §3.7 |
+| W1 | Optional extra warnings stay disabled | Approved |
+| V1 | Ollama stays the default provider | Approved |
+| G1 | GitHub Actions CI, actions pinned to **verified commit SHAs** | Approved (§3.9) |
+| Toolchain | Keep TypeScript 7, Vite 8, Oxlint, Vitest 5 | Approved |
 ## 2. Which issues change Workflow JSON v1?
 
 Two contracts are involved and the answer differs for each:
@@ -32,12 +49,12 @@ Two contracts are involved and the answer differs for each:
 
 | Issue | Changes the **document structure** (needs `schemaVersion` bump)? | Changes the **catalog contract**? | Changes **bytes on export**? | Can break existing saved workflows? |
 |---|---|---|---|---|
-| H1 JSON Schema config | **No.** Node `config` stays an arbitrary JSON object; arrays and nested objects only widen what a value may be. | **Yes** (`configSchema` becomes a JSON Schema subset, UI hints move to `ui`, `defaults` replaced by schema `default`). | No | Only if `maxIterations` is tightened to `integer`; handled by a **node** migration (H3), not a document change. |
+| H1 JSON Schema config | **No.** Node `config` stays an arbitrary JSON object; arrays and nested objects only widen what a value may be. | **Yes** (`configSchema` becomes a JSON Schema subset, UI hints move to `ui`, `defaults` replaced by explicitly applied schema `default`s; absent required config keys stop being a structural error, see C1). | No | Only if `maxIterations` is tightened to `integer`; handled by a **node** migration (H3), not a document change. |
 | H2 Shared fixtures | No | No | No | No |
 | H3 Node migrations | **No.** Uses the `typeVersion` field that v1 already has. | No (a node's new version is a new catalog definition) | No | No: migration is the mechanism that **prevents** breakage. |
 | H4 Condition semantics | **No.** Edges already name ports. | **Additive, optional**: `PortDefinition.branch` | No | No |
-| H5 Canonical serialization | **No structural change.** Reading is unaffected. | No | **Yes, once.** Keys become recursively sorted, so e.g. `schemaVersion` moves from first to last. Old files still import and re-export in the new order. | No for reading. Stricter value rules (safe integers, no NUL, no lone surrogates) would newly reject documents that hold such values; none are producible by the editor today. |
-| Secret guard | No | No | No | A document that already contains a high-confidence secret would be blocked at export (that is the intent). |
+| H5 Canonical serialization | **No structural change.** Reading is unaffected. | No | **Yes, once.** Keys become recursively sorted, so e.g. `schemaVersion` moves from first to last. Old files still import and re-export in the new order. | No for reading. Stricter parsing and value rules (unique object keys, safe integers, no NUL, no lone surrogates, depth limit) would newly reject documents that hold such values; none are producible by the editor today. |
+| Secret detection | No | No | No | No. A document that already contains a high-confidence secret still imports and exports; the user gets a prominent warning and an explicit export confirmation. |
 | Warnings | No (warnings are derived, never stored) | No | No | No |
 | Providers | No | Additive enum value (`groq`) | No | No |
 
@@ -81,7 +98,7 @@ interface NodeDefinition {
     order?: string[]
     fields?: Record<string, { widget?: 'text' | 'textarea' | 'select' | 'json' | 'checkbox'; rows?: number; placeholder?: string }>
   }
-  // `defaults` is REMOVED: new nodes are built from schema `default` values
+  // `defaults` is REMOVED: initial values come from schema `default`s, applied explicitly by applyDefaults() at creation
 }
 ```
 
@@ -91,7 +108,8 @@ interface NodeDefinition {
 - **Strings:** `minLength` and `maxLength` count **Unicode code points**, not UTF-16 units. The TypeScript validator must use `[...value].length`; `'😀'.length` is `2` in JavaScript but `len('😀')` is `1` in Python (checked on this machine).
 - **Integers:** `integer` accepts any JSON number with no fractional part (`1.0` is an integer). Values must be safe integers (see H5).
 - **Objects:** every catalog schema sets `additionalProperties: false` explicitly, which preserves today's "unknown setting is an error" behaviour (the standard default would allow extras).
-- **Defaults:** `default` is the single source for initial values. Every `required` property must have a `default` (kept from today's catalog test). Defaults must validate against their own schema (test).
+- **Defaults (revised by P1):** a property's `default` annotation is the single source of its initial value and **replaces `NodeDefinition.defaults`**. Defaults are applied **explicitly**: a pure `applyDefaults(schema)` function is called by node creation (`addNode`) and, where a migration introduces a new property, by that migration's own code. **Validators, the importer and the store never apply defaults implicitly**, so imported data is never silently altered. A nested object receives an initial value only from an explicit `default` on that property (no recursive synthesis). **A required property is not required to have a default**: without one it is simply absent on a new node. The six existing nodes keep exactly today's initial values by carrying them as explicit `default`s, and every `default` must validate against its own schema (test).
+- **Required properties and incomplete configs (consequence of P1; decision C1).** The editor must be able to hold and export incomplete drafts (D-017), and a new node can now lack a required value. Therefore **structural validation of a document does not reject an absent required config key**. `validateAgainstSchema` implements `required` completely but takes a `checkRequired` option: import (and later save) validation uses `checkRequired: false` (type, enum, range, length and unknown-key checks remain errors); the editor's completeness check uses `required` to raise `required-field-empty` warnings (absent or empty); execution in Phase 3 will use `checkRequired: true` and report errors. This only makes import more lenient: no file that imports today is rejected. Python and shared fixtures carry the same option.
 - **UI separation:** `multiline` becomes `ui.fields.<name>.widget = 'textarea'`. Nothing in `ui` is read by the validator; the importer ignores it.
 - **Config panel rendering in 1.1:** string, enum, number, integer and boolean get real controls. **Arrays and nested objects use the existing JSON editor** (validated against the schema). Rich array and nested-object editors are out of scope.
 
@@ -120,9 +138,10 @@ contracts/
     connection/*.json       { name, workflow, source, target, expect: null | "<code>" }
     config/*.json           { name, schemaOf: "llm.prompt", value, expect: [{code, path}] }
     migration/*.json        { name, input, expect: { valid, workflow, upgrades } }
-    serialization/*.json    { name, inputText, expectCompact, expectExport }
+    parsing/duplicates/*.json  { name, inputText, expect: { valid: false, errors: [{code, path}] } }   (duplicate keys, depth, encoding)
+    serialization/{numbers,unicode,keys,export}/*.json   { name, inputText | inputBytesBase64, expectCompact, expectExport } or { name, inputText, expect: { valid: false, errors: [{code, path}] } }
     warnings/*.json         { name, workflow, expect: [{code, nodeId, port?}] }   (TS only; backend does not lint in Phase 2)
-    secrets/*.json          { name, config, expect: { level: "block"|"warn"|"none", paths: [...] } }
+    secrets/*.json          { name, config, expect: { level: "high" | "medium" | "none", paths: [...] } }   (warnings only; never an error code)
 ```
 
 **Common expected outcomes (the shared contract between the two runners):**
@@ -135,16 +154,15 @@ contracts/
 
 | Namespace | Codes |
 |---|---|
-| `doc.*` | `not-json`, `not-object`, `too-large`, `unsupported-version`, `invalid-field` |
+| `doc.*` | `not-json`, `not-object`, `invalid-encoding`, `too-large`, `too-deep`, `duplicate-key`, `unsupported-version`, `invalid-field` |
 | `node.*` | `malformed`, `duplicate-id`, `unknown-type`, `version-newer`, `no-migration-path` |
 | `connection.*` | `unknown-node`, `unknown-port`, `self-loop`, `duplicate`, `input-occupied`, `type-mismatch`, `cycle` |
 | `edge.*` | `malformed`, `duplicate-id` |
 | `schema.*` | `type`, `enum`, `required`, `additionalProperties`, `minimum`, `maximum`, `minLength`, `maxLength`, `minItems`, `maxItems` |
 | `value.*` | `not-finite`, `unsafe-integer`, `invalid-unicode`, `nul-character` |
-| `secret.*` | `detected` |
 
 **Runners:**
-- **Phase 1.1 (TypeScript):** `frontend/src/contracts/fixtures.test.ts` loads every file with Node `fs` and runs it against the real functions. The initial corpus is converted from the existing unit tests (about 40 cases).
+- **Phase 1.1 (TypeScript):** `frontend/src/contracts/fixtures.test.ts` loads every file with Node `fs` and runs it against the real functions. The initial corpus is converted from the existing unit tests (about 40 cases); T4 adds the 120+ serialization and parsing fixtures of §3.5.
 - **Phase 2 (Python):** `backend/tests/test_fixtures.py` runs the same files (Phase 2 step 9).
 - **Limitation (honest):** until Phase 2, the Python side does not exist, so parity is **not yet proven**. Mitigation: fixtures are written in implementation-neutral terms, and §3.5 and §3.1 list the known JS-vs-Python differences explicitly so the Python port can be written against them.
 
@@ -211,48 +229,81 @@ const NODE_MIGRATIONS: NodeMigration[]                  // registry, ordered by 
 
 **Task T8 deliverables:** this specification promoted into a proper section of `docs/ARCHITECTURE.md` §6; the `branch` field on `PortDefinition`; Condition outputs marked; a catalog test (branch only on outputs; Condition has two); no engine code.
 
-### 3.5 H5 — Canonical serialization
+### 3.5 H5 — Canonical JSON (revised per PO decision P7)
 
-**Verified hazards on this machine (Node and Python run side by side):**
+The PO approved deterministic canonical serialization **subject to five revisions**, all applied here: (1) duplicate keys are rejected **during parsing**; (2) NUL rejection is an AgentForge/PostgreSQL rule, not an RFC 8785 rule; (3) the compact canonical form used for hashing is **separate** from the pretty deterministic export form; (4) the safe-integer limit is documented as **AgentForge policy**; (5) cross-language fixtures cover every numeric, Unicode and key-order edge case.
 
-| Case | JavaScript | Python `json` | Consequence |
+**Hazards verified on this machine** (Node 24.13 and Python 3.14.2 run side by side):
+
+| Case | JavaScript | Python | Consequence |
 |---|---|---|---|
-| Keys `"10"`, `"9"`, `"a"` | object order becomes `9, 10, a` (integer-like keys are always ordered first and numerically) | `sort_keys` gives `10, 9, a` | **Building a JS object cannot produce code-unit-sorted output.** The TS serializer must emit text directly, not via `JSON.stringify` on a rebuilt object. |
-| `1.0` | `1` | `1.0` | Number formatting must be defined. |
-| `-0` | `0` | `-0.0` | Same. |
-| `1e-7` | `1e-7` | `1e-07` | Exponent format differs. |
-| `1e21` | `1e+21` | `1e+21` | Threshold for exponent form differs (`1e16` in Python). |
-| `'😀'.length` | 2 | `len` = 1 | Length semantics (H1). |
-| lone surrogate `\ud800` | `JSON.stringify` writes `"\ud800"` | default `ensure_ascii=True` also escapes it; with `ensure_ascii=False`, encoding to UTF-8 raises `UnicodeEncodeError` | Behaviour depends on a flag, so it must be rejected up front. |
-| `NaN` literal | `JSON.parse` throws | `json.loads('NaN')` returns `nan` | Python must reject via `parse_constant`. |
-| integer `12345678901234567890123` | parses to `1.2345678901234568e+22` (precision silently lost) | parses to the exact integer | Why only **safe integers** (±(2^53 − 1)) are allowed. |
-| duplicate key `{"a":1,"a":2}` | last wins (`{"a":2}`) | last wins | Same behaviour today; still treated as undefined (rule 7). |
+| Object with keys `"10"`, `"9"`, `"a"` | key order becomes `9, 10, a` (integer-like keys always first, numerically) | `sort_keys` gives `10, 9, a` | A JS serializer cannot rebuild an object and expect sorted output; **it must write text directly**. |
+| Keys U+E000 and U+1F600 (😀) | UTF-16 code unit order puts 😀 **first** | code point order puts U+E000 **first** | Sort by **UTF-16 code units** (RFC 8785); Python uses `key=lambda k: k.encode('utf-16-be')` (checked: gives the JS order). |
+| `1.0`, `-0` | `1`, `0` | `1.0`, `-0.0` | Number text must be defined. |
+| `0.00001`, `0.000001`, `1e-7` | `0.00001`, `0.000001`, `1e-7` | `1e-05`, `1e-06`, `1e-07` | Exponent threshold and exponent padding differ. Python needs its own formatter. |
+| `1e21`, `1e22`, largest double | `1e+21`, `1e+22`, `1.7976931348623157e+308` (all integral) | same text | Rejected by the safe-integer policy, so large-exponent text is never produced. |
+| `9007199254740993` | parses to `9007199254740992` (precision lost) | exact integer | The policy check catches both. |
+| `1e400` | parses to `Infinity` | `inf` | Rejected (`value.not-finite`). |
+| `'😀'.length` | 2 | `len` is 1 | String length is counted in code points (H1). |
+| Lone surrogate `\ud800` | `JSON.stringify` escapes it | `ensure_ascii=False` then UTF-8 encoding raises `UnicodeEncodeError` | Rejected up front. |
+| `NaN` literal | `JSON.parse` throws | `json.loads` accepts it | Rejected. |
+| Duplicate keys `{"a":1,"a":2}` | last one wins, silently | last one wins, silently | **Rejected during parsing** (revision 1). |
 
-(All rows above were run on this machine with Node 24.13 and Python 3.14.2. The PostgreSQL facts below come from its documentation and were **not** verified here, because PostgreSQL is not installed; Phase 2 step 6 must confirm them.)
+**Rules and where each one comes from** (revisions 2 and 4: AgentForge rules are labelled as such and are not attributed to RFC 8785):
 
-**PostgreSQL `jsonb` facts:** key order is **not** preserved; duplicate keys collapse (last wins); numbers are stored as `numeric`, so `1.0` stays `1.0` and `1e2` becomes `100`; the string `\u0000` is **not storable**; arrays keep their order. So the database text can never be the canonical form, and **canonicalization must run on read**, not on trust.
+| # | Rule | Source |
+|---|---|---|
+| 1 | Object keys sorted recursively by UTF-16 code unit order | RFC 8785 (JCS) |
+| 2 | Array order preserved exactly (`nodes`, `edges`, `enum`; edge order matters for `multiple` inputs) | JSON semantics; RFC 8785 |
+| 3 | Numbers written with the ECMAScript number-to-string algorithm (shortest round-trip digits; `-0` writes `0`) | RFC 8785 |
+| 4 | Strings escape only `"`, `\`, `\b \t \n \f \r`, and other C0 controls as lowercase `\u00xx`. `/`, non-ASCII and U+007F stay literal; UTF-8 output | RFC 8785 |
+| 5 | Object member names must be unique | I-JSON (RFC 7493), which JCS requires of its input. **AgentForge enforces it at parse time** (`doc.duplicate-key`) |
+| 6 | Strings must be valid Unicode: no lone surrogates | I-JSON / JCS. Enforced as `value.invalid-unicode` |
+| 7 | Numbers must be finite doubles | I-JSON. Enforced as `value.not-finite` |
+| 8 | **Integers must be safe integers: -(2^53 - 1) to 2^53 - 1.** Because every double of magnitude 2^53 or more is an integer, this also bounds all numbers to that magnitude | **AgentForge policy** (not an RFC 8785 rule): keeps TypeScript and Python in exact agreement and avoids silent precision loss. Code `value.unsafe-integer` |
+| 9 | **Strings, keys and escapes must not contain U+0000** | **AgentForge / PostgreSQL `jsonb` compatibility rule** (PostgreSQL cannot store `\u0000`); **not** an RFC 8785 requirement. Code `value.nul-character` |
+| 10 | Maximum nesting depth 64 | AgentForge policy (stack safety, and Python and JavaScript recursion limits differ). Code `doc.too-deep` |
+| 11 | Maximum document size 5,000,000 characters | AgentForge policy (exists today). Code `doc.too-large` |
+| 12 | A UTF-8 byte order mark is tolerated and stripped on input and never written; invalid UTF-8 is rejected | AgentForge policy. Code `doc.invalid-encoding` |
+| 13 | No Unicode normalization: strings and keys are preserved exactly, so `é` and `e` + U+0301 are different | AgentForge policy |
 
-**Proposed profile `canonical-json/1`** (a pinned subset of **RFC 8785 JCS**, which defines the same rules for sorting, number text and string escapes, restricted to I-JSON):
+**Strict parsing (revision 1).** Untrusted text is parsed by `workflow/strictJson.ts`, a small RFC 8259 parser, **not** `JSON.parse` (which silently keeps the last duplicate). It rejects: duplicate keys (compared **after** escape decoding, so `"a"` and `"a"` collide) with the JSON Pointer of the second occurrence; depth over 64; `NaN`/`Infinity` tokens, leading zeros, `+1`, `.5`, `1.`, trailing commas and trailing garbage; invalid escapes and raw control characters in strings; lone surrogates; U+0000; numbers that overflow to infinity; and unsafe integers. Objects are built with `Object.defineProperty`, so a key named `__proto__` is an ordinary own property and cannot change a prototype. **Python (Phase 2)** does the same with `json.loads(..., object_pairs_hook=<reject duplicates>, parse_constant=<reject>)` plus an iterative walk for depth, surrogates, NUL and number range. The importer (and the API) use the strict parser only.
 
-1. **Objects:** keys sorted at **every level** by **UTF-16 code unit order** (JCS). Python sorts with `key=lambda k: k.encode('utf-16-be')` to match JavaScript.
-2. **Arrays:** order preserved exactly (`nodes`, `edges`, `enum`, and edge order for `multiple` inputs all carry meaning).
-3. **Numbers:** the ECMAScript number-to-string rules. Integral values print without a fraction or exponent below `1e21`; `-0` prints `0`; shortest round-trip digits. Python reuses `repr` for the digits and reformats to the ES layout (or uses an RFC 8785 library; decided in Phase 2).
-4. **Safe integers only:** integers must lie within ±(2^53 − 1). Larger values are rejected (`value.unsafe-integer`). Non-finite values are rejected (`value.not-finite`).
-5. **Strings:** JCS escapes only: `\"`, `\\`, `\b \t \n \f \r`, other C0 controls as `\u00xx` (lowercase hex). No escaping of `/`, no `\u` for non-ASCII, UTF-8 output, **no Unicode normalization**.
-6. **Rejected strings:** containing U+0000 (`value.nul-character`; PostgreSQL cannot store it) or a lone surrogate (`value.invalid-unicode`).
-7. **Duplicate keys:** both runtimes keep the last value. Treated as undefined behaviour and listed in the README; a custom duplicate-key parser is out of scope.
-8. **Two layouts, one ordering:** the **compact** form (no whitespace) is used for hashing, ETags and comparison. The **export** form is the same ordering and number and string rules, with 2-space indentation and a trailing newline, used for downloaded files.
-9. **Implementation (TS):** `workflow/canonicalJson.ts` walks the parsed value and writes text directly (this avoids the integer-key and `__proto__` problems of building objects). `serializeWorkflow` becomes `exportForm(workflow)`.
-10. **Implementation (Python, Phase 2):** equivalent module; the shared `fixtures/serialization/` files are the proof. The content hash (`sha256` of the compact form) is the identity used for no-op saves (Phase 2 step 8).
+**Two named profiles, one ordering (revision 3).**
 
-**Effects:**
-- Export bytes change **once**: `description, edges, id, metadata, name, nodes, schemaVersion` become alphabetical, and `config` and `metadata` keys are now sorted. Files exported by Phase 1 import fine and re-export in the new order.
-- It resolves review concern H5 (JSONB reorders keys): the server can store JSONB, and export always re-canonicalizes.
-- Readability trade-off: `schemaVersion` is no longer the first key. Accepted by the PO's requirement ("recursively sorted keys").
+- **`canonical-json/1` (compact):** no whitespace at all; rules 1 to 4 above. The **only** form used for hashing, ETags, equality and no-op detection. Never shown to users and never written to a file.
+- **`export-json/1` (pretty, deterministic):** the same key ordering, number text and string escapes, laid out for people: 2-space indentation; `": "` after a key; one array element or member per line; empty containers written inline as `[]` and `{}`; LF line endings on every platform; exactly one trailing LF; no trailing spaces. The **only** form written to downloaded files. It is **never** hashed.
+- **Guarantees (tested in both languages):** `export(parse(export(x))) == export(x)`, and `canonical(parse(export(x))) == canonical(x)`.
+- **Numbers.** TypeScript uses `String(value)` after the range check, because JavaScript already implements the ECMAScript algorithm. Python reuses the digits of `repr(float)` and re-lays them out in the ECMAScript form (decimal notation for magnitudes from `1e-6` up, exponent form below, e.g. `1e-7`, with no zero padding), or an RFC 8785 library; the choice is made in Phase 2.
+- **Content hash (Phase 2):** SHA-256 of the **compact** UTF-8 bytes.
+
+**PostgreSQL `jsonb` (documentation only; not verified here because PostgreSQL is not installed; Phase 2 step 6 must confirm):** key order is not preserved; duplicate keys collapse; numbers are stored as `numeric` (`1.0` stays `1.0`, `1e2` becomes `100`); `\u0000` is not storable; arrays keep their order. So database text is never the canonical form, and **canonicalization runs on read**.
+
+**Cross-language fixtures (revision 5).** Every case is a shared JSON file in `contracts/fixtures/` (`inputText` keeps the raw text, because parsing a fixture would already lose `1.0`, `-0`, key order and duplicates; invalid byte sequences use `inputBytesBase64`). Each case states either `expectCompact` and `expectExport` strings, or the rejection `{code, path}`. Both runners compare **exact strings**. At least **120 fixtures**, in these families:
+
+| Family | Cases that must exist |
+|---|---|
+| **Numbers, accepted** | `0`, `-0` (writes `0`), `1`, `1.0`, `1e2`, `1E2`, `1e+2`, `0.1e1`, `0.1`, `100.5`, `0.30000000000000004`, `4.35`, `0.00001`, `0.000001`, `0.0000001` (writes `1e-7`), `1.5e-7`, `123e-20` (writes `1.23e-18`), `2.5e-5` (writes `0.000025`), `5e-324`, `9007199254740991`, `-9007199254740991`, `9007199254740991.0` |
+| **Numbers, rejected** | `9007199254740992`, `9007199254740993`, `-9007199254740992`, `9007199254740992.0`, `1e21`, `1e22`, `1.7976931348623157e308` (all `value.unsafe-integer`); `1e400`, `-1e400` (`value.not-finite`) |
+| **Number syntax, invalid** | `NaN`, `Infinity`, `-Infinity`, `01`, `+1`, `.5`, `1.`, `1e`, `0x10`, `--1` (`doc.not-json`) |
+| **Unicode, accepted** | literal `é`; `é` and `é` (both write literal `é`); `e` + U+0301 kept distinct from `é` in a key and in a value; literal 😀; surrogate-pair escape `😀` (writes literal 😀); U+2028 and U+2029 literal; U+007F literal; U+FEFF inside a string; U+FFFF; `\b \t \n \f \r` short forms; `\u0001` and `\u001f` (write lowercase hex); `\/` (writes `/`); `\"` and `\\`; UTF-8 BOM before the document (tolerated) |
+| **Unicode, rejected** | `\u0000` (`value.nul-character`); lone `\ud800`; lone `\udc00`; reversed pair `\udc00\ud800` (`value.invalid-unicode`); invalid UTF-8 bytes and an overlong sequence (`doc.invalid-encoding`); raw control character inside a string (`doc.not-json`) |
+| **Key order** | integer-like keys `10`, `9`, `1`, `01`, `-1`, `1.5`; `B` before `a`; prefixes `a`, `ab`, `b`; the empty key first; `é` after `z`; **U+E000 versus U+1F600** (UTF-16 versus code point order); keys written with escapes sorted after decoding; nested objects sorted recursively; objects inside arrays sorted internally while array order is kept; keys `__proto__`, `constructor`, `toString`, `hasOwnProperty`; keys containing quotes, backslashes and spaces; NFC and NFD forms of the same letter as two distinct keys |
+| **Duplicate keys (rejected, `doc.duplicate-key`)** | top level; nested object; object inside an array; duplicate differing only by escape (`"a"` and `"a"`); duplicate `__proto__`; three occurrences; different value types. **Not** duplicates: the same key in sibling objects; keys differing only by case |
+| **Limits** | depth 64 accepted and depth 65 rejected (`doc.too-deep`) for both arrays and objects; empty object and empty array; size at and over the limit (generated in the test, not stored) |
+| **Export layout** | `{}`, `[]`, nested empty containers, arrays of primitives one per line, deep indentation, one trailing LF, no CRLF, no trailing spaces; both guarantees above |
+| **Workflow round trips** | at least 10 whole workflows covering all six node types, numeric edge cases in `config` and `position`, and non-ASCII labels |
+
+**Effects.**
+- Export bytes change **once**: `description, edges, id, metadata, name, nodes, schemaVersion` become alphabetical (`schemaVersion` moves to the end) and `config` and `metadata` keys are sorted. Phase 1 exports still import and re-export in the new order. No `schemaVersion` bump.
+- Concern H5 (JSONB reorders keys) is resolved: the server may store JSONB; export always re-canonicalizes.
+- Files with duplicate keys, unsafe integers, NUL, lone surrogates or nesting over 64 levels are now rejected with a clear code. The editor cannot produce any of them.
+
+**Implementation.** TypeScript: `workflow/strictJson.ts`, `workflow/canonicalJson.ts` (functions `canonicalCompact` and `exportPretty`; `serializeWorkflow` becomes `exportPretty`). Python (Phase 2): equivalents, proven by the same fixtures. The Python side does not exist yet, so parity is **not proven until Phase 2**; the verified hazards above are its checklist.
 
 ### 3.6 Q6 — Editor warnings, aware of categories and port direction
 
-**Separation (D-018):** warnings come from a new pure function `lintWorkflow(workflow, catalog)` in `workflow/lint.ts`, with their own type. `validateWorkflow` stays errors-only. Warnings are **derived**, never stored in the document, never block import, export (except the security gate, §3.7) or editing.
+**Separation (D-018):** warnings come from a new pure function `lintWorkflow(workflow, catalog)` in `workflow/lint.ts`, with their own type. `validateWorkflow` stays errors-only. Warnings are **derived**, never stored in the document, never block import, export or editing. The only related safeguard is the explicit export confirmation for high-confidence secret matches (§3.7), which is a prompt the user can accept, not a block.
 
 ```ts
 interface Warning { code: string; severity: 'warning'; nodeId?: string; port?: string; message: string }
@@ -263,39 +314,55 @@ interface Warning { code: string; severity: 'warning'; nodeId?: string; port?: s
 | Code | Applies to | Condition |
 |---|---|---|
 | `required-input-unconnected` | **input** ports with `required: true`, any category | no incoming edge on that port |
-| `required-field-empty` | node config | a property in `configSchema.required` whose value is an empty or whitespace-only string, or an empty array |
+| `required-field-empty` | node config | a property in `configSchema.required` that is **absent**, an empty or whitespace-only string, or an empty array (see C1: absence is a warning, not a structural error) |
 | `trigger-not-connected` | category `Triggers` | the node has outputs and none has an outgoing edge |
 | `node-unreachable` | all categories **except** `Triggers` | not reachable from any Trigger. Evaluated only when the graph has at least one Trigger. Suppressed when the node already has `required-input-unconnected` and no incoming edge at all (avoids two warnings for the same cause) |
 | `result-unused` | all categories **except** `Output` and `Triggers` | the node has outputs and **no output port** has an outgoing edge. For nodes with `branch` ports (Condition), warn only when none of the branch ports is connected, because using one branch is legitimate |
-| `secret-suspected` | config values | medium-confidence secret heuristics (§3.7) |
+| `secret-likely` | config values and keys | **high-confidence** secret match (§3.7). Rendered prominently and triggers the export confirmation |
+| `secret-suspected` | config values and keys | **medium-confidence** secret match (§3.7). Warning only |
 
 **Optional extras (default off; PO to decide):** `no-trigger` and `no-output` for a non-empty graph with none of that category; `branch-unconnected` when only one branch of a Condition is wired.
 
-**Not-blocking guarantees (tested):** warnings never disable a button, never open a modal, never steal focus, never prevent drag, connect, edit, import, or export. The count updates silently.
+**Not-blocking guarantees (tested):** warnings never disable a button, never open a modal, never steal focus, never prevent drag, connect, edit, import, or export. (A high-confidence secret match adds an explicit confirmation step to export, §3.7; the user can always confirm.) The count updates silently.
 
 **UI:** a warning badge on the node (with an accessible label), a count in the toolbar with a list (clicking an entry selects that node), and a "Warnings for this node" section in the config panel. New nodes warn immediately (an empty prompt, for example), which is intended and visually subdued.
 
 **Cost:** one pass over nodes and edges plus a graph traversal, memoized on the workflow, fine at editor scale.
 
-### 3.7 HTTP header credential exposure and credentials outside workflow JSON
+### 3.7 Secret detection, warnings and export confirmation (revised per PO decision S1)
 
-**Review finding.** `http.request.config.headers` is a free-form JSON object, so a user can paste `Authorization: Bearer ...` or `X-API-Key: ...`, which then lands in the exported file and, from Phase 2, in the database. The same applies to any free-text config field (`payload`, `body`, prompts) and to `metadata`. Today only a description says "Do not put secrets here". This conflicts with D-016.
+**Review finding (unchanged).** `http.request.config.headers` is free-form JSON, so a user can paste `Authorization: Bearer ...` or `X-API-Key: ...`, which then lands in an exported file and, from Phase 2, in a database. The same applies to any free-text config (`payload`, `body`, prompts) and to `metadata`. Today only a description says "Do not put secrets here". This conflicts with D-016 (credentials never in workflow JSON).
 
-**Proposed layered control:**
-1. **Detector** (`workflow/secrets.ts`, one module, shared fixtures `secrets/*.json`): scans **every string and key in every node `config`** and `metadata`, recursively.
-   - **High confidence (block):** header names `authorization`, `proxy-authorization`, `cookie`, `x-api-key`, `api-key`, `x-auth-token`, `x-access-token` with a non-empty literal value; and well-known credential shapes in any string: `sk-...`, `sk-ant-...`, `gsk_...`, `ghp_...`/`github_pat_...`, `AKIA...`, `xox[baprs]-...`, JWT-like `eyJ...`.`...`.`...`, `-----BEGIN ... PRIVATE KEY-----`, `Bearer <long token>`.
-   - **Medium confidence (warn):** object keys containing `secret`, `password`, `passwd`, `token`, `apikey`, `api_key` with a non-empty string value.
-2. **Warning:** medium confidence gives the `secret-suspected` warning; high confidence also shows it, plus a persistent notice on the node.
-3. **Security gate:** **high-confidence matches block export** (and, in Phase 2, save; the backend runs the same detector and returns 422 with `secret.detected`). The message names the node and property but never echoes the value. **No override** is proposed. This is a security control, not a structural warning, so it does not conflict with D-018 or with "warnings never block editing": editing, saving drafts in the browser and everything else remain possible. *(PO decision S1.)*
-4. **Config-panel hint** on `headers`: "Do not enter credentials. Use a credential reference when credentials are supported." The reserved shape for credential references (`credentialRef`) is **not** added in 1.1; it needs the backend credential store (Phase 4 and 7). Until then the guard is the only protection.
-5. **Phase 2 and later:** server-side detection on save; redaction of the same patterns in logs, node-run records and events; secrets never sent to LLMs (ARCHITECTURE §11).
+**What the PO decided.** The detector and its warning system are approved. **Unconditional export blocking without an override is not approved.** Instead: high-confidence matches show a **prominent warning**; the secret value is **never echoed**; the user must **explicitly confirm before exporting**; the UI **explains how to replace the value with a credential reference**; and **backend credential-storage enforcement is kept separate** from this local export experience.
 
-**Known limits (documented, tested):** heuristics have false positives (a literal example token in a prompt) and false negatives (an unfamiliar key format, an obfuscated value). They reduce accidents; they are not a guarantee, and the real fix is credential references.
+**Detector (`workflow/secrets.ts`, one module, shared fixtures `secrets/*.json`).** It scans **every string value and every object key** in every node `config` and in `metadata`, recursively.
+- **High confidence:**
+  - header names `authorization`, `proxy-authorization`, `cookie`, `x-api-key`, `api-key`, `x-auth-token`, `x-access-token` whose value is a non-empty literal;
+  - well-known credential shapes in any string or key: `sk-...`, `sk-ant-...`, `gsk_...`, `ghp_...`, `github_pat_...`, `AKIA...`, `xox[baprs]-...`, JWT-like `eyJ...`.`...`.`...`, `-----BEGIN ... PRIVATE KEY-----`, `Bearer <long token>`.
+- **Medium confidence:** object keys containing `secret`, `password`, `passwd`, `token`, `apikey` or `api_key` with a non-empty string value.
+- **Honest limits:** heuristics produce false positives (an example token in a prompt) and false negatives (an unfamiliar format, an obfuscated value). They reduce accidents; they are not a guarantee. The real fix is credential references.
+
+**Behaviour in the editor.**
+1. **Medium confidence:** the `secret-suspected` warning only (node badge, count, list). No confirmation.
+2. **High confidence:** the `secret-likely` warning, shown **prominently**: a distinct badge on the node, a persistent indicator in the toolbar ("Possible credential in this workflow"), and a notice in the config panel for that node.
+3. **Export:** if any high-confidence match exists, **every export attempt** opens a confirmation dialog before a file is created. The dialog:
+   - states that anyone who obtains the file can use the credential, and that the file may be shared, committed or stored;
+   - lists the affected **nodes and property paths** only; never a value, and never a key that itself looks like a secret (shown as `‹redacted key›`);
+   - explains the replacement path: *remove the value from the workflow. Credential references (an opaque `credentialRef` pointing to a credential stored by the AgentForge backend) **are not available yet**; they arrive with backend credential management. Until then keep the secret out of the file and provide it where the workflow runs. When references exist, replace the value with one.* (The dialog says plainly that references do not exist yet. Nothing in Phase 1.1 pretends otherwise.);
+   - offers **Cancel** (default focus) and **Export anyway**; `Esc` cancels; focus is trapped inside and returns to the Export button; there is **no "don't ask again"**, and confirmation is not remembered between exports.
+4. **Import:** a file containing a high-confidence match imports normally and shows the same prominent warning. Import is never blocked.
+5. **Nothing else is blocked.** Editing, dragging, connecting, saving a draft in the browser and every other action work as usual.
+
+**Never echo (tested).** The raw value, any substring of it, a hash of it, and any secret-shaped key must not appear in: the dialog, warning text, the toolbar indicator, `aria-label`s, the console, error panels, test output and logs. The config field in which the user typed it is the user's own input and is exempt. A Playwright test plants a sentinel secret and asserts that it appears nowhere in the page text outside that field, and in no console message.
+
+**How this fits the decisions.** Detection results are **warnings** from the lint function (D-018 keeps `validateWorkflow` errors-only; there is no new error code). The export confirmation is a user-experience safeguard, not a structural rule, and it does not conflict with "warnings never block editing" (D-017).
+
+**Backend enforcement is separate (Phase 2 and later, not decided here).** What the server does with credentials is its own decision: whether `save` should refuse or sanitize high-confidence matches, server-side redaction in logs, node-run records and events, `credentialRef` resolution inside executors, and never sending secrets to an LLM (ARCHITECTURE §11). It is tracked as decision **X10** in `docs/PHASE2_PLAN.md`. The detector and its fixtures are written so the backend can reuse them, but nothing about the backend is implied by the local export dialog. (My recommendation for X10: because the server **persists** what it receives, reject high-confidence matches on save with a clear 422 and no override. This is only a recommendation for the architect.)
 
 ### 3.8 Provider architecture (extensible)
 
 - **Phase 1.1:** one exported constant `PROVIDERS = ['groq', 'openai', 'anthropic', 'ollama']` is the only place providers are listed. The `provider` enums of `llm.prompt` and `agent.autonomous` are built from it, with a catalog test. Adding a provider is one line plus a test. This resolves L6 and implements D-014. `model` stays free text.
-- **Default provider:** remains `ollama` (local, no credential needed). *(Confirm with the PO.)*
+- **Default provider:** remains `ollama` (local, no credential needed). **(Approved, V1.)**
 - **Phase 2 / 4 path (not built now):** the backend owns a provider registry; each provider is an adapter behind `get_chat_model(provider, model, credential)` (D-015); the catalog's `provider` enum is **generated from registered adapters**, so adding a provider never changes the contract shape. Provider-specific settings (for example an Ollama base URL, which is not a secret) become optional settings declared by the provider, not new node types.
 
 ### 3.9 Playwright (approved) — reproducible local and CI testing
@@ -308,7 +375,7 @@ interface Warning { code: string; severity: 'warning'; nodeId?: string; port?: s
 
 **Tests:** the 49 of 52 browser checks selected in `PHASE1_REVIEW.md` §3.2, in 5 spec files plus a console-error fixture. These become the regression net that protects T4 to T7 (the changes that touch the editor and the contract), which is why Playwright is the **first** task.
 
-**CI:** `.github/workflows/ci.yml` on push and pull request to `main`: checkout, setup-node (Node 24, npm cache), `npm ci`, `tsc -b`, lint, Vitest, build, `playwright install --with-deps chromium`, `test:e2e`, upload `playwright-report/` on failure; `permissions: contents: read`; `concurrency` cancel-in-progress. Pin each action by commit SHA (verified from the action's release page at implementation time). The GitHub remote now exists, so CI can run on the first push of this task. The backend job is added in Phase 2.
+**CI:** `.github/workflows/ci.yml` on push and pull request to `main`: checkout, setup-node (Node 24, npm cache), `npm ci`, `tsc -b`, lint, Vitest, build, `playwright install --with-deps chromium`, `test:e2e`, upload `playwright-report/` on failure; `permissions: contents: read`; `concurrency` cancel-in-progress. Every action is pinned to a **verified commit SHA** (G1): at implementation time each SHA is resolved from the action repository's release tag with `git ls-remote --tags https://github.com/<owner>/<action> <tag>`, checked to be the commit the tag points to (dereferenced tag for annotated tags), and recorded in a trailing comment (`# v4.x.y`). A short note in `docs/DEVELOPMENT.md`-style form (in `frontend/README.md`) says how to re-verify when updating. The GitHub remote now exists, so CI can run on the first push of this task. The backend job is added in Phase 2.
 
 ---
 
@@ -320,7 +387,7 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
 - **Dependencies:** none. **Do this first.**
 - **Files:** `frontend/package.json` and `package-lock.json`, `frontend/playwright.config.ts`, `frontend/e2e/{fixtures,helpers}.ts`, `frontend/e2e/{library,canvas-editing,connections,config-panel,import-export}.e2e.ts`, `frontend/tsconfig.e2e.json` (or edit `tsconfig.node.json`), `frontend/README.md`, `.gitignore`, `.github/workflows/ci.yml`.
 - **Architecture change:** none (tests only).
-- **Acceptance:** `npm run verify` passes on a clean clone; 49 checks run as automated tests; a deliberately broken selector or behaviour makes a test fail (demonstrated once and recorded); CI runs green on GitHub.
+- **Acceptance:** `npm run verify` passes on a clean clone; 49 checks run as automated tests; a deliberately broken selector or behaviour makes a test fail (demonstrated once and recorded); CI runs green on GitHub with every action pinned to a verified commit SHA (G1).
 - **Tests:** the e2e suite itself, plus all existing 48 unit tests unchanged.
 
 ### T2 — Structured validation errors (S)
@@ -336,22 +403,27 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
 - **Acceptance:** at least 40 cases across `workflow`, `connection`, `config`, `catalog`; the runner fails if a fixture file is malformed; the README documents the format and the multiset rule.
 - **Tests:** the runner is the test; a mutation check (change one rule, a fixture fails) is recorded.
 
-### T4 — Canonical JSON (H5) (M)
+### T4 — Strict parsing, canonical JSON and export JSON (H5, revised P7) (L)
 - **Dependencies:** T3.
-- **Files:** `workflow/canonicalJson.ts` (+ test), `workflow/serialize.ts`, `workflow/validate.ts` (new `value.*` rules), `contracts/CANONICAL_JSON.md`, `contracts/fixtures/serialization/*`, e2e import/export expectations.
-- **Acceptance:** recursive sorted keys; numeric-like keys, `1.0`, `-0`, `1e-7`, `1e21`, surrogate pairs, NUL and lone surrogates all behave as specified; export, import, export is byte-identical; a Phase 1 export still imports; unsafe integers and invalid strings are rejected with codes.
-- **Tests:** about 20 serialization fixtures; property-style round trip over generated documents; updated Playwright import/export checks.
+- **Files:** `workflow/strictJson.ts` and test, `workflow/canonicalJson.ts` and test, `workflow/serialize.ts` (strict parse in, `exportPretty` out), `workflow/validate.ts` (value rules), `contracts/CANONICAL_JSON.md`, `contracts/fixtures/{parsing,serialization}/**` (120+ fixtures), Playwright import/export expectations.
+- **Acceptance:**
+  - Duplicate object keys are rejected **during parsing** with `doc.duplicate-key` and the JSON Pointer of the second occurrence, including duplicates that differ only by escape.
+  - Every rule in the §3.5 table is enforced with its stated code, and the AgentForge-policy rules (safe integers, NUL, depth, size, BOM) are documented as policy in `CANONICAL_JSON.md`, never attributed to RFC 8785.
+  - The compact profile (`canonical-json/1`) and the export profile (`export-json/1`) behave exactly as specified; export is never used for hashing.
+  - All 120+ fixtures pass, including the U+E000 versus U+1F600 key-order case and the `1e-5`, `1e-6`, `1e-7` number cases.
+  - `export(parse(export(x))) == export(x)` and `canonical(parse(export(x))) == canonical(x)`; a Phase 1 export still imports; `JSON.parse` is no longer used on untrusted import text (a test greps for it).
+- **Tests:** the fixture runner; a property-style round trip over generated documents; a mutation check (change one rule and a fixture must fail); a lightweight truncation fuzz (a truncated file always produces a structured error, never an exception); updated Playwright import/export checks.
 
 ### T5 — JSON Schema subset, UI separation, providers (H1) (L)
 - **Dependencies:** T2, T3.
 - **Files:** `workflow/types.ts`, `workflow/configSchema.ts` (generalized validator), `catalog/nodes.ts` (all six definitions converted; `PROVIDERS` constant with `groq`; `defaults` removed), `catalog/index.ts`, `store/editorStore.ts` (defaults from schema), `config-panel/ConfigPanel.tsx` (render from schema + `ui`; JSON editor for arrays and nested objects), `contracts/CONFIG_SCHEMA.md`, `contracts/fixtures/config/*`, `contracts/fixtures/catalog/builtin.catalog.json`, tests.
-- **Acceptance:** the validator supports every keyword in §3.1 including `integer`, `array`/`items`, nested objects, `default`, `required`, `additionalProperties`; `multiline` no longer exists in `configSchema`; accepted configs for all existing nodes are unchanged (except the planned `maxIterations` change in T6); catalog tests (unique ports, defaults valid and complete for `required`, enums derived from `PROVIDERS`) pass; the config panel behaves as before for existing nodes.
-- **Tests:** config fixtures (types, ranges, code-point length with emoji, nested and array cases, unknown keys); catalog consistency tests; Playwright config-panel checks.
+- **Acceptance:** the validator supports every keyword in §3.1 including `integer`, `array`/`items`, nested objects, `default`, `required`, `additionalProperties`; `multiline` no longer exists in `configSchema`; accepted configs for all existing nodes are unchanged (except the planned `maxIterations` change in T6); catalog tests (unique ports, schema defaults valid against their own schemas, applied only by the explicit `applyDefaults` at creation (no requirement that required properties have defaults, see C1), enums derived from `PROVIDERS`) pass; the config panel behaves as before for existing nodes.
+- **Tests:** config fixtures (types, ranges, code-point length with emoji, nested and array cases, unknown keys, `checkRequired` on and off cases (C1)); catalog consistency tests (unique ports, defaults valid against their schemas, enums derived from `PROVIDERS`); Playwright config-panel checks.
 
 ### T6 — Node migrations and the first real migration (H3) (M)
 - **Dependencies:** T5.
 - **Files:** `workflow/nodeMigrations.ts`, `workflow/migrate.ts` (pipeline), `workflow/serialize.ts` (`importWorkflow` returns upgrades), `catalog/nodes.ts` (`agent.autonomous` to version 2), `store/editorStore.ts` (upgrade report), `app/Toolbar.tsx` or a small `UpgradeBanner`, `contracts/fixtures/migration/*`.
-- **Acceptance:** a v1 agent workflow with `maxIterations: 2.5` imports as v2 with `3`, a visible banner and a note; the original file is byte-unchanged; newer-than-known and gap cases are rejected with `node.version-newer` and `node.no-migration-path` and leave the open workflow untouched; every migration result validates against the new schema.
+- **Acceptance:** a v1 agent workflow with `maxIterations: 2.5` imports as v2 with `3`, a visible banner and a note; the original file is byte-unchanged; newer-than-known and gap cases are rejected with `node.version-newer` and `node.no-migration-path` and leave the open workflow untouched; every migration result validates against the new schema. A migration that introduces a property sets it by calling `applyDefaults` explicitly.
 - **Tests:** migration fixtures; round trip after migration; Playwright check for the banner; test that the importer never writes.
 
 ### T7 — Editor warnings (Q6, D-017, D-018) (M)
@@ -366,11 +438,17 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
 - **Acceptance:** the specification is merged into ARCHITECTURE; `branch` exists only on output ports; documents are unaffected; the architect signs off the semantics.
 - **Tests:** catalog test; no engine code.
 
-### T9 — Secret guard (S/M)
+### T9 — Secret detection, warnings and export confirmation (S/M)
 - **Dependencies:** T2, T3, T7.
-- **Files:** `workflow/secrets.ts`, tests, `contracts/fixtures/secrets/*`, export path in `app/Toolbar.tsx`, `config-panel/ConfigPanel.tsx` (hint), e2e spec.
-- **Acceptance:** high-confidence values block export with a message that never prints the value; medium-confidence values warn; examples from §3.7 behave as stated; false-positive and false-negative cases are documented as fixtures.
-- **Tests:** secrets fixtures; Playwright: pasting an `Authorization` header blocks export, removing it unblocks.
+- **Files:** `workflow/secrets.ts` and test, `contracts/fixtures/secrets/*`, `workflow/lint.ts` (adds `secret-likely` and `secret-suspected`), `app/Toolbar.tsx` (export flow and indicator), `app/ConfirmDialog.tsx` (small accessible dialog), `config-panel/ConfigPanel.tsx` (hint and node notice), Playwright spec.
+- **Acceptance:**
+  - High-confidence matches show a prominent warning (node badge, toolbar indicator, panel notice) and **every export opens the confirmation dialog**; Cancel is the default focus, `Esc` cancels, focus is trapped and returns to the Export button; there is no "don't ask again".
+  - Cancel creates no file; **Export anyway** creates the file.
+  - Medium-confidence matches only warn. Importing a file with a high-confidence match succeeds and warns.
+  - The dialog explains that credential references are **not available yet** and how to replace the value when they are; it lists nodes and property paths only.
+  - A planted sentinel secret (and a secret-shaped key) appears nowhere in dialog text, warning text, toolbar, `aria-label`s or console output.
+  - False-positive and false-negative examples are fixtures, documenting the heuristic's limits.
+- **Tests:** secrets fixtures (positives, negatives, edge cases); unit tests for the detector and the redacted paths; Playwright: paste an `Authorization` header, see the badge and indicator, export, see the dialog, Cancel gives no download, Export anyway downloads, sentinel absent from the page text outside the editing field and from the console; keyboard-only operation of the dialog.
 
 ### T10 — Documentation, decision records and acceptance report (S)
 - **Dependencies:** T1 to T9.
@@ -400,27 +478,41 @@ T8 is documentation plus a tiny catalog change and can run any time before T7. T
 | R5 | **Export bytes change once** (H5) | Documented; old files still import; no `schemaVersion` bump |
 | R6 | **Stricter value rules** (safe integers, NUL, lone surrogates) | The editor cannot produce them; clear error codes |
 | R7 | **`defaults` removal** changes the catalog contract | No external consumer yet; D-013 review covers it; Phase 2 models are written after this |
-| R8 | **Secret detection is heuristic** | Block only high-confidence; document limits; real fix is credential references |
+| R8 | **Secret detection is heuristic** | Confirmation only for high-confidence matches; medium confidence only warns; document limits; the real fix is credential references |
 | R9 | **Warnings noise** on fresh nodes | Subdued styling, separate list, rules are category and direction aware; optional extras default off |
 | R10 | **Playwright flakiness** on drag and connect | Fixed viewport, reduced motion, helpers that use handle geometry, one retry in CI with traces |
 | R11 | **Arrays and nested objects edited as JSON** in the panel | Accepted for 1.1; richer editors later when a node needs them |
 | R12 | **Node v2 for `maxIterations`** adds migration machinery for a tiny change | It is the deliberate first user of H3; without it the mechanism would ship untested |
 
-## 6. Decisions requested from the PO / architect
+| R13 | **Own strict JSON parser** (revision 1) is security-relevant code we must get right | Small RFC 8259 grammar, 120+ fixtures, truncation fuzz, no `JSON.parse` on untrusted text; Python parity proven in Phase 2 |
+| R14 | **Export confirmation fatigue** (revised S1): users may click through without reading | Dialog only for high-confidence matches; Cancel is the default; the text states the concrete risk; detection precision is tracked via fixtures |
+| R15 | **Required keys no longer structurally required** (C1) means an incomplete file can import | Completeness is surfaced as warnings in the editor and as errors at execution (Phase 3); no file that imports today is rejected |
+| R16 | **Hand-written number formatting in Python** (Phase 2) | Fixtures for every numeric edge case, including the verified `1e-5`/`1e-6`/`1e-7` differences; alternative is an RFC 8785 library |
+| R17 | **Actions pinned to SHAs** need manual updates | Documented re-verification procedure; optional Dependabot for actions can be proposed later |
+
+## 6. Decisions
+
+### 6.1 Decided by the PO (2026-11-03, Session 5)
+
+See §1.1. Approved: P1 (revised), P2, P3, P4, P5, P6, P7 (subject to revisions, applied), W1, V1, G1 and the toolchain. S1 was revised as the PO required. Recorded in `docs/DECISIONS.md` as D-017 (amended), D-019 (amended), D-022, D-023 (revised) and D-024.
+
+### 6.2 Still requested (small; each has a recommendation)
 
 | # | Decision | Recommendation |
 |---|---|---|
-| P1 | Remove `NodeDefinition.defaults` in favour of schema `default` (H1) | Yes |
-| P2 | Own subset validator, no Ajv (H1) | Yes |
-| P3 | `agent.autonomous` v2 with `integer` `maxIterations` as the first migration (H1, H3) | Yes |
-| P4 | Arrays and nested objects use the JSON editor in 1.1 | Yes |
-| P5 | Import always upgrades to the latest node version with a visible report; never writes back (H3) | Yes |
-| P6 | Add `PortDefinition.branch` and adopt the §3.4 semantics, including "any active" join for `multiple` (H4) | Yes |
-| P7 | Adopt `canonical-json/1` (JCS subset); accept the one-time export byte change; no `schemaVersion` bump (H5) | Yes |
-| S1 | Block export on high-confidence secrets with no override; warn on medium confidence | Yes |
-| W1 | Include the optional warning extras (`no-trigger`, `no-output`, `branch-unconnected`)? | No (off) |
-| V1 | Keep `ollama` as the default provider | Yes |
-| G1 | CI now that the GitHub remote exists; pin actions by SHA | Yes |
+| C1 | Because a required property no longer needs a default (P1 revision), **an absent required config key is a completeness warning, not a structural import error**, and execution (Phase 3) is where it becomes an error | Yes |
+| C2 | Policy values: maximum nesting depth **64**, maximum document size **5,000,000 characters** (rules 10 and 11 of §3.5) | Yes |
+| C3 | Export confirmation behaviour: shown on **every** export that has a high-confidence match, **Cancel is the default**, no "don't ask again" (§3.7) | Yes |
+| C4 | Backend secret handling stays a **separate Phase 2 decision (X10)**; the local export dialog implies nothing about it | Yes |
+| C5 | CI action pinning procedure: resolve each commit SHA from the release tag with `git ls-remote --tags`, check it, and record the tag in a comment (§3.9) | Yes |
+
+### 6.3 Implementation scope requested for final approval
+
+Approve **T1 to T10**, executed in this order, **one task per commit**, with `npm run verify` green after each, and no Phase 2 work:
+
+`T1` Playwright and CI → `T2` structured errors → `T3` shared fixtures → `T4` strict parsing and canonical/export JSON → `T5` JSON Schema subset, `groq`, `PROVIDERS`, explicit defaults → `T6` node migrations and `agent.autonomous` v2 → `T8` branch semantics spec and `branch` field → `T7` warnings → `T9` secret detection and export confirmation → `T10` documentation and acceptance.
+
+**Explicitly out of scope:** any backend or Phase 2 work; credential storage or `credentialRef`; Python code; rich array and nested-object editors; the optional extra warnings (disabled by W1); changing the toolchain.
 
 ## 7. Definition of done for Phase 1.1
 

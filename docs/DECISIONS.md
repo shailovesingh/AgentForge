@@ -3,7 +3,7 @@
 > Decision log. Only entries with **Status: Approved** are binding.
 > **Proposed** entries are recommendations awaiting Product Owner / Principal Architect review. **Pending** entries are accepted in direction but blocked on a named review step.
 > Never change an Approved decision silently. Supersede it with a new entry instead.
-> D-012 to D-018 were recorded on 2026-11-03 (Session 3) from the Phase 1 review and are in commit `b7e5cbc` (pushed to GitHub). D-019 to D-024 were recorded on 2026-11-03 (Session 4) from the PO's Phase 1 review decisions; they are **uncommitted working-tree changes**.
+> D-012 to D-018 were recorded on 2026-11-03 (Session 3) from the Phase 1 review and are in commit `b7e5cbc` (pushed to GitHub). D-019 to D-024 were recorded in Session 4 and are in commit `db451da` (pushed). **Session 5 revisions are uncommitted working-tree changes:** D-017 and D-019 amended; D-022, D-023, D-024 rewritten after the PO's decisions; D-025 added.
 
 | ID | Title | Status |
 |---|---|---|
@@ -25,12 +25,13 @@
 | D-016 | Credentials never stored in workflow JSON | **Approved** (already holds in Phase 1) |
 | D-017 | Non-blocking editor warnings (amended: aware of node categories and port direction) | **Approved** (not yet implemented; rules proposed in PHASE1_1_PLAN §3.6) |
 | D-018 | Structural errors kept separate from warnings | **Approved** (not yet implemented) |
-| D-019 | Playwright added to the repository as a Phase 1.1 task | **Approved** |
+| D-019 | Playwright added to the repository as a Phase 1.1 task; GitHub Actions CI with SHA-pinned actions | **Approved** |
 | D-020 | Phase 1 accepted as functionally complete, subject to Phase 1.1 | **Approved** |
 | D-021 | Single-user local mode with a `get_current_user()` boundary | **Approved** |
-| D-022 | Phase 1.1 contract hardening (H1 JSON Schema subset, H2 shared fixtures, H3 node migrations, H4 branch semantics, H5 canonical JSON) | **H2 Approved; direction of H1, H3, H4, H5 Approved; designs Proposed** (final approval pending) |
-| D-023 | Secret guard for workflow JSON (HTTP headers and free-text config) | **Proposed** |
-| D-024 | Extensible provider architecture mechanism | **Proposed** (providers themselves Approved in D-014) |
+| D-022 | Phase 1.1 contract hardening (H1 JSON Schema subset with explicit defaults, H2 shared fixtures, H3 node migrations, H4 branch semantics, H5 canonical JSON) | **Approved** (P7 subject to revisions, now applied); implementation scope pending final approval |
+| D-023 | Secret detection with warning and explicit export confirmation (not blocking) | **Approved as revised**; backend enforcement separate |
+| D-024 | Extensible provider architecture mechanism (Ollama stays the default) | **Approved** |
+| D-025 | Absent required config keys are a completeness concern (consequence of P1) | **Proposed** |
 
 ---
 
@@ -142,7 +143,7 @@
 
 ## D-017 — Non-blocking editor warnings
 - **Status:** Approved (not yet implemented; proposed as Phase 1.1).
-- **Decision:** the editor shows warnings, never blocking export or import, for: (1) unconnected required inputs, (2) empty required fields, (3) unused nodes. **Amendment (PO, 2026-11-03): the warning rules must be aware of node categories and port direction** (for example Triggers are sources, Output nodes are sinks, required inputs are checked on input ports, results on output ports). The concrete rules are proposed in `docs/PHASE1_1_PLAN.md` §3.6.
+- **Decision:** the editor shows warnings, never blocking export or import, for: (1) unconnected required inputs, (2) empty required fields, (3) unused nodes. **W1 (Session 5): the optional additional warnings stay disabled.** **Amendment (PO, 2026-11-03): the warning rules must be aware of node categories and port direction** (for example Triggers are sources, Output nodes are sinks, required inputs are checked on input ports, results on output ports). The concrete rules are proposed in `docs/PHASE1_1_PLAN.md` §3.6.
 - **Consequences:** a pure `lintWorkflow(workflow, catalog)` function is added next to the validator; the exact definitions (e.g. what counts as "unused") are in `docs/PHASE1_REVIEW.md` §2, question 6, and need PO confirmation before implementation.
 
 ## D-018 — Structural errors are separate from warnings
@@ -152,7 +153,7 @@
 
 ## D-019 — Playwright added to the repository
 - **Status:** Approved (PO, 2026-11-03)
-- **Decision:** add `@playwright/test` as a development dependency in `frontend/` as a Phase 1.1 task, with Chromium-only reproducible local runs and GitHub Actions CI. The first Phase 1.1 task, so it protects the later contract changes.
+- **Decision:** add `@playwright/test` as a development dependency in `frontend/` as a Phase 1.1 task, with Chromium-only reproducible local runs and GitHub Actions CI. **G1 (2026-11-03, Session 5): every GitHub Action is pinned to a verified commit SHA.** The first Phase 1.1 task, so it protects the later contract changes.
 - **Details:** `docs/PHASE1_1_PLAN.md` §3.9 and task T1; test selection in `docs/PHASE1_REVIEW.md` §3.2.
 
 ## D-020 — Phase 1 acceptance
@@ -166,23 +167,31 @@
 - **Consequences:** no auth library or login UI before Phase 7; default bind address `127.0.0.1`.
 
 ## D-022 — Phase 1.1 contract hardening (H1 to H5)
-- **Status:** **H2 Approved** (shared JSON fixtures for Vitest and pytest). **H1, H3, H4, H5: direction Approved** by the PO's instructions; **the designs in `docs/PHASE1_1_PLAN.md` §3.1 to §3.5 are Proposed and await final PO and architect approval.**
-- **Decision (requirements set by the PO):**
-  - H1: move toward standard JSON Schema-compatible definitions (integer, array, nested objects, defaults, required, items); UI hints such as multiline stay separate from validation.
-  - H2: shared JSON fixtures consumed by both Vitest and pytest, with a clear structure and common expected outcomes.
-  - H3: a versioned node migration mechanism keyed by `type` and `typeVersion`; old saved workflows are preserved and never overwritten silently.
-  - H4: define named condition outputs, selected branches and skipped nodes for the future DAG engine, compatible with Workflow JSON v1.
-  - H5: deterministic serialization with recursively sorted object keys and preserved array order, consistent across TypeScript, Python and PostgreSQL JSONB.
-- **Impact on Workflow JSON v1:** none of H1 to H5 changes the document structure or requires a `schemaVersion` bump (`docs/PHASE1_1_PLAN.md` §2). The catalog contract changes (H1, H4, providers), and export bytes change once (H5).
-- **Consequences:** D-013 stays pending until the architect reviews the contract files together with this plan.
+- **Status:** **Approved** by the PO (2026-11-03, Session 5), with the revisions below applied. **Final approval of the implementation scope** (tasks T1 to T10 in `docs/PHASE1_1_PLAN.md`) is still pending. D-013 (contract code review) also remains pending.
+- **Decisions:**
+  - **H1 / P1 (revised):** node configs move to a documented JSON Schema subset (integer, array and `items`, nested objects, `default`, `required`, `additionalProperties`); UI hints live in a separate `ui` block. Schema `default`s **replace** `NodeDefinition.defaults` and are applied **explicitly** at node creation (and by migration code), never implicitly by validators or importers. A required property need **not** have a default.
+  - **H1 / P2:** our own validator for the documented subset, with shared fixtures.
+  - **H1 / P4:** arrays and nested objects use the JSON editor initially.
+  - **H2:** shared JSON fixtures consumed by Vitest and pytest (`contracts/`).
+  - **H3 / P3, P5:** versioned node migrations keyed by `type` and `typeVersion`; `agent.autonomous` v2 is the first migration with a visible report; imported workflows are migrated **in memory** and the original is never silently overwritten.
+  - **H4 / P6:** adopt the branch-selection and skipped-node semantics of `docs/PHASE1_1_PLAN.md` §3.4 (optional `PortDefinition.branch`).
+  - **H5 / P7 (approved subject to revisions, now applied in plan §3.5):** two profiles, `canonical-json/1` (compact, used for hashing) and `export-json/1` (pretty, deterministic, used for files); keys sorted recursively by UTF-16 code unit order; array order preserved; **duplicate keys rejected during parsing**; NUL rejection is an **AgentForge/PostgreSQL compatibility rule, not an RFC 8785 requirement**; safe-integer limits are **AgentForge policy**; 120+ cross-language fixtures covering every numeric, Unicode and key-order edge case.
+- **Impact on Workflow JSON v1:** none of H1 to H5 changes the document structure or needs a `schemaVersion` bump. The catalog contract changes, and export bytes change once.
+- **Consequences:** D-025 (C1) follows from the P1 revision. Phase 2 models must follow these outcomes.
 
-## D-023 — Secret guard for workflow JSON
-- **Status:** Proposed
-- **Context:** `http.request.config.headers` is free-form JSON and can hold pasted credentials; the same applies to any free-text config and `metadata` (conflicts with D-016).
-- **Decision (proposed):** a shared detector scans all config strings and keys. High-confidence matches (known credential header names with literal values; well-known token shapes) **block export** (and, in Phase 2, save) with no override and never echo the value; medium-confidence matches only warn. Credentials themselves stay outside workflow JSON; references arrive with backend credential management.
-- **Details and limits:** `docs/PHASE1_1_PLAN.md` §3.7. Needs PO decision S1.
+## D-023 — Secret detection and export confirmation
+- **Status:** Approved **as revised by the PO** (2026-11-03, Session 5). The earlier proposal of unconditional export blocking was **not** approved.
+- **Context:** `http.request` `headers` and other free-text config can hold pasted credentials, which conflicts with D-016.
+- **Decision:** a shared detector scans all config strings and keys. **High-confidence** matches show a **prominent warning**; the secret value is **never echoed**; the user must give **explicit confirmation before each export**, and the dialog explains how to replace the value with a credential reference (stating that references do not exist yet). Medium-confidence matches only warn. Nothing else is blocked. Detection results are warnings, not errors (D-018). **Backend credential-storage enforcement is a separate decision** (Phase 2 plan, X10) and is not implied by the local export UX.
+- **Details:** `docs/PHASE1_1_PLAN.md` §3.7.
 
 ## D-024 — Extensible provider architecture (mechanism)
-- **Status:** Proposed (the providers Groq, OpenAI, Anthropic and Ollama are Approved in D-014; the neutral adapter is Approved in D-015)
-- **Decision (proposed):** one `PROVIDERS` constant is the only list of providers in Phase 1.1, and the node `provider` enums are built from it. From Phase 2/4 the backend registry of adapters generates the catalog enum, so adding a provider never changes the contract shape. `model` stays free text.
+- **Status:** Approved (PO, 2026-11-03, Session 5; V1: Ollama stays the default provider)
+- **Decision:** one `PROVIDERS` constant (`groq`, `openai`, `anthropic`, `ollama`) is the only list of providers in Phase 1.1, and the node `provider` enums are built from it. From Phase 2/4 the backend registry of adapters generates the catalog enum, so adding a provider never changes the contract shape. `model` stays free text.
 - **Details:** `docs/PHASE1_1_PLAN.md` §3.8.
+
+## D-025 — Absent required config keys are a completeness concern
+- **Status:** Proposed (consequence C1 of the P1 revision; recommendation: approve)
+- **Context:** P1 says required properties need not have defaults, so a new node may lack a required value, and the editor must be able to hold and export incomplete drafts (D-017).
+- **Decision (proposed):** structural validation of a document (import, later save) does **not** reject an absent required config key. Type, enum, range, length and unknown-key violations remain errors. The editor reports absent or empty required values as `required-field-empty` warnings, and execution (Phase 3) treats them as errors. The validator implements `required` fully and exposes it as a `checkRequired` option.
+- **Consequences:** import becomes more lenient; no file that is valid today is rejected.

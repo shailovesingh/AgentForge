@@ -1,13 +1,13 @@
 # ROADMAP — AGENTFORGE
 
 > Status legend: **Not started** · **Planned** (detailed plan exists) · **In progress** · **Done** (implemented + verified).
-> Last updated: 2026-11-03 (Session 4). Phase 1.1 and Phase 2 rows are **proposals**, not commitments (Playwright and shared fixtures are approved in principle).
+> Last updated: 2026-11-03 (Session 5). The Phase 2 row is a **proposal**; the Phase 1.1 plan is approved with revisions but its implementation scope still awaits final approval.
 
 | Phase | Name | Status | Prerequisites |
 |---|---|---|---|
 | 0 | Project bootstrap (docs, rules, architecture proposal) | **Done** (architecture approved 2026-11-03) | — |
 | 1 | Visual workflow builder (frontend only) | **Accepted as functionally complete by the PO (D-020), subject to Phase 1.1.** Contract pending final code review (D-013) | — |
-| 1.1 | Contract hardening and follow-ups: Playwright + CI (approved, D-019), shared fixtures (approved), JSON Schema config (H1), node migrations (H3), branch semantics (H4), canonical JSON (H5), `groq`, category-aware warnings, secret guard | **Planned, awaiting final approval.** Ten tasks T1 to T10 in `docs/PHASE1_1_PLAN.md`. Not started | Final PO / architect approval of the plan and of D-022 to D-024; D-013 review |
+| 1.1 | Contract hardening and follow-ups: Playwright + CI with SHA-pinned actions (D-019), shared fixtures, JSON Schema config with explicit defaults (H1), node migrations (H3), branch semantics (H4), strict parsing and canonical JSON (H5), `groq`, category-aware warnings, secret detection with explicit export confirmation (D-023) | **Plan approved with revisions by the PO; implementation scope awaiting final approval.** Ten tasks T1 to T10 in `docs/PHASE1_1_PLAN.md`. **Not started** | Final scope approval; decisions C1 to C5; D-013 review |
 | 2 | Backend: FastAPI, Pydantic schemas, workflow API, PostgreSQL | **Proposed only; NOT approved; not started.** Ten-step plan in `docs/PHASE2_PLAN.md` | PO approval of the plan; D-013 contract review (blocks step 2 onward); Docker Desktop (blocks step 6 onward); D-008, D-009 approved |
 | 3 | Execution engine (registry, validator, DAG scheduler, run logs, SSE) | Not started | Phase 2; D-006 |
 | 4 | AI runtime (LLM node, Agent node, LangGraph, tools, memory) | Not started | Phase 3 |
