@@ -1,0 +1,14 @@
+{
+  "name": "wf-invalid-node-malformed",
+  "description": "A node entry that is not an object is rejected with node.malformed at its index.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [5],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "node.malformed", "path": "/nodes/0" }] }
+}

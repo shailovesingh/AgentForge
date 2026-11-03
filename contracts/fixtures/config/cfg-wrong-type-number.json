@@ -1,0 +1,7 @@
+{
+  "name": "cfg-wrong-type-number",
+  "description": "A string where a number is declared is schema.type.",
+  "nodeType": "llm.prompt",
+  "config": { "provider": "ollama", "prompt": "hi", "temperature": "hot" },
+  "expect": [{ "code": "schema.type", "path": "/temperature" }]
+}

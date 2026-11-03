@@ -1,0 +1,7 @@
+{
+  "name": "cfg-key-valueof",
+  "description": "A config key named after an inherited object member (valueOf) is an unknown key, not a schema property.",
+  "nodeType": "output.result",
+  "config": { "valueOf": {} },
+  "expect": [{ "code": "schema.additionalProperties", "path": "/valueOf" }]
+}

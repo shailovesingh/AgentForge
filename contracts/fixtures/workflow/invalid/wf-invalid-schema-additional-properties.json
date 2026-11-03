@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-schema-additional-properties",
+  "description": "A config key that the node's schema does not declare is rejected with schema.additionalProperties.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "provider": "ollama", "prompt": "hi", "extra": 1 }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "schema.additionalProperties", "path": "/nodes/0/config/extra" }] }
+}

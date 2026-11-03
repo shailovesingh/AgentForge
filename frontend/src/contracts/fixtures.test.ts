@@ -1,0 +1,454 @@
+/// <reference types="node" />
+// Runs the language-neutral fixtures in /contracts/fixtures against the real TypeScript code.
+// Format and rules: contracts/README.md. In Phase 1.1 the fixtures are executed in TypeScript
+// only; no other implementation runs them yet.
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import { describe, expect, test } from 'vitest'
+import { getLatestNodeDefinition, getNodeDefinition, nodeDefinitions } from '../catalog'
+import { validateConfig } from '../workflow/configSchema'
+import { checkConnection } from '../workflow/connections'
+import { ERROR_CODES, jsonPointer } from '../workflow/errors'
+import { importWorkflow } from '../workflow/serialize'
+import type { Workflow } from '../workflow/types'
+
+// ---------------------------------------------------------------------------
+// Shape checker (pure; unit-tested below with deliberately bad examples)
+// ---------------------------------------------------------------------------
+
+type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config'
+
+const FAMILY_FIELDS: Record<Family, readonly string[]> = {
+  'workflow/valid': ['input', 'inputText', 'expect'],
+  'workflow/invalid': ['input', 'inputText', 'expect'],
+  connection: ['nodes', 'edges', 'source', 'target', 'expect'],
+  config: ['nodeType', 'config', 'configText', 'expect'],
+}
+
+const KNOWN_CODES: readonly string[] = ERROR_CODES
+
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v)
+const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v !== ''
+const isPointer = (v: unknown): v is string => typeof v === 'string' && (v === '' || v.startsWith('/'))
+const hasExactKeys = (v: Record<string, unknown>, keys: string[]) =>
+  Object.keys(v).length === keys.length && keys.every((k) => Object.hasOwn(v, k))
+
+function familyOf(file: string): Family | undefined {
+  const dir = file.slice(0, Math.max(file.lastIndexOf('/'), 0))
+  return (Object.keys(FAMILY_FIELDS) as Family[]).find((f) => f === dir)
+}
+
+const isPair = (v: unknown): boolean => Array.isArray(v) && v.length === 2 && v.every(isNonEmptyString)
+
+/**
+ * Returns the problems with one fixture file; an empty list means well-formed.
+ * `file` is the path relative to contracts/fixtures, with forward slashes.
+ */
+export function checkShape(file: string, value: unknown): string[] {
+  const family = familyOf(file)
+  if (!family) {
+    return [`${file}: not in a known fixture directory (${Object.keys(FAMILY_FIELDS).join(', ')})`]
+  }
+  if (!isObject(value)) return [`${file}: must be a JSON object`]
+
+  const problems: string[] = []
+  const bad = (message: string) => problems.push(`${file}: ${message}`)
+
+  const allowed = ['name', 'description', ...FAMILY_FIELDS[family]]
+  for (const key of Object.keys(value)) if (!allowed.includes(key)) bad(`unknown field "${key}"`)
+
+  const expectation = (v: unknown, where: string) => {
+    if (!isObject(v) || !hasExactKeys(v, ['code', 'path'])) return bad(`${where} must be exactly { code, path }`)
+    if (typeof v.code !== 'string' || !KNOWN_CODES.includes(v.code)) bad(`${where}.code "${String(v.code)}" is not a known error code`)
+    if (!isPointer(v.path)) bad(`${where}.path must be a JSON Pointer ("" or starting with "/")`)
+  }
+  const expectationList = (v: unknown, allowEmpty: boolean) => {
+    if (!Array.isArray(v) || (!allowEmpty && v.length === 0)) {
+      return bad(`expect must be a${allowEmpty ? '' : ' non-empty'} array of { code, path }`)
+    }
+    v.forEach((e, i) => expectation(e, `expect[${i}]`))
+  }
+  // Exactly one of `<field>` / `<field>Text`.
+  const oneOf = (field: string, isValid: (v: unknown) => boolean, kind: string) => {
+    const hasValue = Object.hasOwn(value, field)
+    const hasText = Object.hasOwn(value, `${field}Text`)
+    if (hasValue && hasText) bad(`has both ${field} and ${field}Text; use exactly one`)
+    else if (!hasValue && !hasText) bad(`needs ${field} or ${field}Text`)
+    if (hasValue && !isValid(value[field])) bad(`${field} must be ${kind}`)
+    if (hasText && typeof value[`${field}Text`] !== 'string') bad(`${field}Text must be a string`)
+  }
+
+  if (!isNonEmptyString(value.name)) bad('name must be a non-empty string')
+  else if (value.name !== file.slice(file.lastIndexOf('/') + 1).replace(/\.json$/, '')) {
+    bad(`name "${value.name}" must equal the file name without .json`)
+  }
+  if (!isNonEmptyString(value.description)) bad('description must be a non-empty string')
+
+  const expected = value.expect
+  switch (family) {
+    case 'workflow/valid':
+      oneOf('input', () => true, 'any JSON value')
+      if (!isObject(expected) || !hasExactKeys(expected, ['valid']) || expected.valid !== true) {
+        bad('expect must be exactly { "valid": true }')
+      }
+      break
+    case 'workflow/invalid':
+      oneOf('input', () => true, 'any JSON value')
+      if (!isObject(expected) || !hasExactKeys(expected, ['valid', 'errors']) || expected.valid !== false) {
+        bad('expect must be { "valid": false, "errors": [...] }')
+      } else expectationList(expected.errors, false)
+      break
+    case 'config':
+      if (!isNonEmptyString(value.nodeType)) bad('nodeType must be a non-empty string')
+      oneOf('config', isObject, 'a JSON object')
+      expectationList(expected, true)
+      break
+    case 'connection': {
+      if (!Array.isArray(value.nodes)) bad('nodes must be an array of { id, type }')
+      else {
+        value.nodes.forEach((n, i) => {
+          if (!isObject(n) || !hasExactKeys(n, ['id', 'type']) || !isNonEmptyString(n.id) || !isNonEmptyString(n.type)) {
+            bad(`nodes[${i}] must be exactly { id, type } with non-empty strings`)
+          }
+        })
+      }
+      if (!Array.isArray(value.edges)) bad('edges must be an array of { source, target }')
+      else {
+        value.edges.forEach((e, i) => {
+          if (!isObject(e) || !hasExactKeys(e, ['source', 'target']) || !isPair(e.source) || !isPair(e.target)) {
+            bad(`edges[${i}] must be exactly { source: [nodeId, port], target: [nodeId, port] }`)
+          }
+        })
+      }
+      if (!isPair(value.source)) bad('source must be [nodeId, port]')
+      if (!isPair(value.target)) bad('target must be [nodeId, port]')
+      if (expected !== null && !(typeof expected === 'string' && expected.startsWith('connection.') && KNOWN_CODES.includes(expected))) {
+        bad('expect must be null or a connection.<rule> code')
+      }
+      break
+    }
+  }
+  return problems
+}
+
+/** Names must be unique across ALL fixtures. */
+export function checkUniqueNames(entries: { file: string; name: unknown }[]): string[] {
+  const byName = new Map<string, string[]>()
+  for (const { file, name } of entries) {
+    if (typeof name !== 'string') continue
+    byName.set(name, [...(byName.get(name) ?? []), file])
+  }
+  return [...byName]
+    .filter(([, files]) => files.length > 1)
+    .map(([name, files]) => `name "${name}" is used by more than one fixture: ${files.join(', ')}`)
+}
+
+// ---------------------------------------------------------------------------
+// Loading
+// ---------------------------------------------------------------------------
+
+const FIXTURES_DIR = resolve(import.meta.dirname, '../../../contracts/fixtures')
+const FORMAT_FILE = 'format.json'
+const CATALOG_FILE = 'catalog/builtin.catalog.json'
+const CATALOG_PATH = join(FIXTURES_DIR, CATALOG_FILE)
+
+interface Expected {
+  code: string
+  path: string
+}
+interface CaseBase {
+  file: string
+  name: string
+  description: string
+}
+interface WorkflowCase extends CaseBase {
+  input?: unknown
+  inputText?: string
+  expect: { valid: boolean; errors?: Expected[] }
+}
+interface ConnectionCase extends CaseBase {
+  nodes: { id: string; type: string }[]
+  edges: { source: [string, string]; target: [string, string] }[]
+  source: [string, string]
+  target: [string, string]
+  expect: string | null
+}
+interface ConfigCase extends CaseBase {
+  nodeType: string
+  config?: Record<string, unknown>
+  configText?: string
+  expect: Expected[]
+}
+
+interface Corpus {
+  problems: string[]
+  valid: WorkflowCase[]
+  invalid: WorkflowCase[]
+  connection: ConnectionCase[]
+  config: ConfigCase[]
+}
+
+function loadCorpus(): Corpus {
+  const corpus: Corpus = { problems: [], valid: [], invalid: [], connection: [], config: [] }
+  if (!existsSync(FIXTURES_DIR)) {
+    corpus.problems.push('contracts/fixtures does not exist')
+    return corpus
+  }
+  const files = readdirSync(FIXTURES_DIR, { withFileTypes: true, recursive: true })
+    .filter((d) => d.isFile())
+    .map((d) => relative(FIXTURES_DIR, join(d.parentPath, d.name)).split(sep).join('/'))
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+
+  const names: { file: string; name: unknown }[] = []
+  for (const file of files) {
+    // Both are checked by their own tests; they are not cases.
+    if (file === FORMAT_FILE || file === CATALOG_FILE) continue
+    if (!file.endsWith('.json')) {
+      corpus.problems.push(`${file}: fixtures must be .json files`)
+      continue
+    }
+    let value: unknown
+    try {
+      value = JSON.parse(readFileSync(join(FIXTURES_DIR, file), 'utf8'))
+    } catch (e) {
+      corpus.problems.push(`${file}: not valid JSON (${e instanceof Error ? e.message : String(e)})`)
+      continue
+    }
+    const problems = checkShape(file, value)
+    corpus.problems.push(...problems)
+    if (isObject(value)) names.push({ file, name: value.name })
+    if (problems.length > 0) continue // shape-checked above, so the casts below are safe
+    const withFile = { ...(value as object), file }
+    const family = familyOf(file)
+    if (family === 'workflow/valid') corpus.valid.push(withFile as WorkflowCase)
+    else if (family === 'workflow/invalid') corpus.invalid.push(withFile as WorkflowCase)
+    else if (family === 'connection') corpus.connection.push(withFile as ConnectionCase)
+    else corpus.config.push(withFile as ConfigCase)
+  }
+  corpus.problems.push(...checkUniqueNames(names))
+  return corpus
+}
+
+const corpus = loadCorpus()
+
+// ---------------------------------------------------------------------------
+// Runners
+// ---------------------------------------------------------------------------
+
+/** Order-insensitive comparison form: a sorted list of { code, path } (messages are never compared). */
+const asMultiset = (list: Expected[]): Expected[] =>
+  list
+    .map(({ code, path }) => ({ code, path }))
+    .sort((a, b) => {
+      const x = `${a.code}\u0000${a.path}`
+      const y = `${b.code}\u0000${b.path}`
+      return x < y ? -1 : x > y ? 1 : 0
+    })
+
+const workflowText = (c: WorkflowCase): string => c.inputText ?? JSON.stringify(c.input)
+
+function connectionWorkflow(c: ConnectionCase): Workflow {
+  return {
+    schemaVersion: '1.0',
+    id: 'wf_fixture',
+    name: c.name,
+    description: '',
+    nodes: c.nodes.map((n) => ({
+      id: n.id,
+      type: n.type,
+      typeVersion: 1,
+      label: n.id,
+      config: structuredClone(getNodeDefinition(n.type, 1)?.defaults ?? {}),
+      position: { x: 0, y: 0 },
+    })),
+    edges: c.edges.map((e, i) => ({
+      id: `e${i + 1}`,
+      source: { nodeId: e.source[0], port: e.source[1] },
+      target: { nodeId: e.target[0], port: e.target[1] },
+    })),
+    metadata: {},
+  }
+}
+
+describe('fixture corpus', () => {
+  test('format.json declares fixtureFormat 1', () => {
+    const file = join(FIXTURES_DIR, FORMAT_FILE)
+    expect(existsSync(file), `${FORMAT_FILE} is missing`).toBe(true)
+    expect(JSON.parse(readFileSync(file, 'utf8')), FORMAT_FILE).toEqual({ fixtureFormat: 1 })
+  })
+
+  test('every fixture file is well-formed and names are unique', () => {
+    expect(corpus.problems, corpus.problems.join('\n')).toEqual([])
+  })
+
+  test('every error code is expected by at least one workflow/invalid fixture', () => {
+    const covered = new Set(corpus.invalid.flatMap((c) => c.expect.errors ?? []).map((e) => e.code))
+    expect(ERROR_CODES.filter((code) => !covered.has(code)), 'codes with no workflow/invalid fixture').toEqual([])
+  })
+
+  test('every connection.* code is the expected result of at least one connection fixture', () => {
+    const covered = new Set(corpus.connection.map((c) => c.expect))
+    const missing = ERROR_CODES.filter((code) => code.startsWith('connection.') && !covered.has(code))
+    expect(missing, 'connection codes with no connection fixture').toEqual([])
+  })
+
+  test('every family has at least one case', () => {
+    expect([corpus.valid.length, corpus.invalid.length, corpus.connection.length, corpus.config.length].every((n) => n > 0)).toBe(true)
+  })
+})
+
+describe('catalog fixture', () => {
+  test('builtin.catalog.json equals the catalog in code', () => {
+    const current: unknown = JSON.parse(JSON.stringify(nodeDefinitions))
+    if (process.env.UPDATE_FIXTURES === '1') {
+      mkdirSync(dirname(CATALOG_PATH), { recursive: true })
+      writeFileSync(CATALOG_PATH, JSON.stringify(nodeDefinitions, null, 2) + '\n', 'utf8')
+    }
+    let stored: unknown
+    try {
+      stored = JSON.parse(readFileSync(CATALOG_PATH, 'utf8'))
+    } catch (e) {
+      stored = `unreadable: ${e instanceof Error ? e.message : String(e)}`
+    }
+    expect(
+      stored,
+      `contracts/fixtures/${CATALOG_FILE} differs from the catalog in frontend/src/catalog/nodes.ts. ` +
+        `If the catalog change is intended, regenerate the file with UPDATE_FIXTURES=1 npm test ` +
+        `(PowerShell: $env:UPDATE_FIXTURES='1'; npm test) and review the diff.`,
+    ).toEqual(current)
+  })
+})
+
+describe('workflow/valid fixtures', () => {
+  for (const c of corpus.valid) {
+    test(c.name, () => {
+      const text = workflowText(c)
+      const result = importWorkflow(text, nodeDefinitions)
+      expect(result.ok, `${c.file}: expected a valid workflow, got ${JSON.stringify(result.ok ? [] : result.errors)}`).toBe(true)
+      if (result.ok) expect(result.workflow, `${c.file}: imported workflow differs from the input`).toEqual(JSON.parse(text))
+    })
+  }
+})
+
+describe('workflow/invalid fixtures', () => {
+  for (const c of corpus.invalid) {
+    test(c.name, () => {
+      const result = importWorkflow(workflowText(c), nodeDefinitions)
+      expect(result.ok, `${c.file}: expected import to fail`).toBe(false)
+      if (result.ok) return
+      expect(asMultiset(result.errors), `${c.file}: errors ({code, path}, order-insensitive)`).toEqual(asMultiset(c.expect.errors ?? []))
+    })
+  }
+})
+
+describe('connection fixtures', () => {
+  for (const c of corpus.connection) {
+    test(c.name, () => {
+      const problem = checkConnection(
+        connectionWorkflow(c),
+        nodeDefinitions,
+        { nodeId: c.source[0], port: c.source[1] },
+        { nodeId: c.target[0], port: c.target[1] },
+      )
+      expect(problem === null ? null : `connection.${problem}`, `${c.file}: connection result`).toBe(c.expect)
+    })
+  }
+})
+
+describe('config fixtures', () => {
+  for (const c of corpus.config) {
+    test(c.name, () => {
+      const def = getLatestNodeDefinition(c.nodeType)
+      expect(def, `${c.file}: unknown nodeType ${c.nodeType}`).toBeDefined()
+      if (!def) return
+      const config = (c.configText !== undefined ? JSON.parse(c.configText) : c.config) as Record<string, unknown>
+      const actual = validateConfig(def.configSchema, config).map(({ key, code }) => ({ code, path: jsonPointer(key) }))
+      expect(asMultiset(actual), `${c.file}: config errors ({code, path}, order-insensitive)`).toEqual(asMultiset(c.expect))
+    })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// The shape checker itself, with deliberately bad examples
+// ---------------------------------------------------------------------------
+
+describe('checkShape', () => {
+  const good = {
+    invalid: {
+      name: 'a',
+      description: 'd',
+      input: [],
+      expect: { valid: false, errors: [{ code: 'doc.not-object', path: '' }] },
+    },
+    valid: { name: 'a', description: 'd', input: {}, expect: { valid: true } },
+    connection: {
+      name: 'a',
+      description: 'd',
+      nodes: [{ id: 'x', type: 'llm.prompt' }],
+      edges: [{ source: ['x', 'text'], target: ['x', 'input'] }],
+      source: ['x', 'text'],
+      target: ['x', 'input'],
+      expect: 'connection.self-loop',
+    },
+    config: { name: 'a', description: 'd', nodeType: 'llm.prompt', config: {}, expect: [{ code: 'schema.required', path: '/provider' }] },
+  }
+  const files = {
+    invalid: 'workflow/invalid/a.json',
+    valid: 'workflow/valid/a.json',
+    connection: 'connection/a.json',
+    config: 'config/a.json',
+  }
+
+  test.each(Object.keys(good) as (keyof typeof good)[])('a well-formed %s fixture has no problems', (family) => {
+    expect(checkShape(files[family], good[family])).toEqual([])
+  })
+
+  const some = (problems: string[], text: string) => expect(problems.some((p) => p.includes(text)), problems.join(' | ')).toBe(true)
+
+  test('missing name', () => {
+    const { name: _name, ...noName } = good.invalid
+    some(checkShape(files.invalid, noName), 'name must be a non-empty string')
+  })
+
+  test('name that differs from the file name', () => {
+    some(checkShape('workflow/invalid/other.json', good.invalid), 'must equal the file name')
+  })
+
+  test('unknown field', () => {
+    some(checkShape(files.invalid, { ...good.invalid, extra: 1 }), 'unknown field "extra"')
+    some(checkShape(files.valid, { ...good.valid, expect: { valid: true, canonical: 1 } }), 'expect must be exactly')
+  })
+
+  test('both input and inputText', () => {
+    some(checkShape(files.invalid, { ...good.invalid, inputText: '[]' }), 'has both input and inputText')
+    some(checkShape(files.config, { ...good.config, configText: '{}' }), 'has both config and configText')
+  })
+
+  test('neither input nor inputText', () => {
+    const { input: _input, ...noInput } = good.invalid
+    some(checkShape(files.invalid, noInput), 'needs input or inputText')
+  })
+
+  test('unknown error code', () => {
+    some(checkShape(files.invalid, { ...good.invalid, expect: { valid: false, errors: [{ code: 'nope', path: '' }] } }), 'not a known error code')
+    some(checkShape(files.connection, { ...good.connection, expect: 'schema.type' }), 'connection.<rule>')
+  })
+
+  test('bad path, empty error list, wrong types', () => {
+    some(checkShape(files.invalid, { ...good.invalid, expect: { valid: false, errors: [{ code: 'doc.not-object', path: 'id' }] } }), 'JSON Pointer')
+    some(checkShape(files.invalid, { ...good.invalid, expect: { valid: false, errors: [] } }), 'non-empty array')
+    some(checkShape(files.connection, { ...good.connection, source: ['x'] }), 'source must be')
+    some(checkShape(files.config, { ...good.config, config: [] }), 'config must be a JSON object')
+  })
+
+  test('file outside the known directories, or not an object', () => {
+    some(checkShape('misc/a.json', good.invalid), 'not in a known fixture directory')
+    some(checkShape(files.invalid, []), 'must be a JSON object')
+  })
+
+  test('duplicate names across fixtures', () => {
+    expect(checkUniqueNames([{ file: 'a.json', name: 'x' }, { file: 'b.json', name: 'y' }])).toEqual([])
+    some(checkUniqueNames([{ file: 'a.json', name: 'x' }, { file: 'b.json', name: 'x' }]), 'used by more than one fixture')
+  })
+})

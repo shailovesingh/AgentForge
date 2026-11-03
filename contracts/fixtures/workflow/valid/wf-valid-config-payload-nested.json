@@ -1,0 +1,23 @@
+{
+  "name": "wf-valid-config-payload-nested",
+  "description": "A trigger whose config has an own key named payload holding nested JSON (objects, arrays, null, numbers) is valid.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Nested payload",
+    "description": "",
+    "nodes": [
+      {
+        "id": "t",
+        "type": "trigger.manual",
+        "typeVersion": 1,
+        "label": "t",
+        "config": { "payload": { "user": { "name": "Ada", "tags": ["a", "b"], "age": null }, "scores": [1, 2.5, -3], "ok": true } },
+        "position": { "x": 0, "y": 0 }
+      }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": true }
+}

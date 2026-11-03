@@ -1,0 +1,13 @@
+{
+  "name": "wf-invalid-doc-invalid-field",
+  "description": "A document without the required string field id is rejected with doc.invalid-field at /id.",
+  "input": {
+    "schemaVersion": "1.0",
+    "name": "Sample",
+    "description": "",
+    "nodes": [],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "doc.invalid-field", "path": "/id" }] }
+}

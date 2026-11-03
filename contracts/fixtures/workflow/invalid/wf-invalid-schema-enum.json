@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-schema-enum",
+  "description": "A config value outside the allowed enum is rejected with schema.enum at the config key.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "provider": "nope", "prompt": "hi" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "schema.enum", "path": "/nodes/0/config/provider" }] }
+}

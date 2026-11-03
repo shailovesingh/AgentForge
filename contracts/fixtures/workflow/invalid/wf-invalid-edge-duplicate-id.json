@@ -1,0 +1,21 @@
+{
+  "name": "wf-invalid-edge-duplicate-id",
+  "description": "Two edges with the same id are rejected with edge.duplicate-id at the second edge's id.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "t", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "provider": "ollama", "prompt": "hi" }, "position": { "x": 0, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "o", "config": { "format": "text" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l", "port": "input" } },
+      { "id": "e1", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "edge.duplicate-id", "path": "/edges/1/id" }] }
+}

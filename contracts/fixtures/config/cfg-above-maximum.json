@@ -1,0 +1,7 @@
+{
+  "name": "cfg-above-maximum",
+  "description": "A number above the declared maximum is schema.maximum.",
+  "nodeType": "agent.autonomous",
+  "config": { "provider": "ollama", "maxIterations": 51 },
+  "expect": [{ "code": "schema.maximum", "path": "/maxIterations" }]
+}

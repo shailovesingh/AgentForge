@@ -1,0 +1,12 @@
+{
+  "name": "conn-allowed-any-to-typed",
+  "description": "An output of type any (condition true branch) may connect to a typed input (agent task, text).",
+  "nodes": [
+    { "id": "c", "type": "logic.condition" },
+    { "id": "a", "type": "agent.autonomous" }
+  ],
+  "edges": [],
+  "source": ["c", "true"],
+  "target": ["a", "input"],
+  "expect": null
+}

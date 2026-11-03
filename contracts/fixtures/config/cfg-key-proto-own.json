@@ -1,0 +1,7 @@
+{
+  "name": "cfg-key-proto-own",
+  "description": "A config with an own __proto__ key (only possible by parsing raw JSON text) is an unknown key; it must not be treated as a prototype assignment.",
+  "nodeType": "output.result",
+  "configText": "{\"__proto__\": {\"format\": \"text\"}}",
+  "expect": [{ "code": "schema.additionalProperties", "path": "/__proto__" }]
+}

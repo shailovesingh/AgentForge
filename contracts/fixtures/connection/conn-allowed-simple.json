@@ -1,0 +1,12 @@
+{
+  "name": "conn-allowed-simple",
+  "description": "A trigger output may connect to a free LLM input in an otherwise empty workflow.",
+  "nodes": [
+    { "id": "t", "type": "trigger.manual" },
+    { "id": "l", "type": "llm.prompt" }
+  ],
+  "edges": [],
+  "source": ["t", "data"],
+  "target": ["l", "input"],
+  "expect": null
+}

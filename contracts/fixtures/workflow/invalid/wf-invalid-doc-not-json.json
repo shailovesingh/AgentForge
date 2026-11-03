@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-doc-not-json",
+  "description": "Text that is not JSON is rejected with doc.not-json at the document root.",
+  "inputText": "{nope",
+  "expect": { "valid": false, "errors": [{ "code": "doc.not-json", "path": "" }] }
+}

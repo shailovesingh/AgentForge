@@ -1,0 +1,14 @@
+{
+  "name": "wf-invalid-edge-malformed",
+  "description": "An edge entry that is not an object is rejected with edge.malformed at its index.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [],
+    "edges": ["x"],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "edge.malformed", "path": "/edges/0" }] }
+}

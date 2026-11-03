@@ -1,0 +1,28 @@
+{
+  "name": "wf-valid-all-six-types",
+  "description": "A pipeline using all six built-in node types, including a second edge into the multiple-input agent.tools port.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "All node types",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "t", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "h", "type": "http.request", "typeVersion": 1, "label": "h", "config": { "method": "GET", "url": "", "headers": {}, "body": "" }, "position": { "x": 200, "y": 0 } },
+      { "id": "c", "type": "logic.condition", "typeVersion": 1, "label": "c", "config": { "field": "", "operator": "equals", "value": "" }, "position": { "x": 400, "y": 0 } },
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "provider": "ollama", "model": "", "systemPrompt": "", "prompt": "", "temperature": 0.7 }, "position": { "x": 600, "y": 0 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "a", "config": { "provider": "ollama", "model": "", "instructions": "", "maxIterations": 10 }, "position": { "x": 800, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "o", "config": { "format": "text" }, "position": { "x": 1000, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "h", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "h", "port": "body" }, "target": { "nodeId": "c", "port": "input" } },
+      { "id": "e3", "source": { "nodeId": "c", "port": "true" }, "target": { "nodeId": "l", "port": "input" } },
+      { "id": "e4", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "a", "port": "input" } },
+      { "id": "e5", "source": { "nodeId": "c", "port": "false" }, "target": { "nodeId": "a", "port": "tools" } },
+      { "id": "e6", "source": { "nodeId": "a", "port": "output" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": { "valid": true }
+}

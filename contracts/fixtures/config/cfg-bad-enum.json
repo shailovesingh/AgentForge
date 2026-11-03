@@ -1,0 +1,7 @@
+{
+  "name": "cfg-bad-enum",
+  "description": "A string outside the declared enum is schema.enum.",
+  "nodeType": "llm.prompt",
+  "config": { "provider": "nope", "prompt": "hi" },
+  "expect": [{ "code": "schema.enum", "path": "/provider" }]
+}

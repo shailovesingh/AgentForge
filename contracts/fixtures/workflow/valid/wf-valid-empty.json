@@ -1,0 +1,14 @@
+{
+  "name": "wf-valid-empty",
+  "description": "A workflow with no nodes and no edges is valid.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Empty",
+    "description": "",
+    "nodes": [],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": true }
+}

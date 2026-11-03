@@ -1,0 +1,16 @@
+{
+  "name": "wf-valid-non-ascii-label",
+  "description": "Non-ASCII text (written as literal UTF-8) in a node label and in the workflow name is preserved.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Café workflow — 日本語",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Démarrer 🚀 開始", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": true }
+}

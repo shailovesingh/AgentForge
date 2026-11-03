@@ -1,0 +1,20 @@
+{
+  "name": "wf-invalid-connection-cycle",
+  "description": "An edge that closes a loop between two nodes is rejected with connection.cycle at the closing edge.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "h1", "type": "http.request", "typeVersion": 1, "label": "h1", "config": { "method": "GET", "url": "" }, "position": { "x": 0, "y": 0 } },
+      { "id": "h2", "type": "http.request", "typeVersion": 1, "label": "h2", "config": { "method": "GET", "url": "" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "h1", "port": "body" }, "target": { "nodeId": "h2", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "h2", "port": "body" }, "target": { "nodeId": "h1", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "connection.cycle", "path": "/edges/1" }] }
+}

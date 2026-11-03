@@ -1,0 +1,7 @@
+{
+  "name": "cfg-unknown-key",
+  "description": "A key the schema does not declare is schema.additionalProperties.",
+  "nodeType": "llm.prompt",
+  "config": { "provider": "ollama", "prompt": "hi", "extra": 1 },
+  "expect": [{ "code": "schema.additionalProperties", "path": "/extra" }]
+}

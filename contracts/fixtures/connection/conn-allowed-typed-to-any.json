@@ -1,0 +1,12 @@
+{
+  "name": "conn-allowed-typed-to-any",
+  "description": "A typed output (text) may connect to an input of type any.",
+  "nodes": [
+    { "id": "l", "type": "llm.prompt" },
+    { "id": "o", "type": "output.result" }
+  ],
+  "edges": [],
+  "source": ["l", "text"],
+  "target": ["o", "input"],
+  "expect": null
+}

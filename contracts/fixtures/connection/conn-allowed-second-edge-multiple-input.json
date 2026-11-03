@@ -1,0 +1,12 @@
+{
+  "name": "conn-allowed-second-edge-multiple-input",
+  "description": "A second, different edge into the multiple input agent.tools is allowed.",
+  "nodes": [
+    { "id": "c", "type": "logic.condition" },
+    { "id": "a", "type": "agent.autonomous" }
+  ],
+  "edges": [{ "source": ["c", "true"], "target": ["a", "tools"] }],
+  "source": ["c", "false"],
+  "target": ["a", "tools"],
+  "expect": null
+}

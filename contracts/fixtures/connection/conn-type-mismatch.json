@@ -1,0 +1,12 @@
+{
+  "name": "conn-type-mismatch",
+  "description": "A number output (http.request status) into a text input (agent task) is rejected with connection.type-mismatch.",
+  "nodes": [
+    { "id": "h", "type": "http.request" },
+    { "id": "a", "type": "agent.autonomous" }
+  ],
+  "edges": [],
+  "source": ["h", "status"],
+  "target": ["a", "input"],
+  "expect": "connection.type-mismatch"
+}

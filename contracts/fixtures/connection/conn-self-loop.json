@@ -1,0 +1,9 @@
+{
+  "name": "conn-self-loop",
+  "description": "Connecting a node's output to its own input is rejected with connection.self-loop.",
+  "nodes": [{ "id": "l", "type": "llm.prompt" }],
+  "edges": [],
+  "source": ["l", "text"],
+  "target": ["l", "input"],
+  "expect": "connection.self-loop"
+}

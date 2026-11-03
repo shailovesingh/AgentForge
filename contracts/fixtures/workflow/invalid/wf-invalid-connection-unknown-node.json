@@ -1,0 +1,18 @@
+{
+  "name": "wf-invalid-connection-unknown-node",
+  "description": "An edge whose target node does not exist is rejected with connection.unknown-node at the edge.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "t", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "ghost", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "connection.unknown-node", "path": "/edges/0" }] }
+}

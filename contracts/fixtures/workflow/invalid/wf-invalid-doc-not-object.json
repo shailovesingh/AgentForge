@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-doc-not-object",
+  "description": "A JSON array at the top level is rejected with doc.not-object.",
+  "input": [],
+  "expect": { "valid": false, "errors": [{ "code": "doc.not-object", "path": "" }] }
+}

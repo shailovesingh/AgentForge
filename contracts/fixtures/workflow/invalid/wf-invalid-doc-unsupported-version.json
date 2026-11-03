@@ -1,0 +1,14 @@
+{
+  "name": "wf-invalid-doc-unsupported-version",
+  "description": "A schemaVersion with no migration path is rejected with doc.unsupported-version at /schemaVersion.",
+  "input": {
+    "schemaVersion": "9.9",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "doc.unsupported-version", "path": "/schemaVersion" }] }
+}

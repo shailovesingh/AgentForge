@@ -1,0 +1,18 @@
+{
+  "name": "wf-invalid-connection-self-loop",
+  "description": "An edge from a node to itself is rejected with connection.self-loop at the edge.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "provider": "ollama", "prompt": "hi" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "l", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "connection.self-loop", "path": "/edges/0" }] }
+}

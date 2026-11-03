@@ -1,0 +1,12 @@
+{
+  "name": "conn-unknown-node-unknown-type",
+  "description": "A connection to a node whose type is not in the catalog is rejected with connection.unknown-node.",
+  "nodes": [
+    { "id": "t", "type": "trigger.manual" },
+    { "id": "m", "type": "mystery.node" }
+  ],
+  "edges": [],
+  "source": ["t", "data"],
+  "target": ["m", "input"],
+  "expect": "connection.unknown-node"
+}

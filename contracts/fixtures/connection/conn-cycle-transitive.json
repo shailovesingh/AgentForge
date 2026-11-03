@@ -1,0 +1,16 @@
+{
+  "name": "conn-cycle-transitive",
+  "description": "Connecting h3 back to h1 through the existing chain h1 -> h2 -> h3 closes a three-node cycle and is rejected with connection.cycle.",
+  "nodes": [
+    { "id": "h1", "type": "http.request" },
+    { "id": "h2", "type": "http.request" },
+    { "id": "h3", "type": "http.request" }
+  ],
+  "edges": [
+    { "source": ["h1", "body"], "target": ["h2", "input"] },
+    { "source": ["h2", "body"], "target": ["h3", "input"] }
+  ],
+  "source": ["h3", "body"],
+  "target": ["h1", "input"],
+  "expect": "connection.cycle"
+}

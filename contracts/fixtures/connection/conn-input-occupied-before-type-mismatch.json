@@ -1,0 +1,13 @@
+{
+  "name": "conn-input-occupied-before-type-mismatch",
+  "description": "When the input is occupied and the types also mismatch (number into the agent's text task), input-occupied is the reported rule (it is checked before type-mismatch).",
+  "nodes": [
+    { "id": "l", "type": "llm.prompt" },
+    { "id": "h", "type": "http.request" },
+    { "id": "a", "type": "agent.autonomous" }
+  ],
+  "edges": [{ "source": ["l", "text"], "target": ["a", "input"] }],
+  "source": ["h", "status"],
+  "target": ["a", "input"],
+  "expect": "connection.input-occupied"
+}

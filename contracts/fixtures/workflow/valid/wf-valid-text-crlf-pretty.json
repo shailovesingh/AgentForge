@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-text-crlf-pretty",
+  "description": "Raw import text that is pretty-printed with CRLF line endings, tabs and a trailing newline is valid.",
+  "inputText": "{\r\n\t\"schemaVersion\": \"1.0\",\r\n\t\"id\": \"wf_1\",\r\n\t\"name\": \"CRLF\",\r\n\t\"description\": \"\",\r\n\t\"nodes\": [\r\n\t\t{ \"id\": \"t\", \"type\": \"trigger.manual\", \"typeVersion\": 1, \"label\": \"t\", \"config\": { \"payload\": {} }, \"position\": { \"x\": 0, \"y\": 0 } }\r\n\t],\r\n\t\"edges\": [],\r\n\t\"metadata\": {}\r\n}\r\n",
+  "expect": { "valid": true }
+}

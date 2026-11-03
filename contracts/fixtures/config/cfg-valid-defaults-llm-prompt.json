@@ -1,0 +1,7 @@
+{
+  "name": "cfg-valid-defaults-llm-prompt",
+  "description": "The catalog default config of llm.prompt is valid.",
+  "nodeType": "llm.prompt",
+  "config": { "provider": "ollama", "model": "", "systemPrompt": "", "prompt": "", "temperature": 0.7 },
+  "expect": []
+}

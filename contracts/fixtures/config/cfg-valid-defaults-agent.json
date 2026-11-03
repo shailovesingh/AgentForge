@@ -1,0 +1,7 @@
+{
+  "name": "cfg-valid-defaults-agent",
+  "description": "The catalog default config of agent.autonomous is valid.",
+  "nodeType": "agent.autonomous",
+  "config": { "provider": "ollama", "model": "", "instructions": "", "maxIterations": 10 },
+  "expect": []
+}

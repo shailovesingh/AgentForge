@@ -1,0 +1,12 @@
+{
+  "name": "conn-duplicate-multiple-input",
+  "description": "Repeating an existing edge into the multiple input agent.tools (from condition port true) is rejected with connection.duplicate.",
+  "nodes": [
+    { "id": "c", "type": "logic.condition" },
+    { "id": "a", "type": "agent.autonomous" }
+  ],
+  "edges": [{ "source": ["c", "true"], "target": ["a", "tools"] }],
+  "source": ["c", "true"],
+  "target": ["a", "tools"],
+  "expect": "connection.duplicate"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "cfg-wrong-type-object",
+  "description": "An array where a JSON object is declared (trigger payload) is schema.type.",
+  "nodeType": "trigger.manual",
+  "config": { "payload": [] },
+  "expect": [{ "code": "schema.type", "path": "/payload" }]
+}

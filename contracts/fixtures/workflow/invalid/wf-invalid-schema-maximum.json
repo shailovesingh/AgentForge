@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-schema-maximum",
+  "description": "A number above the declared maximum is rejected with schema.maximum at the config key.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "provider": "ollama", "prompt": "hi", "temperature": 5 }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "schema.maximum", "path": "/nodes/0/config/temperature" }] }
+}

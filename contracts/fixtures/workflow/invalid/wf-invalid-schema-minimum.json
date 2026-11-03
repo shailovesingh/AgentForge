@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-schema-minimum",
+  "description": "A number below the declared minimum is rejected with schema.minimum at the config key.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "provider": "ollama", "prompt": "hi", "temperature": -1 }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "schema.minimum", "path": "/nodes/0/config/temperature" }] }
+}

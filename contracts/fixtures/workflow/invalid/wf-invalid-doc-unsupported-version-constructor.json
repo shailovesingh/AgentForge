@@ -1,0 +1,14 @@
+{
+  "name": "wf-invalid-doc-unsupported-version-constructor",
+  "description": "A schemaVersion named after an inherited object member (constructor) is not a migration step and is rejected.",
+  "input": {
+    "schemaVersion": "constructor",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "doc.unsupported-version", "path": "/schemaVersion" }] }
+}

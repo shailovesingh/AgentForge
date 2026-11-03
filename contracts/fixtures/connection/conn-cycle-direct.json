@@ -1,0 +1,12 @@
+{
+  "name": "conn-cycle-direct",
+  "description": "Connecting h2 back to h1 when h1 already feeds h2 closes a two-node cycle and is rejected with connection.cycle.",
+  "nodes": [
+    { "id": "h1", "type": "http.request" },
+    { "id": "h2", "type": "http.request" }
+  ],
+  "edges": [{ "source": ["h1", "body"], "target": ["h2", "input"] }],
+  "source": ["h2", "body"],
+  "target": ["h1", "input"],
+  "expect": "connection.cycle"
+}

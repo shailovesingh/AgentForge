@@ -1,0 +1,19 @@
+{
+  "name": "wf-invalid-connection-type-mismatch",
+  "description": "An edge from a number output (http.request status) to a text input (agent task) is rejected with connection.type-mismatch.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "h", "type": "http.request", "typeVersion": 1, "label": "h", "config": { "method": "GET", "url": "" }, "position": { "x": 0, "y": 0 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "a", "config": { "provider": "ollama" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "h", "port": "status" }, "target": { "nodeId": "a", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "connection.type-mismatch", "path": "/edges/0" }] }
+}

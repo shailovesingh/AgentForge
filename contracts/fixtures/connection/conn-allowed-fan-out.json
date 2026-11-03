@@ -1,0 +1,13 @@
+{
+  "name": "conn-allowed-fan-out",
+  "description": "One output may feed several different inputs (fan-out): the trigger already feeds the LLM and now also feeds the output.",
+  "nodes": [
+    { "id": "t", "type": "trigger.manual" },
+    { "id": "l", "type": "llm.prompt" },
+    { "id": "o", "type": "output.result" }
+  ],
+  "edges": [{ "source": ["t", "data"], "target": ["l", "input"] }],
+  "source": ["t", "data"],
+  "target": ["o", "input"],
+  "expect": null
+}

@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-text-unicode-escapes",
+  "description": "Raw import text that spells a label with \\u escapes (including a surrogate pair) is valid and decodes to the same characters.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"Escapes\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"caf\\u00e9 \\ud83d\\ude80 \\/ \\\"q\\\"\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": { "valid": true }
+}

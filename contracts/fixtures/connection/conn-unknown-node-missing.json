@@ -1,0 +1,9 @@
+{
+  "name": "conn-unknown-node-missing",
+  "description": "A connection whose source node id is not in the workflow is rejected with connection.unknown-node.",
+  "nodes": [{ "id": "l", "type": "llm.prompt" }],
+  "edges": [],
+  "source": ["ghost", "data"],
+  "target": ["l", "input"],
+  "expect": "connection.unknown-node"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-schema-required",
+  "description": "A config that lacks a required key is rejected with schema.required at that key.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "prompt": "hi" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "schema.required", "path": "/nodes/0/config/provider" }] }
+}

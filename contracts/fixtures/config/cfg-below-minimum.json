@@ -1,0 +1,7 @@
+{
+  "name": "cfg-below-minimum",
+  "description": "A number below the declared minimum is schema.minimum.",
+  "nodeType": "llm.prompt",
+  "config": { "provider": "ollama", "prompt": "hi", "temperature": -0.5 },
+  "expect": [{ "code": "schema.minimum", "path": "/temperature" }]
+}

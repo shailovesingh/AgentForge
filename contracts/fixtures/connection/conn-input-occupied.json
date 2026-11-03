@@ -1,0 +1,13 @@
+{
+  "name": "conn-input-occupied",
+  "description": "A second edge from a different node into an already connected single-connection input is rejected with connection.input-occupied.",
+  "nodes": [
+    { "id": "t", "type": "trigger.manual" },
+    { "id": "t2", "type": "trigger.manual" },
+    { "id": "l", "type": "llm.prompt" }
+  ],
+  "edges": [{ "source": ["t", "data"], "target": ["l", "input"] }],
+  "source": ["t2", "data"],
+  "target": ["l", "input"],
+  "expect": "connection.input-occupied"
+}
