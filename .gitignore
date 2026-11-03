@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Build output
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.vite/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code local-only files
+.claude/settings.local.json
+.claude/plans/
+
+# Logs
+*.log
+npm-debug.log*
