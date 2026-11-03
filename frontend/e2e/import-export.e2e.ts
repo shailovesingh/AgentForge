@@ -71,6 +71,8 @@ test.describe('import', () => {
 
     await editor.importText(JSON.stringify(workflow))
     await expect(editor.nodes).toHaveCount(2)
+    await expect(editor.nodes.first()).toBeVisible()
+    await expect(editor.nodes.last()).toBeVisible()
     await expect(editor.edges).toHaveCount(1)
 
     const exported = JSON.parse((await editor.exportWorkflow()).text) as {
@@ -89,8 +91,7 @@ test.describe('import', () => {
     await expect(alert.getByText(/Not valid JSON/)).toBeVisible()
     const code = alert.getByText('doc.not-json', { exact: true })
     await expect(code).toBeVisible()
-    await expect(code).toHaveAttribute('title', '(whole document)')
-    await expect(alert).toContainText('(whole document)')
+    await expect(alert.getByText('(whole document)', { exact: true })).toBeVisible()
     await expect(editor.nodes).toHaveCount(3)
   })
 
@@ -104,8 +105,7 @@ test.describe('import', () => {
     await expect(alert.getByText(/unknown node type mystery\.node@1/)).toBeVisible()
     const code = alert.getByText('node.unknown-type', { exact: true })
     await expect(code).toBeVisible()
-    await expect(code).toHaveAttribute('title', '/nodes/0/type')
-    await expect(alert).toContainText('at /nodes/0/type')
+    await expect(alert.getByText('at /nodes/0/type', { exact: true })).toBeVisible()
     await expect(editor.nodes).toHaveCount(3)
     await expect(editor.edges).toHaveCount(2)
   })

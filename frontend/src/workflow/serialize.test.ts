@@ -144,14 +144,14 @@ describe('import rejects bad files with specific codes, paths and messages', () 
     expect(typeMismatch).toMatchObject({ code: 'connection.type-mismatch', path: '/edges/2' })
     expect(typeMismatch.message).toMatch(/incompatible data types/)
     // e4 targets l.input, which e1 already feeds, so the single-input rule fires before the cycle rule.
-    const cycle = withEdit((w) => {
+    const occupiedInput = withEdit((w) => {
       w.nodes.push(node('h', 'http.request', { method: 'GET', url: '' }))
       w.edges.push(
         { id: 'e3', source: { nodeId: 'l', port: 'text' }, target: { nodeId: 'h', port: 'input' } },
         { id: 'e4', source: { nodeId: 'h', port: 'body' }, target: { nodeId: 'l', port: 'input' } },
       )
     })
-    const occupied = errorsOf(cycle)[0]
+    const occupied = errorsOf(occupiedInput)[0]
     expect(occupied).toMatchObject({ code: 'connection.input-occupied', path: '/edges/3' })
     expect(occupied.message).toMatch(/already has a connection/)
   })

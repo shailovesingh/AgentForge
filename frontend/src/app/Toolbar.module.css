@@ -75,6 +75,12 @@
   font-size: 12px;
 }
 
+.path {
+  margin-left: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .errorsHeader {
   display: flex;
   justify-content: space-between;
@@ -88,4 +94,5 @@
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+  white-space: nowrap;
 }

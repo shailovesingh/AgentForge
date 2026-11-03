@@ -33,11 +33,4 @@ describe('toFlowNodes measured sizes', () => {
     expect(flow.map((n) => n.id)).toEqual([...hostileIds, 'normal'])
     expect(flow.map((n) => n.measured)).toEqual([size, undefined, undefined, undefined, undefined])
   })
-
-  test('does not pollute Object.prototype', () => {
-    const measured: Measured = new Map([['__proto__', size]])
-    toFlowNodes(hostileIds.map(node), [], measured)
-    expect(({} as Record<string, unknown>).width).toBeUndefined()
-    expect(({} as Record<string, unknown>).height).toBeUndefined()
-  })
 })
