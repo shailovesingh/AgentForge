@@ -1,0 +1,23 @@
+{
+  "name": "wf-invalid-cascade-unknown-type-edge",
+  "description": "A rejected node is not added, so an edge that uses it also fails: the unknown-type node gives node.unknown-type and the edge to it gives connection.unknown-node.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "t", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "m", "type": "mystery.node", "typeVersion": 1, "label": "m", "config": {}, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [{ "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "m", "port": "input" } }],
+    "metadata": {}
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      { "code": "node.unknown-type", "path": "/nodes/1/type" },
+      { "code": "connection.unknown-node", "path": "/edges/0" }
+    ]
+  }
+}

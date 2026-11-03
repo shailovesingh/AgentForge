@@ -50,8 +50,19 @@ file is malformed, a name is duplicated, or a code is not a known code.
 { "name": "...", "description": "...", "input": { ... }, "expect": { "valid": true } }
 ```
 
-`input` is a JSON value; use `inputText` (a string with the raw text to import) instead, and only when
-the exact text matters (line endings, escapes, whitespace). Give exactly one of `input` / `inputText`.
+`input` is a JSON value. Instead of `input` a case may use `inputText` (a string with the raw text to
+import; only when the exact text matters: line endings, escapes, whitespace) or `inputRepeat` (below).
+Give **exactly one** of `input`, `inputText`, `inputRepeat`.
+
+`inputRepeat` builds a large or repetitive import text without a large file:
+
+```json
+{ "inputRepeat": { "prefix": "[", "unit": "1,", "times": 3, "suffix": "1]" } }
+```
+
+The text is `prefix + unit.repeat(times) + suffix` (the example is `[1,1,1,1]`). `prefix` and `suffix` are
+optional strings, `unit` is a string and `times` is an integer from 0 to **10,000,000** (the runner rejects
+anything larger so a typo cannot allocate gigabytes). The fixture format version stays 1.
 
 The import must succeed, and the resulting workflow must deep-equal the parsed input (valid cases are
 written in canonical shape, so importing changes nothing).
@@ -63,11 +74,23 @@ written in canonical shape, so importing changes nothing).
   "expect": { "valid": false, "errors": [ { "code": "node.duplicate-id", "path": "/nodes/1/id" } ] } }
 ```
 
-`input` / `inputText` as above. `errors` must be non-empty. The import must fail with exactly these
-errors (see the comparison rule below).
+`input` / `inputText` / `inputRepeat` as above. `errors` must be non-empty. The import must fail with
+exactly these errors (see the comparison rule below). `wf-invalid-doc-too-large.json` uses `inputRepeat`
+(5,242,881 spaces) so the repository holds no large file.
 
-`wf-invalid-doc-too-large.json` is about 5 MB because the limit under test is 5 MiB of text; it is the
-only large file and is a single line of spaces inside `inputText`.
+#### Import semantics a second runner must follow
+
+- **Document-level errors stop validation.** If the document fields (`id`, `name`, `description`,
+  `metadata`, `nodes`, `edges`) are wrong, those errors are returned and nodes and edges are not checked
+  (see `wf-invalid-doc-error-stops-before-nodes`).
+- **Nodes** are checked in array order. A rejected node (malformed, duplicate id, unknown type, or any
+  config error) is **not added**; the **second** occurrence of a duplicate id is the one blamed.
+- **Edges** are checked in array order, each as if it were being added to the edges **already accepted**.
+  A cycle is therefore reported on the edge that closes it, and a rejected edge is not added.
+- Because rejected nodes are not added, a bad node **cascades**: an edge that uses it also fails with
+  `connection.unknown-node` (see `wf-invalid-cascade-unknown-type-edge`).
+- **At most 20 errors** are reported (`MAX_ERRORS` in `frontend/src/workflow/validate.ts`); the first 20 in
+  the order above are kept (see `wf-invalid-error-cap`, built with `inputRepeat`).
 
 ### `connection/*.json`
 
@@ -81,12 +104,16 @@ only large file and is a single line of spaces inside `inputText`.
 
 The workflow is described compactly: each node is `{ id, type }` and each edge is
 `{ source: [nodeId, port], target: [nodeId, port] }`. A runner builds a full workflow from it: every
-node gets `typeVersion` 1, its id as label, position `{0, 0}` and its catalog default `config`; edges
-get ids `e1`, `e2`, ... in order. It then asks whether `source` -> `target` may be added.
+node gets `typeVersion` 1, its id as label, position `{0, 0}` and an **empty** `config` (`{}`; the
+connection rules never read config, so this format does not depend on catalog defaults); edges get ids
+`e1`, `e2`, ... in order. It then asks whether `source` -> `target` may be added.
 `expect` is `null` when the connection is allowed, otherwise the first failing rule as a full code:
 `connection.unknown-node`, `connection.unknown-port`, `connection.self-loop`, `connection.duplicate`,
 `connection.input-occupied`, `connection.type-mismatch` or `connection.cycle`. The rule order matters
-and is part of the contract (for example `input-occupied` is reported before `type-mismatch`).
+and is part of the contract, in this order: `unknown-node`, `unknown-port`, `self-loop`, `duplicate`,
+`input-occupied`, `type-mismatch`, `cycle`. Fixtures that break two rules at once pin the adjacent pairs
+(for example `conn-input-occupied-before-type-mismatch`, `conn-type-mismatch-before-cycle`). A port name must
+exist in the right direction: the source among the node's outputs, the target among its inputs.
 
 ### `config/*.json`
 
@@ -97,9 +124,10 @@ and is part of the contract (for example `input-occupied` is reported before `ty
 
 Validates `config` against the `configSchema` of the latest catalog definition of `nodeType`. `path` is
 a JSON Pointer **relative to the config object** (`/provider`). `expect` may be empty (the config is
-valid). Use `configText` (raw JSON text) instead of `config` when the parsed value must be built by a
-JSON parser, for example to get an **own** `__proto__` key, which a literal object cannot express.
-Give exactly one of `config` / `configText`.
+valid). Use `configText` (raw JSON text) instead of `config` when the exact text should be explicit, for
+example in the `__proto__` fixture: a JSON parser always creates an **own** `__proto__` key, whereas an
+object literal in JavaScript or Python would not, so `configText` makes that intent visible. Give exactly
+one of `config` / `configText`.
 
 ## Comparing errors: multisets, no messages
 
@@ -116,9 +144,13 @@ and review the diff:
 
 ```
 cd frontend
-UPDATE_FIXTURES=1 npm test                      # bash
-$env:UPDATE_FIXTURES='1'; npm test              # Windows PowerShell
+UPDATE_FIXTURES=1 npm test                      # bash (then: unset UPDATE_FIXTURES)
+$env:UPDATE_FIXTURES='1'; npm test; Remove-Item Env:UPDATE_FIXTURES   # Windows PowerShell
 ```
+
+With `UPDATE_FIXTURES` set the catalog test rewrites the file and then **fails on purpose** ("catalog
+fixture regenerated; unset UPDATE_FIXTURES and run again"), so a lingering environment variable can never
+make the drift check pass silently. Unset it and run `npm test` again.
 
 Only the catalog file is ever regenerated. The case fixtures are never generated from code: they are
 the independent statement of what the code must do.
@@ -130,7 +162,9 @@ the independent statement of what the code must do.
 2. Write the expected result from the rules (the documented contract), not by pasting what the code
    currently prints.
 3. Run `npm test` in `frontend/`. The runner names the file if it is malformed or fails.
-4. Every error code must stay covered by at least one `workflow/invalid` case, and every
+4. Raise `MIN_COUNTS` in the runner to the new totals. The floors make deleting fixtures fail the run and
+   are never lowered.
+5. Every error code must stay covered by at least one `workflow/invalid` case, and every
    `connection.*` code by at least one `connection` case; the runner enforces both.
 
 ## Never edit expected values just to make a test pass

@@ -20,7 +20,8 @@
       { "id": "e3", "source": { "nodeId": "c", "port": "true" }, "target": { "nodeId": "l", "port": "input" } },
       { "id": "e4", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "a", "port": "input" } },
       { "id": "e5", "source": { "nodeId": "c", "port": "false" }, "target": { "nodeId": "a", "port": "tools" } },
-      { "id": "e6", "source": { "nodeId": "a", "port": "output" }, "target": { "nodeId": "o", "port": "input" } }
+      { "id": "e6", "source": { "nodeId": "c", "port": "true" }, "target": { "nodeId": "a", "port": "tools" } },
+      { "id": "e7", "source": { "nodeId": "a", "port": "output" }, "target": { "nodeId": "o", "port": "input" } }
     ],
     "metadata": {}
   },

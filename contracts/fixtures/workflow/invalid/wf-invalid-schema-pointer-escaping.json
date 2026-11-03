@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-schema-pointer-escaping",
+  "description": "RFC 6901 escaping: the unknown config key a/b~c is reported at /nodes/0/config/a~1b~0c (a slash is ~1 and a tilde is ~0).",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "o", "config": { "format": "text", "a/b~c": 1 }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "schema.additionalProperties", "path": "/nodes/0/config/a~1b~0c" }] }
+}

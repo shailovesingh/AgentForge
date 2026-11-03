@@ -1,11 +1,10 @@
-/// <reference types="node" />
 // Runs the language-neutral fixtures in /contracts/fixtures against the real TypeScript code.
 // Format and rules: contracts/README.md. In Phase 1.1 the fixtures are executed in TypeScript
 // only; no other implementation runs them yet.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { getLatestNodeDefinition, getNodeDefinition, nodeDefinitions } from '../catalog'
+import { getLatestNodeDefinition, nodeDefinitions } from '../catalog'
 import { validateConfig } from '../workflow/configSchema'
 import { checkConnection } from '../workflow/connections'
 import { ERROR_CODES, jsonPointer } from '../workflow/errors'
@@ -19,13 +18,16 @@ import type { Workflow } from '../workflow/types'
 type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config'
 
 const FAMILY_FIELDS: Record<Family, readonly string[]> = {
-  'workflow/valid': ['input', 'inputText', 'expect'],
-  'workflow/invalid': ['input', 'inputText', 'expect'],
+  'workflow/valid': ['input', 'inputText', 'inputRepeat', 'expect'],
+  'workflow/invalid': ['input', 'inputText', 'inputRepeat', 'expect'],
   connection: ['nodes', 'edges', 'source', 'target', 'expect'],
   config: ['nodeType', 'config', 'configText', 'expect'],
 }
 
 const KNOWN_CODES: readonly string[] = ERROR_CODES
+
+// A typo in `inputRepeat.times` must not allocate gigabytes.
+export const MAX_REPEAT_TIMES = 10_000_000
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -79,6 +81,26 @@ export function checkShape(file: string, value: unknown): string[] {
     if (hasText && typeof value[`${field}Text`] !== 'string') bad(`${field}Text must be a string`)
   }
 
+  // Workflow cases: exactly one of `input`, `inputText`, `inputRepeat`.
+  const workflowInput = () => {
+    const present = ['input', 'inputText', 'inputRepeat'].filter((k) => Object.hasOwn(value, k))
+    if (present.length === 0) return bad('needs input, inputText or inputRepeat')
+    if (present.length > 1) return bad(`has more than one of input, inputText, inputRepeat (${present.join(', ')}); use exactly one`)
+    if (present[0] === 'inputText' && typeof value.inputText !== 'string') bad('inputText must be a string')
+    if (present[0] !== 'inputRepeat') return
+    const r = value.inputRepeat
+    if (!isObject(r) || Object.keys(r).some((k) => !['prefix', 'unit', 'times', 'suffix'].includes(k))) {
+      return bad('inputRepeat must be an object with only prefix, unit, times, suffix')
+    }
+    if (typeof r.unit !== 'string') bad('inputRepeat.unit must be a string')
+    if (!Number.isInteger(r.times) || (r.times as number) < 0 || (r.times as number) > MAX_REPEAT_TIMES) {
+      bad(`inputRepeat.times must be an integer from 0 to ${MAX_REPEAT_TIMES}`)
+    }
+    for (const k of ['prefix', 'suffix']) {
+      if (Object.hasOwn(r, k) && typeof r[k] !== 'string') bad(`inputRepeat.${k} must be a string`)
+    }
+  }
+
   if (!isNonEmptyString(value.name)) bad('name must be a non-empty string')
   else if (value.name !== file.slice(file.lastIndexOf('/') + 1).replace(/\.json$/, '')) {
     bad(`name "${value.name}" must equal the file name without .json`)
@@ -88,13 +110,13 @@ export function checkShape(file: string, value: unknown): string[] {
   const expected = value.expect
   switch (family) {
     case 'workflow/valid':
-      oneOf('input', () => true, 'any JSON value')
+      workflowInput()
       if (!isObject(expected) || !hasExactKeys(expected, ['valid']) || expected.valid !== true) {
         bad('expect must be exactly { "valid": true }')
       }
       break
     case 'workflow/invalid':
-      oneOf('input', () => true, 'any JSON value')
+      workflowInput()
       if (!isObject(expected) || !hasExactKeys(expected, ['valid', 'errors']) || expected.valid !== false) {
         bad('expect must be { "valid": false, "errors": [...] }')
       } else expectationList(expected.errors, false)
@@ -165,6 +187,7 @@ interface CaseBase {
 interface WorkflowCase extends CaseBase {
   input?: unknown
   inputText?: string
+  inputRepeat?: { prefix?: string; unit: string; times: number; suffix?: string }
   expect: { valid: boolean; errors?: Expected[] }
 }
 interface ConnectionCase extends CaseBase {
@@ -246,7 +269,11 @@ const asMultiset = (list: Expected[]): Expected[] =>
       return x < y ? -1 : x > y ? 1 : 0
     })
 
-const workflowText = (c: WorkflowCase): string => c.inputText ?? JSON.stringify(c.input)
+const workflowText = (c: WorkflowCase): string => {
+  const r = c.inputRepeat
+  if (r) return (r.prefix ?? '') + r.unit.repeat(r.times) + (r.suffix ?? '')
+  return c.inputText ?? JSON.stringify(c.input)
+}
 
 function connectionWorkflow(c: ConnectionCase): Workflow {
   return {
@@ -259,7 +286,7 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
       type: n.type,
       typeVersion: 1,
       label: n.id,
-      config: structuredClone(getNodeDefinition(n.type, 1)?.defaults ?? {}),
+      config: {}, // checkConnection never reads config, so this format does not depend on catalog defaults
       position: { x: 0, y: 0 },
     })),
     edges: c.edges.map((e, i) => ({
@@ -270,6 +297,8 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
     metadata: {},
   }
 }
+
+const MIN_COUNTS = { total: 74, valid: 7, invalid: 30, connection: 22, config: 15 }
 
 describe('fixture corpus', () => {
   test('format.json declares fixtureFormat 1', () => {
@@ -293,17 +322,30 @@ describe('fixture corpus', () => {
     expect(missing, 'connection codes with no connection fixture').toEqual([])
   })
 
-  test('every family has at least one case', () => {
-    expect([corpus.valid.length, corpus.invalid.length, corpus.connection.length, corpus.config.length].every((n) => n > 0)).toBe(true)
+  // Floors: deleting fixtures must fail the run. Raise them when you add cases; never lower them.
+  test('no fixtures have been deleted (minimum counts)', () => {
+    const counts = {
+      total: corpus.valid.length + corpus.invalid.length + corpus.connection.length + corpus.config.length,
+      valid: corpus.valid.length,
+      invalid: corpus.invalid.length,
+      connection: corpus.connection.length,
+      config: corpus.config.length,
+    }
+    expect(counts.total, 'total cases').toBeGreaterThanOrEqual(MIN_COUNTS.total)
+    for (const family of ['valid', 'invalid', 'connection', 'config'] as const) {
+      expect(counts[family], `${family} cases`).toBeGreaterThanOrEqual(MIN_COUNTS[family])
+    }
   })
 })
 
 describe('catalog fixture', () => {
   test('builtin.catalog.json equals the catalog in code', () => {
     const current: unknown = JSON.parse(JSON.stringify(nodeDefinitions))
-    if (process.env.UPDATE_FIXTURES === '1') {
+    if (process.env.UPDATE_FIXTURES) {
       mkdirSync(dirname(CATALOG_PATH), { recursive: true })
       writeFileSync(CATALOG_PATH, JSON.stringify(nodeDefinitions, null, 2) + '\n', 'utf8')
+      // Regenerating always fails, so a lingering UPDATE_FIXTURES can never make the drift check pass.
+      throw new Error('catalog fixture regenerated; unset UPDATE_FIXTURES and run again')
     }
     let stored: unknown
     try {
@@ -315,7 +357,7 @@ describe('catalog fixture', () => {
       stored,
       `contracts/fixtures/${CATALOG_FILE} differs from the catalog in frontend/src/catalog/nodes.ts. ` +
         `If the catalog change is intended, regenerate the file with UPDATE_FIXTURES=1 npm test ` +
-        `(PowerShell: $env:UPDATE_FIXTURES='1'; npm test) and review the diff.`,
+        `(PowerShell: $env:UPDATE_FIXTURES='1'; npm test; Remove-Item Env:UPDATE_FIXTURES), then run npm test again, and review the diff.`,
     ).toEqual(current)
   })
 })
@@ -421,13 +463,67 @@ describe('checkShape', () => {
   })
 
   test('both input and inputText', () => {
-    some(checkShape(files.invalid, { ...good.invalid, inputText: '[]' }), 'has both input and inputText')
+    some(checkShape(files.invalid, { ...good.invalid, inputText: '[]' }), 'has more than one of input, inputText, inputRepeat')
     some(checkShape(files.config, { ...good.config, configText: '{}' }), 'has both config and configText')
   })
 
   test('neither input nor inputText', () => {
     const { input: _input, ...noInput } = good.invalid
-    some(checkShape(files.invalid, noInput), 'needs input or inputText')
+    some(checkShape(files.invalid, noInput), 'needs input, inputText or inputRepeat')
+  })
+
+  describe('inputRepeat', () => {
+    const { input: _input, ...base } = good.invalid
+    const withRepeat = (inputRepeat: unknown) => ({ ...base, inputRepeat })
+
+    test('a valid inputRepeat (with and without prefix and suffix) has no problems', () => {
+      expect(checkShape(files.invalid, withRepeat({ unit: ' ', times: 3 }))).toEqual([])
+      expect(checkShape(files.invalid, withRepeat({ prefix: '[', unit: '1,', times: 3, suffix: '1]' }))).toEqual([])
+      const { input: _validInput, ...validBase } = good.valid
+      expect(checkShape(files.valid, { ...validBase, inputRepeat: { unit: 'x', times: 0 } })).toEqual([])
+    })
+    test('inputRepeat together with input or inputText', () => {
+      some(checkShape(files.invalid, { ...good.invalid, inputRepeat: { unit: ' ', times: 1 } }), 'has more than one of')
+      some(checkShape(files.invalid, { ...withRepeat({ unit: ' ', times: 1 }), inputText: '[]' }), 'has more than one of')
+    })
+    test('times over the cap, negative or not an integer', () => {
+      expect(checkShape(files.invalid, withRepeat({ unit: ' ', times: MAX_REPEAT_TIMES }))).toEqual([])
+      some(checkShape(files.invalid, withRepeat({ unit: ' ', times: MAX_REPEAT_TIMES + 1 })), 'inputRepeat.times must be an integer')
+      some(checkShape(files.invalid, withRepeat({ unit: ' ', times: 1.5 })), 'inputRepeat.times must be an integer')
+      some(checkShape(files.invalid, withRepeat({ unit: ' ', times: -1 })), 'inputRepeat.times must be an integer')
+      some(checkShape(files.invalid, withRepeat({ unit: ' ', times: '3' })), 'inputRepeat.times must be an integer')
+    })
+    test('missing or mistyped unit, prefix, suffix, unknown key, non-object', () => {
+      some(checkShape(files.invalid, withRepeat({ times: 3 })), 'inputRepeat.unit must be a string')
+      some(checkShape(files.invalid, withRepeat({ unit: ' ', times: 3, prefix: 1 })), 'inputRepeat.prefix must be a string')
+      some(checkShape(files.invalid, withRepeat({ unit: ' ', times: 3, suffix: null })), 'inputRepeat.suffix must be a string')
+      some(checkShape(files.invalid, withRepeat({ unit: ' ', times: 3, extra: 1 })), 'only prefix, unit, times, suffix')
+      some(checkShape(files.invalid, withRepeat([])), 'inputRepeat must be an object')
+    })
+  })
+
+  test('missing description', () => {
+    const { description: _description, ...noDescription } = good.invalid
+    some(checkShape(files.invalid, noDescription), 'description must be a non-empty string')
+  })
+
+  test('workflow/valid with valid:false', () => {
+    some(checkShape(files.valid, { ...good.valid, expect: { valid: false } }), 'expect must be exactly { "valid": true }')
+  })
+
+  test('a bad nodes or edges entry in a connection case', () => {
+    some(checkShape(files.connection, { ...good.connection, nodes: [{ id: 'x' }] }), 'nodes[0] must be exactly { id, type }')
+    some(checkShape(files.connection, { ...good.connection, nodes: 'x' }), 'nodes must be an array')
+    some(checkShape(files.connection, { ...good.connection, edges: [{ source: ['x', 'text'] }] }), 'edges[0] must be exactly')
+    some(checkShape(files.connection, { ...good.connection, edges: 'x' }), 'edges must be an array')
+  })
+
+  test('an extra message key inside an expected error entry', () => {
+    some(
+      checkShape(files.invalid, { ...good.invalid, expect: { valid: false, errors: [{ code: 'doc.not-object', path: '', message: 'm' }] } }),
+      'expect[0] must be exactly { code, path }',
+    )
+    some(checkShape(files.config, { ...good.config, expect: [{ code: 'schema.required', path: '/provider', message: 'm' }] }), 'expect[0] must be exactly')
   })
 
   test('unknown error code', () => {

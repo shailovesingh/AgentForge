@@ -1,0 +1,12 @@
+{
+  "name": "conn-unknown-port-source-is-input",
+  "description": "Using an input port (llm.prompt input) as the source is rejected with connection.unknown-port, although the target port is a valid input.",
+  "nodes": [
+    { "id": "l", "type": "llm.prompt" },
+    { "id": "o", "type": "output.result" }
+  ],
+  "edges": [],
+  "source": ["l", "input"],
+  "target": ["o", "input"],
+  "expect": "connection.unknown-port"
+}

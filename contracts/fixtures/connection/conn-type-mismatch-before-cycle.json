@@ -1,0 +1,12 @@
+{
+  "name": "conn-type-mismatch-before-cycle",
+  "description": "Connecting the number output h.status into the text input a.input when a already feeds h is both a type mismatch and a cycle; type-mismatch is reported (it is checked before cycle).",
+  "nodes": [
+    { "id": "a", "type": "agent.autonomous" },
+    { "id": "h", "type": "http.request" }
+  ],
+  "edges": [{ "source": ["a", "output"], "target": ["h", "input"] }],
+  "source": ["h", "status"],
+  "target": ["a", "input"],
+  "expect": "connection.type-mismatch"
+}

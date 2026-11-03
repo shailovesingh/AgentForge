@@ -1,0 +1,16 @@
+{
+  "name": "conn-input-occupied-before-cycle",
+  "description": "Connecting l2 back into l1.input, which the trigger already feeds and which already reaches l2, is both occupied and cycle-closing; input-occupied is reported (it is checked before cycle).",
+  "nodes": [
+    { "id": "t", "type": "trigger.manual" },
+    { "id": "l1", "type": "llm.prompt" },
+    { "id": "l2", "type": "llm.prompt" }
+  ],
+  "edges": [
+    { "source": ["t", "data"], "target": ["l1", "input"] },
+    { "source": ["l1", "text"], "target": ["l2", "input"] }
+  ],
+  "source": ["l2", "text"],
+  "target": ["l1", "input"],
+  "expect": "connection.input-occupied"
+}

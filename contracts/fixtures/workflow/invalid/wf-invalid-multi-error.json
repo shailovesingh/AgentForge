@@ -1,0 +1,23 @@
+{
+  "name": "wf-invalid-multi-error",
+  "description": "Errors in different nodes are all reported: an unknown config key on the LLM node and a bad enum value on the output node give two errors.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "provider": "ollama", "prompt": "hi", "extra": 1 }, "position": { "x": 0, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "o", "config": { "format": "xml" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      { "code": "schema.additionalProperties", "path": "/nodes/0/config/extra" },
+      { "code": "schema.enum", "path": "/nodes/1/config/format" }
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "name": "wf-invalid-error-cap",
+  "description": "At most 20 errors are reported (MAX_ERRORS): 23 nodes share one id, so 22 duplicate-id errors arise and only the first 20 are returned (nodes 1 to 20).",
+  "inputRepeat": {
+    "prefix": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"Sample\",\"description\":\"\",\"nodes\":[",
+    "unit": "{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"t\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}},",
+    "times": 22,
+    "suffix": "{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"t\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}"
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/1/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/2/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/3/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/4/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/5/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/6/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/7/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/8/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/9/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/10/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/11/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/12/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/13/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/14/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/15/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/16/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/17/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/18/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/19/id"
+      },
+      {
+        "code": "node.duplicate-id",
+        "path": "/nodes/20/id"
+      }
+    ]
+  }
+}

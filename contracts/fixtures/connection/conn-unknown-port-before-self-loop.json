@@ -1,0 +1,9 @@
+{
+  "name": "conn-unknown-port-before-self-loop",
+  "description": "A connection from a missing port of a node to that same node is both an unknown port and a self-loop; unknown-port is reported (it is checked before self-loop).",
+  "nodes": [{ "id": "l", "type": "llm.prompt" }],
+  "edges": [],
+  "source": ["l", "nope"],
+  "target": ["l", "input"],
+  "expect": "connection.unknown-port"
+}

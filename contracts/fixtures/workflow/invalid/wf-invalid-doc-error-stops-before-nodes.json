@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-doc-error-stops-before-nodes",
+  "description": "A document-level error stops validation before nodes are checked: the numeric id gives doc.invalid-field and the unknown node type is not reported.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": 5,
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "m", "type": "mystery.node", "typeVersion": 1, "label": "m", "config": {}, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "doc.invalid-field", "path": "/id" }] }
+}

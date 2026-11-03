@@ -1,0 +1,12 @@
+{
+  "name": "conn-unknown-port-target-is-output",
+  "description": "Using an output port (llm.prompt text) as the target is rejected with connection.unknown-port, although the source port is a valid output.",
+  "nodes": [
+    { "id": "t", "type": "trigger.manual" },
+    { "id": "l", "type": "llm.prompt" }
+  ],
+  "edges": [],
+  "source": ["t", "data"],
+  "target": ["l", "text"],
+  "expect": "connection.unknown-port"
+}

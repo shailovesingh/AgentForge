@@ -1,0 +1,12 @@
+{
+  "name": "conn-unknown-port-missing-target",
+  "description": "A connection into an input port the node does not have is rejected with connection.unknown-port.",
+  "nodes": [
+    { "id": "t", "type": "trigger.manual" },
+    { "id": "l", "type": "llm.prompt" }
+  ],
+  "edges": [],
+  "source": ["t", "data"],
+  "target": ["l", "nope"],
+  "expect": "connection.unknown-port"
+}

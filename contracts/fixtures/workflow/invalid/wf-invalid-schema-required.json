@@ -1,6 +1,6 @@
 {
   "name": "wf-invalid-schema-required",
-  "description": "A config that lacks a required key is rejected with schema.required at that key.",
+  "description": "Documents CURRENT behaviour: a config that lacks a required key is rejected with schema.required at that key. Task T5 changes this per decision D-025 (absent required keys stop being a structural import error), and this fixture will change with it.",
   "input": {
     "schemaVersion": "1.0",
     "id": "wf_1",
