@@ -3,7 +3,7 @@
 > **For the Product Owner.** Part 1 is a plain-language **primer** (reference material: what we are building and how the code is organised). Part 2 is the **teaching record** (lessons actually taught and what you demonstrated).
 > The **curriculum and statuses** are in `docs/LEARNING.md`. Learning progress is tracked separately from implementation progress.
 > **Living document.** The Principal Architect updates it at the end of every task (D-028). The primer describes the project **as it is today**; where something is planned but not built, it says so.
-> Last updated: 2026-11-04, after Phase 1.1 T4a (Lesson L4).
+> Last updated: 2026-11-04, after Phase 1.1 T4b and its review fixes (Lesson L5, revised for commit `d2ef493`).
 
 # Part 1: Primer
 
@@ -26,7 +26,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 |---|---|
 | The visual editor in the browser: drag nodes from a library, connect them with rules, edit each node's settings, save the workflow to a `.json` file and load it back | Running workflows (the "engine") |
 | A catalog of 6 node types | AI models, agents, tools (Phase 4) |
-| 460 unit tests and 28 browser tests | Natural-language workflow generation (Phase 5) |
+| 707 unit tests and 30 browser tests | Natural-language workflow generation (Phase 5) |
 | A CI workflow that runs the checks on GitHub | The backend server, database, saving to a server (Phase 2) |
 
 **Important:** today everything runs **in your browser only**. There is no server. Nothing runs a workflow yet. The editor produces a *description* of a workflow; later phases will execute it.
@@ -34,7 +34,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | Phase | What it delivers | Status |
 |---|---|---|
 | 1 | The visual editor | Done and accepted |
-| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 4a of 10 done) |
+| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 4 of 10 done) |
 | 2 | Backend server and database; save/load workflows | Planned, not approved |
 | 3 | Execution engine: actually run workflows | Planned |
 | 4 | AI runtime: LLM and Agent nodes | Planned |
@@ -115,7 +115,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **Strict parsing (built in task T4a, Lesson L4).** Reading an imported file with our own small parser instead of the browser's built-in one, so that problems the built-in parser hides (a repeated key, a number too big to store exactly, a file that is not valid UTF-8) become clear errors. It also enforces AgentForge's limits: numbers no larger than 2^53 - 1 in magnitude, nesting at most 64 levels, files at most 5,000,000 bytes. See `frontend/src/workflow/strictJson.ts` and `valuePolicy.ts`.
 
-**Canonical JSON (planned, task T4b).** Writing a workflow to text in one exact, repeatable way (keys sorted, numbers formatted the same everywhere) so the same workflow always produces byte-identical text. This matters for comparing, hashing and testing across TypeScript, Python and the database.
+**Canonical JSON and export JSON (built in task T4b, Lesson L5; TypeScript only).** Writing a workflow to text in one exact, repeatable way (keys sorted, numbers formatted the same everywhere) so the same workflow always produces byte-identical text. There are two named forms: `canonical-json/1` (compact, meant for hashing) and `export-json/1` (pretty, 2-space indent, for the `.json` files you download; never hashed). See `frontend/src/workflow/canonicalJson.ts` and `contracts/CANONICAL_JSON.md`. **Built and tested in TypeScript only: the Python version is planned for Phase 2 and no parity is claimed; no hashing code exists yet (planned, Phase 2).**
 
 **Fixtures (built in task T3, Lesson L3).** Shared test data files in the top-level `contracts/` folder, one case per file, with no code inside. The TypeScript tests read them today; the Python backend tests are planned (Phase 2) to read the same files, and only then can the two sides be said to agree.
 
@@ -131,7 +131,8 @@ frontend/src/
     validate.ts       checks an imported file and returns a clean Workflow or a list of errors
     configSchema.ts   checks a node's settings against its schema
     migrate.ts        upgrades old file formats
-    serialize.ts      export to text, import from text (bytes or text)
+    serialize.ts      export to text (with the export guard), import from text (bytes or text)
+    canonicalJson.ts  the two repeatable JSON text writers: compact (for hashing) and pretty (for files) (T4b)
     strictJson.ts     our strict JSON parser for imported files (T4a)
     valuePolicy.ts    the limits (numbers, nesting, text rules) as one shared checker (T4a)
     errors.ts         the error codes and JSON Pointer paths (T2)
@@ -156,7 +157,7 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 3. `store/editorStore.ts` looks up the definition in the catalog, creates a node with default settings, and updates the workflow.
 4. The store change re-renders: `canvas/flowMapping.ts` converts the workflow to React Flow objects, and `nodes/WorkflowNode.tsx` draws the box with its ports.
 5. You connect two ports: `Canvas.tsx` asks `workflow/connections.ts` whether it is allowed, and only then calls `store.connect`.
-6. You click Export: `app/Toolbar.tsx` calls `serialize.ts`, which writes the workflow to a `.json` file.
+6. You click Export: `app/Toolbar.tsx` calls `exportWorkflowText` in `serialize.ts`, which checks the workflow against the limits, writes it with `canonicalJson.ts` (keys sorted, one exact layout) and only then lets the browser download the `.json` file. If a check fails, the toolbar says "Export failed. No file was created."
 
 **Suggested reading order** (each is short): `workflow/types.ts` → `catalog/nodes.ts` → `workflow/connections.ts` → `store/editorStore.ts` → `canvas/Canvas.tsx` → `workflow/validate.ts`.
 
@@ -164,8 +165,8 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 | Kind | Tool | What it does | Command |
 |---|---|---|---|
-| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, and the shared fixtures in `contracts/`). 460 today. | `npm test` |
-| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 28 today. | `npm run test:e2e` |
+| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, and the shared fixtures in `contracts/`). 707 today. | `npm test` |
+| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 29 today. | `npm run test:e2e` |
 | **Type check** | TypeScript | Catches mismatched data shapes before running | part of `npm run build` |
 | **Lint** | Oxlint | Catches suspicious code patterns | `npm run lint` |
 | **Everything** | | All of the above, in order | `npm run verify` |
@@ -218,7 +219,7 @@ npm run dev              # open http://localhost:5173
 
 ## 10. What happens next
 
-Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export; **T5** better settings schemas and the Groq provider; **T6** upgrading old files; **T8** the branch rules written down; **T7** warnings in the editor; **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
+Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5** better settings schemas and the Groq provider; **T6** upgrading old files; **T8** the branch rules written down; **T7** warnings in the editor; **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
 
 ## 11. Glossary, quick reference
 
@@ -251,6 +252,7 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | **L2** | Phase 1.1 T2: structured validation errors | 3 (main); also 1 and 12 | 2026-11-03 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L3** | Phase 1.1 T3: shared JSON fixtures and the TypeScript runner | 1, 3, 12 | 2026-11-03 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L4** | Phase 1.1 T4a: strict JSON parsing and the policy limits | 3 (main), 12, 1 | 2026-11-04 | 6 (answered at the end of the project) | Explained; evaluation pending |
+| **L5** | Phase 1.1 T4b (commits `dd33e84`, `d2ef493`): canonical compact JSON, pretty export JSON and the export guard | 3 (main), 1, 12 | 2026-11-04 | 6 (answered at the end of the project) | Explained; evaluation pending |
 
 ## Concept index
 
@@ -292,6 +294,21 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | Bounding attacker-controlled text when it is echoed in a message (exact machine path, short human message) | 3, 12 | L4 | Explained (no evidence) |
 | Boundary-value tests, differential testing against `JSON.parse`, fuzz-style truncation tests, a guard test over source text | 12 | L4 | Explained (no evidence) |
 | Mutation testing and the equivalent mutant; a vacuous test caused by the tooling | 12 | L4 | Explained (no evidence) |
+| Canonical form and deterministic serialization (same data, same bytes); why a hash needs it | 1, 3 | L5 | Explained (no evidence) |
+| Two named profiles: `canonical-json/1` (compact, for hashing) and `export-json/1` (pretty, for files, never hashed); no hashing code exists yet | 3 | L5 | Explained (no evidence) |
+| Why integer-like keys defeat `JSON.stringify` (also with a sorting replacer) and the fix: sort the key list and write the text directly | 3 | L5 | Explained (no evidence) |
+| UTF-16 code unit order versus code point order (the U+E000 and U+1F600 pair); what a Python implementation must do | 1, 3 | L5 | Explained (no evidence) |
+| Number text: ECMAScript `String(n)` versus Python `repr`; minus zero; the 1e-7 threshold | 3 | L5 | Explained (no evidence) |
+| String escapes: only the standard set; U+007F, U+2028, U+2029 literal; no Unicode normalization | 3 | L5 | Explained (no evidence) |
+| Which rules come from RFC 8785, I-JSON, AgentForge policy or PostgreSQL compatibility (and the export layout being AgentForge's own) | 1, 3 | L5 | Explained (no evidence) |
+| Idempotence and round trip: export, import, export is byte-identical; the export guard (`exportWorkflowText`) and "what you can export you can import" | 1, 3 | L5 | Explained (no evidence) |
+| Writers that refuse non-JSON data (undefined, Map, Date, cycles) instead of skipping it | 3, 12 | L5 | Explained (no evidence) |
+| A guard that never throws: project to known fields, check, write inside try/catch, return one structured error (`value.not-json-data`, an export-only code) | 1, 3, 12 | L5 | Explained (no evidence) |
+| PostgreSQL JSONB does not keep key order, so canonicalize on read (documented; not verified here) | 1 | L5 | Explained (no evidence) |
+| Golden files with hand-written expectations; property-based testing against an independent reference; a reference that shares one call with the code (numbers) | 12 | L5 | Explained (no evidence) |
+| Independent re-implementation by a reviewer as an answer to circular tests | 12 | L5 | Explained (no evidence) |
+| A refactor can delete an implicit protection (projecting to known fields; catching writer failures) | 3, 12 | L5 | Explained (no evidence) |
+| Mutation testing of a writer (17 breaks) and an equivalent mutant (`JSON.stringify(n)` versus `String(n)`) | 12 | L5 | Explained (no evidence) |
 | Primer concepts (workflow, node, port, edge, catalog, config schema, `schemaVersion` vs `typeVersion`, validation vs warnings, DAG, credentials) | 1, 2, 3, 6, 7 | Primer (Part 1) | Explained as reference (no evidence, no lesson) |
 
 ---
@@ -908,3 +925,195 @@ Every box on the left is a place where the file can be refused, and every refusa
 4. The importer decodes the file with a *fatal* UTF-8 decoder and strips one byte order mark. What would happen to a damaged file if it used the default lenient decoding, and what would happen to a file that begins with two byte order marks? Where in the code and fixtures are these decisions pinned?
 5. Walk through what happens when a user types a deeply nested JSON object or the number `9007199254740993` into a node's settings panel. Why must the editor obey the same limits as the importer (round-trip integrity), what does `CONFIG_PARENT_DEPTH` represent, and which part of that path still uses `JSON.parse` and why is it acceptable there?
 6. Our review found an equivalent mutant, a vacuous surrogate test and an unbounded error message. For each, state in your own words what went wrong, how it was detected, and what the response was. Then explain why, for the equivalent mutant, "write a test that tells them apart" would have been the wrong response.
+
+---
+
+## Lesson L5: The same workflow, the same bytes, everywhere (canonical JSON, export JSON and the export guard)
+
+**Task:** Phase 1.1 T4b (canonical compact JSON, pretty export JSON, the export guard and the serialization fixtures), commit `dd33e84`, plus its review-fix commit `d2ef493`. **Modules:** 3 (Workflow JSON: canonical form, deterministic output, round trip), 1 (System Architecture: one contract across languages and storage), 12 (Security, Testing and Deployment: golden files, property-based testing against an independent reference, mutation testing, equivalent mutants).
+
+*Status of the code described here.* This lesson describes the code as of commit `d2ef493`, which is the follow-up to `dd33e84`. The independent review of `dd33e84` found two real problems (story 2 below); `d2ef493` fixes them, and this lesson describes the fixed code. Where the lesson says what `dd33e84` alone did, it says so. **What I verified myself:** I read `git show d2ef493`, the current `serialize.ts`, `errors.ts`, `strictJson.ts`, `configSchema.ts` and the new tests, and I ran `npm test` in `frontend/` (707 unit tests passed). **What I did not run:** the 30 browser (Playwright) tests (I counted the `test(` calls in `frontend/e2e/`: 30, but did not execute them) and the mutation checks (those are the implementer's and reviewer's reports, repeated here as reports).
+
+### 1. The problem
+
+Imagine two people each write down the same shopping list. One writes the items alphabetically, one in the order they thought of them; one writes "1.0 kg", the other "1 kg". Both lists mean the same thing, but if you compare them letter by letter, or compute a **fingerprint** (a hash) of each, they differ. A hash is a short code computed from the exact bytes of some data: change one byte and the fingerprint changes completely.
+
+AgentForge will want fingerprints of workflows (to detect "nothing actually changed, do not save a new version", for caching, and later for version identity). That only works if **the same workflow always becomes exactly the same bytes**, whichever program wrote them. The workflow will be handled by three different systems: the TypeScript editor today, a Python backend (planned, Phase 2) and the PostgreSQL database (planned, Phase 2). The trouble is that they disagree about small things. I ran these on this machine (Node v24.13.0 and Python 3.14.2, the versions named in `docs/PHASE1_1_PLAN.md` section 3.5):
+
+| Case | JavaScript | Python | Why it matters |
+|---|---|---|---|
+| An object with keys `"10"`, `"9"`, `"a"` | `Object.keys` lists `9, 10, a` (verified), and `JSON.stringify` writes them in that order | `json.dumps(..., sort_keys=True)` writes `10, 9, a` (verified) | Two languages sorting "the same" keys produce different text |
+| Two keys: U+E000 and U+1F600 (the grinning-face emoji) | Default sort puts the emoji **first** (verified) | Default sort puts U+E000 **first** (verified) | The emoji is stored in UTF-16 as two code units that begin with D83D, which is smaller than E000. Python compares whole code points, where 1F600 is larger than E000. A Python writer must sort by UTF-16 code units. Encoding each key as `utf-16-be` before sorting restores the JavaScript order (verified) |
+| The numbers one, minus zero, 0.00001, 0.000001, 0.0000001 | `1`, `0`, `0.00001`, `0.000001`, `1e-7` (verified via `String(n)`) | `repr` gives `1.0`, `-0.0`, `1e-05`, `1e-06`, `1e-07` (verified) | Same number, different text. Python pads the exponent and switches to exponent form earlier |
+| `{"a":1,"a":2}` | Last value wins, silently | Last value wins, silently (both verified) | Handled at parse time since T4a (Lesson L4) |
+| `1e400`, `NaN` | `JSON.parse` gives `Infinity`, and refuses `NaN` | `json.loads` gives `inf` and **accepts** `NaN` (verified) | Handled by the policy (finite numbers only) |
+| A lone surrogate (half of an emoji) | `JSON.stringify` escapes it | Writing it as UTF-8 raises `UnicodeEncodeError` (verified) | Refused up front |
+
+The PostgreSQL row is **not verified**, because PostgreSQL is not installed in this repository: the plan and `contracts/CANONICAL_JSON.md` document that its `jsonb` type does **not** keep key order, collapses duplicate keys, and stores numbers as `numeric`. That is why the database can never be the canonical form (see section 3).
+
+And what did we have **before** T4b? `serializeWorkflow` in `frontend/src/workflow/serialize.ts` copied the known fields into a new object in a hand-written order (visible with `git show dd33e84^:frontend/src/workflow/serialize.ts`) and called `JSON.stringify(..., null, 2)`. That gave stable output only by accident: the top-level order was whatever the code listed, and `config` and `metadata` (user-typed settings) were written in whatever order their keys had been inserted. Nothing wrote down the rules, and nothing could be shared with another language.
+
+### 2. The concept
+
+**Canonical form (canonicalization).** A single agreed way to write a piece of data as text, so equal data gives equal text. **Deterministic serialization** means the same input always gives the same output. The relevant standard is **RFC 8785, the JSON Canonicalization Scheme (JCS)**. It defines: sort object keys by UTF-16 code units, write numbers the way ECMAScript's number-to-string does, write strings with a fixed set of escapes, and use no whitespace. (I read these rules as summarized in `contracts/CANONICAL_JSON.md` and the plan; I did not open the RFC itself in this session.)
+
+**Two profiles, not one.** AgentForge names two text forms and keeps them separate:
+
+| Profile | Function | Layout | Job |
+|---|---|---|---|
+| `canonical-json/1` | `canonicalCompact` | compact, no whitespace at all, no trailing LF | **The form meant for hashing**, ETags, equality and no-op detection. Never shown to people, never written to a file |
+| `export-json/1` | `exportPretty` | 2-space indent, `": "` after a key, one item per line, empty `{}` and `[]` inline, LF line ends, exactly one trailing LF | Human-readable `.json` files you download. **Never hashed** |
+
+Both live in `frontend/src/workflow/canonicalJson.ts` and share one function, so they have the same key order, number text and string escapes by construction. **Important honesty point:** no hashing code exists yet. Hashing is Phase 2 (planned: SHA-256 of the compact UTF-8 bytes, see `docs/PHASE1_1_PLAN.md` section 3.5). T4b only builds the two text profiles.
+
+**Round trip and idempotence.** Two properties are the heart of the task. **Idempotent:** exporting, importing and exporting again gives byte-identical text. **Stable canonical form:** the compact form of the re-imported export equals the compact form of the original. These are the promises the tests check.
+
+**Rules and where each one comes from.** As in Lesson L4, it matters to say honestly whether a rule is a standard or our own decision:
+
+| Rule | Source |
+|---|---|
+| Keys sorted at every level by UTF-16 code unit order; array order kept | RFC 8785 (arrays: JSON semantics too) |
+| Numbers written by ECMAScript number-to-string (shortest digits that read back the same; minus zero writes `0`; `1.0` writes `1`; `1e2` writes `100`; `0.000001` stays decimal; `0.0000001` writes `1e-7`) | RFC 8785 |
+| Strings escape only: quote, backslash, `b t n f r` short forms, other controls below U+0020 as a six-character escape with **lowercase** hex. Slash, U+007F, U+2028, U+2029, U+FEFF and all non-ASCII stay literal | RFC 8785 |
+| Keys unique; no lone surrogates; numbers finite | I-JSON (RFC 7493), which JCS requires of its input; we enforce uniqueness at parse time (Lesson L4) |
+| **Magnitude of every number at most 2^53 - 1** | **AgentForge policy**, not an RFC 8785 rule |
+| **No U+0000 anywhere in strings or keys** | **AgentForge / PostgreSQL `jsonb` compatibility rule**, not an RFC 8785 rule (PostgreSQL cannot store NUL; documented, not verified here) |
+| Depth at most 64 (root is 1); size at most 5,000,000 UTF-8 bytes | AgentForge policy |
+| No Unicode normalization (an e with an acute accent and an `e` followed by U+0301 are different) | AgentForge policy |
+| The export **layout** (indent, `": "`, trailing LF) | AgentForge's own profile. RFC 8785 describes only the compact form (my understanding from general knowledge; `export-json/1` is an AgentForge name, not a standard) |
+
+### 3. Why we selected this approach
+
+1. **Two profiles, one function.** If you hash the pretty form, then any future tweak to the layout (indent width, a trailing newline, Windows line ends) changes every hash. Keeping hashing on the compact form and files on the pretty form means each can be tuned for its own job. The pretty form follows the compact form's rules, so a person reading the file sees the same content that gets hashed.
+2. **Write the text directly. Do not rebuild an object and call `JSON.stringify`.** A JavaScript object lists integer-like keys first, in numeric order, whatever order you insert them in. So no amount of preparation can make `JSON.stringify` write `"10"` before `"9"`. I verified that even a "sorting replacer" function (the usual trick) still produces `9, 10, a`. `canonicalJson.ts` instead builds an array of text pieces and sorts the **key list** itself.
+3. **Sort with the default `Array.prototype.sort()` on strings.** In JavaScript that compares UTF-16 code units, which is exactly the JCS order, so the code is one call: `Object.keys(v).sort()`. The fixtures (including the emoji versus U+E000 pair) pin it, so a later "improvement" to locale-aware or code-point sorting fails a test.
+4. **Numbers with `String(value)`.** JavaScript already implements the ECMAScript algorithm, so we do not write a formatter. The Python side will need its own (its `repr` differs, see section 1).
+5. **`JSON.stringify` on one string at a time for escapes.** For a single well-formed string it produces exactly the JCS escape set, so we reuse it. Lone surrogates and NUL are refused **before** it is called, so it never sees an ill-formed string. I verified that its output for the controls 0x01 and 0x1f uses lowercase hex.
+6. **Refuse what is not JSON data.** The writers throw for `undefined`, functions, symbols, bigints, `Map`, `Set`, `Date`, class instances, circular structures, depth over 64, non-finite numbers, numbers beyond the safe range, and NUL or lone surrogates. A serializer that silently skips or converts these (as `JSON.stringify` does for `undefined` and `Date`) would produce text that is not the data you gave it.
+7. **A guard before writing the file.** The promise "if the editor lets you export it, you can import it again" (round-trip integrity from Lesson L4) needs a check on the exporting side too. `exportWorkflowText` checks the same policy and the same size limit the importer will apply, **before** any file exists. It also **never throws**: a button handler that throws shows the user nothing, so every failure becomes a structured error. Two design choices came from the review: it projects to the known fields first (what is not written cannot block or leak), and it catches the writer's refusal of non-JSON data. The low-level `serializeWorkflow` is left throwing on purpose, so a programming error is loud there and only the UI-facing guard converts it.
+8. **No library.** The two writers are about 100 lines in one file. A published JCS library might exist for each language (general knowledge; not evaluated here), but we still need our own policy rules, a second implementation proven against the same fixtures, and `CLAUDE.md` section 4 requires approval for new dependencies.
+9. **Accept a one-time change in exported bytes, and do not bump `schemaVersion`.** Files exported before T4b listed `schemaVersion` first; now the top level is alphabetical (`description, edges, id, metadata, name, nodes, schemaVersion`), and every nested key is sorted too. Old files still import. The data model did not change, only how it is written as text, so no version bump is needed (`contracts/CANONICAL_JSON.md`, "The one-time export byte change"; the test "a Phase 1 export (schemaVersion first) still imports and is re-exported in the new order" in `serialize.test.ts` pins it).
+
+### 4. How it works internally
+
+**The writer** is one private function, `write(value, pretty)` in `frontend/src/workflow/canonicalJson.ts`, and the two public functions are one line each: `canonicalCompact` calls `write(value, false)`; `exportPretty` calls `write(value, true)` and appends one LF. It walks the value recursively and appends text pieces to an array that is joined at the end:
+
+- **A string** (and each key): `stringProblem` (from `valuePolicy.ts`, Lesson L4) rejects NUL and lone surrogates; otherwise `JSON.stringify(s)` produces the quoted, escaped text.
+- **A number:** refuse if not finite or if its magnitude is above 2^53 - 1; otherwise `String(v)`.
+- **A container:** refuse if it is a class instance, `Map` and so on (only arrays and plain objects, including `Object.create(null)`, are accepted), if the same container is already being written higher up (a cycle, tracked in a set of "ancestors"), or if the depth would exceed 64. An empty `{}` or `[]` is written inline in both profiles. Otherwise the object's own keys are sorted and each member is written as key, colon (with one space after it in the pretty profile), value. Pretty layout adds a newline plus two spaces per depth before every item and before the closing bracket.
+- **Failures** throw an `Error` whose message names the problem and the JSON Pointer (Lesson L2), for example "Cannot write JSON: a number that is not finite (NaN) at /n".
+
+Only own, enumerable **string** keys are written. A key named `__proto__` is just a key (the property test and fixtures include it). A symbol-keyed property is ignored (a test pins this).
+
+**The data flow of one export click**, from the store to the file:
+
+```mermaid
+flowchart TD
+  ST["Editor store: the Workflow in memory"] --> TB["Toolbar.tsx onExport"]
+  TB --> EWT["exportWorkflowText in serialize.ts"]
+  EWT --> PROJ["projectWorkflow: copy only the known Workflow fields<br/>(config and metadata kept as they are)"]
+  PROJ --> POL{"findPolicyViolations over the projected workflow:<br/>name, labels, config, metadata, positions<br/>(NUL, lone surrogate, not finite, over 2^53 - 1, depth over 64)"}
+  POL -- "violations" --> FAIL["errors: code + JSON Pointer path<br/>Toolbar shows: Export failed. No file was created."]
+  POL -- "clean" --> WR["exportPretty in canonicalJson.ts:<br/>sort keys explicitly by UTF-16 code units,<br/>write the text directly, 2-space layout, one trailing LF"]
+  WR -- "value that is not JSON data: the writer throws,<br/>the try/catch in exportWorkflowText catches it" --> NJD["one error: value.not-json-data<br/>(export-only code, path from the writer's text)"]
+  NJD --> FAIL
+  WR --> SZ{"UTF-8 length of the text over 5,000,000 bytes?"}
+  SZ -- "yes" --> FAIL
+  SZ -- "no" --> FILE["Blob, download link: the .json file"]
+  CC["canonicalCompact in canonicalJson.ts<br/>same writer, compact layout"] -.->|"planned, Phase 2"| HASH["SHA-256 content hash<br/>(no hashing code exists yet)"]
+```
+
+Notes on the diagram, so it can be explained in an interview. The solid path is what `exportWorkflowText` does in commit `d2ef493`. First the workflow is **projected** to its known fields (`projectWorkflow`), then the policy check runs on the **projected** value, then the text is written, and the **size is measured on the written text** (so it is the real number of bytes the importer will see). Projecting before checking means the check and the writer look at exactly the same data: an extra in-memory field with a bad value (a test sets one to `NaN`) can neither leak into the file nor block the export. The projection, the policy check and the write all sit inside one `try/catch`, so a value the policy check cannot see (undefined, an array hole, a Date, a function, a bigint) makes the writer throw and the `catch` turns that into **one structured error**. In commit `dd33e84` neither the projection nor the `catch` existed (story 2). The dashed hash box is Phase 2. `canonicalCompact` is not used anywhere in the editor today except by tests.
+
+**A known soft spot, said honestly.** For that catch-all error, the JSON Pointer path is **taken out of the writer's error text** (the code looks for the words " at /" in a message starting with "Cannot write JSON: "). That works today (tests pin the paths) but it ties the guard to the exact wording of the writer's message. If the writer's message were reworded, the path would silently become empty (the error would still be returned, just without a location). A sturdier design would have the writer throw a typed error that carries the path as a field. Also note that `value.not-json-data` is an **export-only** code: an imported file is parsed JSON, which is always data, so an import can never produce it.
+
+**Where the user sees a refusal.** `onExport` in `frontend/src/app/Toolbar.tsx` calls `exportWorkflowText`. If it returns `ok: false`, the toolbar shows the heading "Export failed. No file was created." with the list of errors (code and path), using the same panel as import errors (Lesson L4). A fresh export click clears the panel.
+
+**The import direction** (unchanged since L4) is the mirror image: bytes, strict parse, `migrate`, `validateWorkflow`. The round-trip promise is that anything `exportWorkflowText` accepts survives that path and comes out identical.
+
+**A second small change in the same commit.** `parseConfigInput` in `frontend/src/workflow/configSchema.ts` now reads text typed into an object-typed setting with `strictParse` instead of the built-in `JSON.parse`. So a duplicate key typed into a JSON setting is flagged ("must be valid JSON" is kept for plain typos; a duplicate shows the parser's bounded message) instead of silently collapsing. This closes the one remaining built-in-parser path that Lesson L4 said was carried over.
+
+**A third small change, from the review fixes (`d2ef493`).** `strictParse` in `frontend/src/workflow/strictJson.ts` has a catch-all for an unexpected exception inside the parser itself (a bug, not bad text). Before, it produced "Not valid JSON: <the exception's text> at position N", which reads like a typo in the user's file. Now it returns a distinct message, the constant `INTERNAL_PARSER_ERROR` ("Not valid JSON: internal parser error (please report this)"), still under the code `doc.not-json`, and the exception text is not echoed. `parseConfigInput` in `configSchema.ts` shows that message as it is, while an ordinary typo still shows "must be valid JSON". The tests trigger it by passing a non-string to the parser, which makes it throw a `TypeError` inside itself. The point: a bug in our code should never be reported to the user as their mistake.
+
+### 5. How it communicates with other components
+
+- **`Toolbar.tsx` -> `exportWorkflowText` -> `findPolicyViolations` (`valuePolicy.ts`) -> `exportPretty`.** The same policy module the importer and the settings panel use (one definition of "allowed value", Lesson L4).
+- **`serialize.ts` `serializeWorkflow`** is the low-level writer: `exportPretty(projectWorkflow(workflow))` (in `dd33e84` it was `exportPretty(workflow)`, without the projection). It **still throws** for values that are not JSON data. The UI uses `exportWorkflowText`, which does the same projection, the policy check and the size check around the writer and **never throws**: it returns `{ ok: true, text }` or `{ ok: false, errors }`.
+- **`errors.ts`.** `ERROR_CODES` gained `value.not-json-data`. Because an imported file can never produce it, `errors.test.ts` and `fixtures.test.ts` each carry an explicit `EXPORT_ONLY_CODES` exemption list. The rule "every code has a test case and a fixture" still holds for every other code. The lists are deliberately short and named, so adding a code to dodge a missing import test would be visible in review.
+- **`canonicalJson.ts` -> `errors.ts` and `valuePolicy.ts`.** For `jsonPointer`, the limits and the messages. It does not import the editor, the store or React: it is pure, so the future backend rules can be compared to it.
+- **The shared fixtures (Lesson L3).** The new `serialization` family in `contracts/fixtures/serialization/` feeds `frontend/src/contracts/fixtures.test.ts`: parse the input text with `strictParse`, then compare `canonicalCompact` and `exportPretty` to the stored text **as exact strings**. Rejection cases compare `{code, path}`. `contracts/README.md` documents the format; `contracts/CANONICAL_JSON.md` is the specification of both profiles.
+- **Planned, not built: Python and PostgreSQL.** A Python writer and Python fixture runner are planned for Phase 2. Until the same 109 files pass there, **no TypeScript-to-Python parity is claimed**. When a workflow is stored in PostgreSQL JSONB, key order is lost, so the plan says canonicalization **runs on read** (documented in `CANONICAL_JSON.md`; not verified because PostgreSQL is not installed).
+- **Planned, not built: hashing.** `canonicalCompact` is the only function that will feed the hash. Nothing hashes in this repository today.
+
+### 6. Important code paths
+
+| Where | What it does |
+|---|---|
+| `frontend/src/workflow/canonicalJson.ts` | `canonicalCompact`, `exportPretty`, and the private `write` (explicit key sort, direct text, refusal of non-data) |
+| `frontend/src/workflow/serialize.ts` | `projectWorkflow` (known fields only), `serializeWorkflow` (= `exportPretty(projectWorkflow(w))`, throws), `exportWorkflowText` (project, policy check, write inside try/catch, byte-size check, structured errors, never throws), `exportTooLarge`, `utf8Length`, `MAX_IMPORT_BYTES` |
+| `frontend/src/workflow/errors.ts` | `ERROR_CODES`, now including the export-only `value.not-json-data` |
+| `frontend/src/workflow/strictJson.ts` | `INTERNAL_PARSER_ERROR`: an unexpected exception inside the parser now gives its own `doc.not-json` message (see below) instead of one that looks like a typo in the text |
+| `frontend/src/workflow/valuePolicy.ts` | `findPolicyViolations` (reused by the guard), `stringProblem`, `MAX_DEPTH`, `MAX_SAFE_MAGNITUDE` |
+| `frontend/src/app/Toolbar.tsx` | `onExport`: calls the guard, shows "Export failed. No file was created." or downloads the text |
+| `frontend/src/workflow/configSchema.ts` | `parseConfigInput` now uses `strictParse` for typed JSON |
+| `contracts/CANONICAL_JSON.md` | The specification: both profiles, every rule with its source, the layout, the guarantees, the one-time byte change |
+| `contracts/fixtures/serialization/` | 109 hand-written cases: 100 valid (exact `compact` and `export` text) and 9 rejected (`ser-invalid-*`). Families by file name: `ser-keys-*`, `ser-number-*`, `ser-escape-*`, `ser-unicode-*`, `ser-layout-*`, `ser-workflow-*`, `ser-scalar-*` |
+| `frontend/src/workflow/canonicalJson.test.ts` | Hand-written examples; a table of 26 refusal cases (with message and JSON Pointer); the depth boundary (64 written, 65 refused, 100,000 refused without a stack overflow); and the property tests below |
+| `frontend/src/workflow/serialize.test.ts` | Round trip, key order, the Phase 1 file still imports, the guard tests (NUL in the name, a lone surrogate in a label, config and position and metadata, depth 60 versus 61, the byte limit exactly at and one over, bytes not characters), the five non-JSON-data cases (undefined, array hole, Date, function, bigint: a structured error with a pointer, nothing throws, while `serializeWorkflow` does throw), and the projection tests (extra fields such as `selected` never reach the text, even an extra field holding `NaN` does not block the export, export then import then export is byte-identical) |
+| `frontend/e2e/import-export.e2e.ts` | A Playwright test: a workflow name containing a NUL character shows "Export failed. No file was created.", the code `value.nul-character` and `at /name`, and no download happens |
+| `frontend/src/contracts/fixtures.test.ts` | The serialization runner, the floor (`serialization: 109`, `serializationInvalid: 9`), the coverage guard for rejection codes (with the `EXPORT_ONLY_CODES` exemption), the property test over every valid workflow fixture, and a runner that imports each `ser-workflow-*` fixture (12 files) as a whole workflow and requires `serializeWorkflow` of the result to equal the fixture's stored `expect.export` text |
+
+**Testing ideas worth knowing** (Module 12):
+
+- **Golden files (also "snapshot tests").** Store the exact expected output and compare strings. The weakness, as Lesson L3 said, is circularity: if the expected text is pasted from what the code printed, the test only proves the code equals itself. `contracts/README.md` therefore says the expected texts are **written by hand from the rules**. A golden file is only as trustworthy as the review of its expectations.
+- **Property-based testing against an independent reference.** In `canonicalJson.test.ts`, a seeded random generator (a small function named `rng`) builds 1,500 random JSON-like values. Their alphabet deliberately includes the awkward characters: quotes, a backslash, two control characters, DEL, U+2028, U+E000, the emoji, a combining accent. For each value the test checks four things: the writer's output equals a **reference writer** (`referenceCompact`, which sorts with its own explicit loop over UTF-16 code units and its own escape table: a different mechanism from the real code); the output re-parses with the strict parser to the same data; writing it again gives the same text; and (a second test) the pretty output round-trips and is idempotent. A **guard on the generator** asserts that more than 20 of the cases contain integer-like keys, so the test cannot quietly stop covering the hard case. The seed is fixed, so a failure is reproducible. One honest limit I found by reading the reference: it writes numbers with `String(v)` too, the same call as the implementation, so number text is **not** independently checked by the property test. Numbers are protected by the hand-written number fixtures and the table test instead.
+- **Round-trip tests over real data.** For every valid workflow fixture (19 today) the runner imports, exports, imports and exports again, and asserts byte-identity, a stable canonical form, no CR and exactly one trailing LF.
+- **A fixture-guard change in `d2ef493`.** The serialization fixtures named `ser-workflow-*` (12 files) used to be checked only as text through the writers. The runner now also imports each one **as a whole workflow** with `importWorkflow` and requires `serializeWorkflow(imported)` to equal the fixture's hand-written `expect.export`. So the whole-workflow path (parse, migrate, validate, project, write) is covered by the hand-written golden text, not only the low-level writer. A guard test requires at least 12 such fixtures so the loop cannot quietly become empty.
+- **One more property-test guard.** The integer-like-key assertion in the property test was replaced by a stronger one: it measures objects that mix integer-like keys with other keys, at several nesting levels, and counts those whose JavaScript key order differs from the sorted order (the case a naive writer gets wrong). The earlier version only grepped the output text for `{"` followed by a digit. This is in the same `d2ef493` commit (`canonicalJson.test.ts`; I read the diff, I did not re-derive the thresholds).
+
+### 7. Alternatives and trade-offs
+
+| Option | Good | Costs |
+|---|---|---|
+| **`JSON.stringify` of a rebuilt object with sorted keys** (before T4b, with a fixed field order) | One line | Cannot order integer-like keys (I verified: a sorting replacer still gives `9, 10, a`); order of user-typed `config` keys depends on insertion; no written rules |
+| **`JSON.stringify` with a replacer that sorts keys** | Looks like a fix | Same flaw: the replacer returns an object, and objects reorder integer-like keys |
+| **A published RFC 8785 (JCS) library** | Less code to own, written by specialists | New dependency needing approval; each language needs its own; our extra policy (safe integers, NUL, depth, size) still has to be coded; we must still prove the two sides agree with shared fixtures. Not chosen, not ruled out for Phase 2 |
+| **Canonicalize inside the database** | One place | JSONB does not keep key order, so the database cannot be the canonical form; it also ties the rule to one product. Chosen instead: canonicalize on read |
+| **Hash the pretty export** | One text form to maintain | Layout (indent, trailing LF, line endings) becomes part of every workflow's identity; a formatting tweak changes every hash |
+| **Store the author's original text and hash that** | Preserves exactly what was typed | Equal workflows get different hashes; no-op detection and "same version" checks fail; it would still need a canonical form for comparison. A system can store both |
+| **Compare parsed objects instead of text** | Fine inside one program | Useless for hashing, for a diff in git, and for cross-language agreement |
+| **Sort keys by code point** (Python's default) | Natural in Python | Wrong for RFC 8785 (the emoji case); caught by fixtures |
+| **A "lenient" writer that skips or converts odd values** (`JSON.stringify` drops `undefined`, turns `Date` into text) | Never throws | The text no longer matches the data; silent corruption |
+
+### 8. Real-world applications
+
+*The following are from general knowledge, not from this repository.*
+
+- **Content addressing.** Git names objects by a hash of their exact bytes, and container registries identify images by digest. Any system that hashes data needs a byte-for-byte stable form of that data.
+- **Signatures over JSON.** RFC 8785 was written so a JSON document can be signed or hashed independent of how a library laid it out. Standards that sign JSON have this problem.
+- **HTTP caching and ETags,** and **no-op detection** ("the user pressed Save but nothing changed"), compare a stable representation.
+- **Formatters and lockfiles.** Tools such as formatters and package lockfiles write stable, sorted output so that version-control diffs show real changes only.
+- **Cross-language contract tests.** Teams that share a data format between services in different languages keep shared test vectors (the same idea as `contracts/`). Cryptographic libraries use "known-answer" test vectors the same way.
+- **Property-based testing** (QuickCheck, Hypothesis, fast-check) and **differential testing** against a reference implementation are standard ways to test parsers and serializers.
+- **Mutation testing tools** (for example Stryker for JavaScript) automate the break-the-code-on-purpose idea used in this task's review.
+
+### Three lessons from our own review (real examples)
+
+1. **"Are the expected values just a copy of the code?" The reviewer answered it by writing its own writer.** A golden file written by the implementer proves little if the implementer's code and the implementer's expectations share the same misunderstanding. The independent Opus reviewer did not trust the fixtures: it **wrote its own writer from the specification** and ran it over the fixtures. It reproduced all 100 valid fixtures with zero mismatches (this was reported to me by the Principal Architect; I did not repeat it and it is not yet in `docs/DEVELOPMENT_LOG.md`). That is stronger than the in-repo property test, because a different author with only the specification is unlikely to repeat the same mistake. Lesson: independent re-implementation from the spec is one of the best answers to the circularity worry from Lesson L3. (I count the 100 as the valid cases in `contracts/fixtures/serialization/`, 109 minus the 9 `ser-invalid-*` files; I listed the folder.)
+2. **A refactor silently deleted two protections (found by the reviewer, fixed in `d2ef493`).** The review of `dd33e84` found two linked problems, both visible in the code at that commit:
+   - *The export button could still throw.* `exportWorkflowText` runs `findPolicyViolations`, but that function (in `valuePolicy.ts`) only looks at strings, numbers and containers: it never complains about `undefined`, a function, a `Date` or a bigint. Such a value passed the guard and then `exportPretty` threw. In `dd33e84` nothing in `exportWorkflowText` or `onExport` caught it, so the user would get an uncaught error and no message instead of "Export failed. No file was created."
+   - *Dropping the old "copy only the known fields" step let extra fields leak.* The pre-T4b exporter built a new object from the known fields only (I read it with `git show dd33e84^:...`). The new `serializeWorkflow` of `dd33e84` passed the whole object to `exportPretty`. If an in-memory node carried an extra property (a view-library field such as `selected` is the classic example), it was written into the file. On import, `validateWorkflow` returns only the known fields (its own comment in `validate.ts` says "unknown extra keys dropped"), so the next export no longer contains it: the file is **not** byte-identical after a round trip, breaking the promise this task exists to keep.
+   
+   **The fix, commit `d2ef493`** (I read the code and ran the unit tests; I did not run the mutation checks): `projectWorkflow` restores the projection to the known fields, and `exportWorkflowText` now does projection, policy check and write inside one `try/catch` that returns a single `value.not-json-data` error. New tests pin both fixes: five non-JSON values each give a structured error with a pointer, extra fields never reach the text, and export, import, export is byte-identical for an object that carries extras. **Mutation-checked (the implementer's report, not repeated by me):** removing the `catch` makes 8 tests fail, and skipping the projection makes 3 tests fail. That is what you want to see: each protection has tests that break the moment it is deleted again. Lesson: when you replace one implementation with another, list **everything the old one did implicitly** (here, dropping unknown fields) and check each is still done. A refactor can delete a protection nobody wrote down, and the way to keep it from being deleted twice is a test that fails without it.
+3. **Mutation testing: 17 breaks, all caught, one equivalent mutant.** The implementer broke the writer 17 ways (sort by code point, no sort at all, rebuild the object and `JSON.stringify` it, `toFixed` for numbers, CRLF line ends, a missing trailing LF, escaping U+007F, uppercase hex, and so on) and reported that every break made some test fail (reported to me, not repeated by me). One variant did **not** fail anything: writing the number text with `JSON.stringify(n)` instead of `String(n)`. That is an **equivalent mutant** (Lesson L4): for a finite number the two use the same ECMAScript algorithm, so no test could ever tell them apart. I checked it on this machine: 200,000 random doubles of mixed magnitudes gave identical text for both, including minus zero (that is a spot check, not a proof; the reason is the shared algorithm, which is general knowledge about the language specification). The right response is to record it, not to invent a fake test. Contrast with `toFixed`: a different algorithm, so it **is** distinguishable, and it was caught.
+
+### Knowledge Check / Interview Questions
+
+*Answers are not given here. Study this lesson and `docs/LEARNING.md`, then answer all questions in the dedicated learning session at the end of the project.*
+
+1. A colleague proposes: "sort the keys, put them in a new object and call `JSON.stringify`: done." Using the keys `"10"`, `"9"` and `"a"`, explain exactly what goes wrong and why a sorting replacer function does not fix it. Then explain how `canonicalJson.ts` avoids the problem, and why the pair U+E000 and U+1F600 matters to a future Python implementer (which default would they have to override, and with what?).
+2. AgentForge has two named text profiles. State the job of each, and what would happen to every stored hash if a future task changed the export indent from 2 spaces to 4 under (a) the current design, and (b) a design that hashed the pretty export. Why does the design say "export is never hashed", and what exists today that actually hashes (be precise)?
+3. For each of these rules, say whether its source is RFC 8785, I-JSON, AgentForge policy or PostgreSQL compatibility, and explain why being accurate matters when you present the design to an engineer who knows JSON: key order by UTF-16 code units; the number text `1e-7`; magnitude at most 2^53 - 1; no U+0000; U+007F written literally; the 2-space layout.
+4. `exportWorkflowText` runs the value policy and a size check before writing. What promise does it protect, and why is the size measured on the **written text in UTF-8 bytes** instead of the object or the character count? Then use the review of `dd33e84` and its fix `d2ef493` to explain two ways a refactor of the exporter broke that promise (one involving a value that is not JSON data, one involving an extra field on an in-memory object), what `exportWorkflowText` does about each now (why does it project to the known fields **before** the policy check, and why is `serializeWorkflow` still allowed to throw while `exportWorkflowText` never is?), and which tests would fail if each protection were deleted again. Finally, name the soft spot in how the `value.not-json-data` path is obtained and what you would change.
+5. The fixtures' expected text is written by hand, the property test has a reference writer, and the independent reviewer wrote a third writer. Explain how these together answer "are the expected values just a copy of the code?" Then identify one thing the in-repo reference writer does **not** check independently (read it), and say what protects that area instead.
+6. The implementer made 17 deliberate breaks of the writer. Explain what a mutation test proves and what it cannot. Why did "number text via `JSON.stringify`" survive without that being a test gap, while `toFixed` did not survive? In Phase 2 a Python implementer writes `1e-07` for the number 0.0000001: which fixture fails, when, and why can we not say today that TypeScript and Python agree?

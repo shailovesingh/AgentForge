@@ -207,8 +207,8 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 to T3 and T4a done (MS-A approved by the PO); T4b in progress.** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones (next: MS-B after T6). Phase 2 is **proposed only** and unauthorized.
-- **Last completed task:** Session 10: T4a (strict JSON parsing and policy limits) implemented, reviewed by Opus, fixed and accepted; Lesson L4 written; Docker Desktop verified. Earlier: T3 (Session 9), T2 (Session 8), T1 (Session 6). Documentation commits `b7e5cbc`, `db451da`, `cf738b5` were made and pushed by others.
+- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 to T4 done (MS-A approved by the PO); T5a (JSON Schema subset validator) in progress.** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones (next: MS-B after T6). Phase 2 is **proposed only** and unauthorized.
+- **Last completed task:** Session 10: T4 done: T4a (strict JSON parsing and policy limits) and T4b (canonical compact JSON, pretty export JSON, never-throwing export guard; `dd33e84`, fixes `d2ef493`) implemented, reviewed by Opus, fixed and accepted; Lessons L4 and L5 written; Docker Desktop verified. Earlier: T3 (Session 9), T2 (Session 8), T1 (Session 6). Documentation commits `b7e5cbc`, `db451da`, `cf738b5` were made and pushed by others.
 - **Last code commit:** `35fe3bc`.
 
 ### Verification results (actual, run 2026-11-03)
@@ -226,6 +226,16 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 **Browser run covered (Chrome only):** library list, search and empty state; drag-and-drop landing at the cursor; click and Enter-key add; Delete/Backspace on nodes and edges; valid connections; rejection of occupied-input, duplicate and type-mismatched connections; config panel editing, label edit, invalid number and invalid JSON flagged and **not committed**; export contents (no React Flow fields, edited config present, name-derived filename); import into a fresh page; byte-identical re-export; failed imports leaving the graph untouched; node drag persisting position; deleting a node removing its edges; "New" clearing the canvas; no console errors.
 
 **The browser script is not in the repository.** It ran from a scratch directory with `playwright-core` and the locally installed Chrome. It is therefore not reproducible from the repo, and repo-based E2E remains deferred (open question 2).
+
+### Verification results, Session 10 (Phase 1.1 T4b; actual, 2026-11-04)
+
+| Check | Result |
+|---|---|
+| `npm run verify` at `d2ef493` (run by the Principal Architect) | **exit 0**: oxlint clean; **13 files, 707 unit tests passed** (679 at `dd33e84`); build ok; **30 e2e tests passed** (29 before) |
+| Fixtures | 262 case files: workflow/valid 19, workflow/invalid 97, connection 22, config 15, serialization 109 (100 valid, 9 invalid; 12 are whole-workflow `ser-workflow-*`) |
+| Opus review of `dd33e84` | PASS WITH FINDINGS (no blockers or majors): the reviewer wrote its own writer from the spec and it reproduced all 100 valid fixtures with 0 mismatches (reviewer's report, not repeated by Claude) |
+| Mutation checks (by the implementer; not repeated by Claude) | `dd33e84`: 17 breaks of the writer, all caught except one equivalent mutant (`JSON.stringify(n)` for numbers). `d2ef493`: removing the try/catch fails 8 tests; skipping the projection fails 3 |
+| Not verified | Python parity (no Python runner exists; planned Phase 2); the e2e no-download check is timing based |
 
 ### Verification results, Session 10 (Phase 1.1 T4a; actual, 2026-11-04)
 
@@ -314,33 +324,35 @@ Small implementation choices made in Session 2 without a decision entry (flagged
 26. **A 5 MB fixture blob is in the history of `e28483d`** (about 23 KB compressed). History is never rewritten, so it stays; the working tree no longer contains it.
 27. **Docker Desktop is installed and running (verified by Claude, 2026-11-04).** It is a **per-user install** (`C:\Users\shail\AppData\Local\Programs\DockerDesktop`, Docker Desktop 4.97.0, found through the registry and running processes; an earlier check looked only in `Program Files` and wrongly concluded it was missing). The engine answers on its named pipe: `docker` client and server 29.9.2 (linux/amd64), Docker Compose v5.6.1, WSL 2 backend (Ubuntu), 8 CPUs and about 8 GB of memory available to it, context `desktop-linux`, **0 containers and 0 images**. `docker` is **not on this shell's PATH**: use `C:\Users\shail\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe` (or add that folder to the PATH). Nothing was pulled or started. It unblocks nothing yet: Phase 2 is unauthorized.
 28. **An untracked `.kilo/` folder** (2 small files from another tool, created 2026-11-04 00:35) exists in the repository root. It is not ours, is not committed and is left alone; the PO may want to add it to `.gitignore` or delete it.
-29. **Safeguard 1 (token-level number decision) is met in structure but cannot be observed in behaviour** (equivalent mutant, see `docs/PHASE1_1_PLAN.md`). **Other messages that echo attacker-controlled ids, types or `schemaVersion` are not length-bounded** (the Toolbar truncates the display to 200 characters). The config panel's typed JSON still uses the built-in `JSON.parse` until T4b.
+29. **Safeguard 1 (token-level number decision) is met in structure but cannot be observed in behaviour** (equivalent mutant, see `docs/PHASE1_1_PLAN.md`). **Other messages that echo attacker-controlled ids, types or `schemaVersion` are not length-bounded** (the Toolbar truncates the display to 200 characters). (Resolved in T4b: the config panel's typed JSON now uses the strict parser.)
+30. **T4b soft spots (accepted, D-032):** the JSON Pointer in the export-only error `value.not-json-data` is parsed from the canonical writer's error text (a structured error would be sturdier); the Playwright no-download assertion after a refused export is a 1-second negative wait. A one-time effect: exported files list top-level keys alphabetically (`schemaVersion` last); older files still import. Old validator (`validateConfig`) and the new schema validator (T5a) coexist until T5b removes the old one.
 
 ## 10. Open Questions
 
 The six original questions are all decided (see `docs/PHASE1_REVIEW.md` §4 and §4.1). Phase 1.1 decisions P1 to P7, S1, W1, V1, G1 and C1 to C5 are decided (D-017, D-019, D-022 to D-026). **No design question is open.**
 
 **Pending (need PO review or decision):**
-- **PO review of T1** (this task) before T2 begins.
+- **PO review at milestone MS-B (after T6)** and MS-C (after T10); no review is pending now (MS-A was approved).
 - **D-013:** final code review of the Workflow contract, best done alongside Phase 1.1.
 - **Phase 2:** approval of `docs/PHASE2_PLAN.md` and decisions X1 to X10. **Phase 2 is not authorized.**
 - **Git coordination:** two kinds of actor now commit and push to this repository (see §6). The PO decides how that is coordinated; Claude will not push, fetch, pull or change remotes without explicit permission.
 - **First CI run:** needs a push, which Claude may not do. The PO can push when ready and report the result; failures would be fixed in a follow-up Phase 1.1 commit.
 
-**Blocked:** T2 onward waits for T1 review. Phase 2 step 2 onward waits for Phase 1.1 and D-013. Phase 2 step 6 onward waits for Docker Desktop (PO will install).
+**Blocked:** nothing in Phase 1.1. Phase 2 step 2 onward waits for Phase 1.1 and D-013. Phase 2 step 6 onward waits for Docker Desktop (PO will install).
 ## 11. Last Session Handoff
 
-- **Date:** 2026-11-03 (Session 9)
-- **Last task:** T3 (shared fixtures and the TypeScript runner): Sonnet implementer, Opus review (PASS WITH FINDINGS, no blockers), one fix commit, accepted. Lesson L3 (Sonnet tutor). **Milestone MS-A (T1 to T3) reached.**
-- **Implemented changes:** `contracts/` (README, format, 75 fixtures, catalog export), `frontend/src/contracts/fixtures.test.ts`, `frontend/tsconfig.contracts.json` and the tsconfig reference changes. No application source changed.
-- **Tests:** `npm run verify` exit 0 at `058faae` (185 unit, 27 e2e), run by the Principal Architect and by the reviewer.
-- **Git:** local commits only (D-030); the last `git status` showed `main` ahead of `origin/main` by 10 commits. Whether the PO has pushed since is unknown to Claude.
-- **Learning:** Lessons L1, L2 and L3 delivered, each ending in a Knowledge Check; nothing marked Understood; evaluation at the end of the project.
-- **Next task:** the PO's MS-A review, then T4.
+- **Date:** 2026-11-04 (Session 10)
+- **Last task:** T4 (T4a strict parsing; T4b canonical and export JSON): Sonnet implementer, Opus reviews (both PASS WITH FINDINGS, no blockers), fix commits, accepted. Lessons L4 and L5 (Sonnet tutor).
+- **Implemented changes (T4b):** `canonicalJson.ts` (two profiles), `serialize.ts` (`projectWorkflow`, never-throwing `exportWorkflowText`), `strictJson.ts` (distinct internal-error message), `configSchema.ts` (strict parser for typed JSON), `errors.ts` (31 codes, one export-only), `contracts/CANONICAL_JSON.md`, the `serialization` fixture family.
+- **Tests:** `npm run verify` exit 0 at `d2ef493` (707 unit, 30 e2e), run by the Principal Architect.
+- **Git:** local commits only (D-030). Whether the PO has pushed is unknown to Claude.
+- **Learning:** Lessons L1 to L5 delivered, each ending in a Knowledge Check; nothing marked Understood; evaluation at the end of the project.
+- **In flight:** T5a with the implementer (new `workflow/jsonSchema.ts`, `schema` fixtures, `contracts/CONFIG_SCHEMA.md`).
+- **Next task:** T5a review and acceptance, then T5b, then T6; MS-B (PO review) after T6.
 
 ## 12. Next Recommended Action
 
-1. **PO: review milestone MS-A (T1 to T3).** What to look at: the `contracts/` folder and its `README.md`; `docs/DEVELOPMENT_LOG.md` Sessions 6 to 9; the two Opus reviews and their triage; `npm run verify` (or the GitHub Actions run if you push). Decide: continue to T4 (strict parsing, canonical JSON), or change course.
+1. **Principal Architect: continue Phase 1.1 in order (T5a, T5b, T6, then T8, T7, T9, T10).** No PO action is needed until **MS-B (after T6)**; the PO may redirect or stop at any time. MS-A was approved.
 2. **PO (optional):** push to GitHub for a Linux CI run and a backup; report any CI failure to Claude (D-030).
 3. **PO (housekeeping):** move `Downloads\CLAUDE.md` out of the AgentForge parent path; install Docker Desktop before Phase 2 step 6.
 4. **No Phase 2 or backend work.**
@@ -362,14 +374,15 @@ Do not invent implementation status, test results, commit IDs, or decisions.
 
 > Tracked **separately from implementation progress** (D-028). The curriculum is `docs/LEARNING.md`; the evidence is in `docs/LEARNING_GUIDE.md`. A topic is Understood only with evidence from the Product Owner's answers.
 
-- **Current learning module:** Module 3, Workflow JSON and State Management (structured validation errors, shared fixtures, strict parsing and the policy limits), via **Lessons L2, L3 and L4**; Module 1 (contract-first design, the limits as part of the contract) via **Lessons L3 and L4**; Module 12 (testing and CI, data-driven tests, trust boundaries, mutation testing) via **Lessons L1, L3 and L4**. Recommended next: Modules 1, 2 and the rest of Module 3 (they describe code that already exists).
+- **Current learning module:** Module 3, Workflow JSON and State Management (structured validation errors, shared fixtures, strict parsing and the policy limits, canonical and export JSON), via **Lessons L2, L3, L4 and L5**; Module 1 (contract-first design, the limits and the canonical text as part of the contract) via **Lessons L3, L4 and L5**; Module 12 (testing and CI, data-driven tests, trust boundaries, golden files, property tests, mutation testing) via **Lessons L1, L3, L4 and L5**. Recommended next: Modules 1, 2 and the rest of Module 3 (they describe code that already exists).
 - **Concepts explained:**
   - **L1 (taught 2026-11-03):** end-to-end versus unit tests, fixtures and helpers, auto-waiting assertions, flaky tests and retries, vacuous tests and fault injection, continuous integration, supply-chain pinning by commit SHA.
   - **L2 (taught 2026-11-03, after Phase 1.1 T2):** machine-readable versus human-readable errors, stable namespaced error codes, JSON Pointer (RFC 6901), string-literal union types and compile-time exhaustiveness, validating untrusted input at a boundary (own-property lookups), table-driven and guard tests, errors versus warnings (D-018).
   - **L3 (taught 2026-11-03, after Phase 1.1 T3):** contract-first design with a shared contract between two implementations (language-neutral fixtures in `contracts/`; the Python runner is planned for Phase 2 and no parity is claimed), data-driven tests with data kept apart from code, comparing `{code, path}` as multisets and never the message, rule order in `checkConnection` as part of the contract, the import semantics a second implementation must follow, coverage guards and minimum-count floors, the catalog drift test with fail-on-purpose regeneration, `inputRepeat` (a generator spec instead of a 5 MB file), circular tests and expectations written from the specification, and mutation checks.
   - **L4 (taught 2026-11-04, after Phase 1.1 T4a):** why the built-in `JSON.parse` is not enough for an untrusted file (last duplicate key wins, lenient decoding of invalid bytes, big integers rounded), the strict RFC 8259 parser (`strictJson.ts`), the policy limits and where each rule comes from (RFC, I-JSON / RFC 8785, AgentForge policy, PostgreSQL compatibility), deciding a number's range from its token text, size in UTF-8 bytes, depth counted as containers open, the byte order mark and strict UTF-8, safe object construction (`__proto__`), round-trip integrity for values typed in the editor (`valuePolicy.ts`), rejecting rather than repairing, bounded error messages, boundary-value and differential tests, and mutation testing with an equivalent mutant (TypeScript only; Python parity is planned for Phase 2 and not claimed).
+  - **L5 (taught 2026-11-04, after Phase 1.1 T4b):** canonical form and deterministic serialization (why a hash needs the same bytes everywhere), the two named profiles (`canonical-json/1` compact for hashing, `export-json/1` pretty for files and never hashed; no hashing code exists yet), why integer-like keys defeat `JSON.stringify` (also with a sorting replacer) so `canonicalJson.ts` sorts the key list and writes the text directly, UTF-16 code unit order versus code point order (U+E000 and U+1F600), number text (`String(n)` versus Python `repr`, verified on this machine), string escapes and no Unicode normalization, the rule sources (RFC 8785, I-JSON, AgentForge policy, PostgreSQL compatibility), writers that refuse non-JSON data, idempotence and round trip, the export guard `exportWorkflowText` (projects to known fields, never throws, export-only code `value.not-json-data`; lesson revised for the review-fix commit `d2ef493`), PostgreSQL JSONB losing key order (documented, not verified), golden files, a property test against an independent reference, a reviewer's independent re-implementation, a refactor that dropped two implicit protections (fixed in `d2ef493`), and mutation testing with an equivalent mutant (TypeScript only; Python runner and hashing planned for Phase 2; no parity claimed).
   - **Primer (reference only, no lesson, no evidence):** workflow, node, port, edge, catalog, config schema, `schemaVersion` versus `typeVersion`, validation versus warnings, DAG, credentials.
 - **Topics understood:** **none yet.** By design (D-029) answers are collected in one dedicated learning session at the end of the project; no per-lesson questions are asked in conversation.
 - **Topics requiring revision:** none recorded.
-- **Next learning objective:** keep building; each completed task gets a lesson ending in a Knowledge Check (next: Lesson L5 after T4b, canonical and export JSON). The evaluation session happens at the end of the project.
+- **Next learning objective:** keep building; each completed task gets a lesson ending in a Knowledge Check (next: a lesson after T5, the JSON Schema subset, defaults and the Groq provider; Lesson L5 was already revised for the T4b review fixes, commit `d2ef493`). The evaluation session happens at the end of the project.
 - **Module status summary:** Modules 1, 3 and 12 In Progress; Modules 2 and 4 to 11 Not Started.

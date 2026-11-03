@@ -1,13 +1,13 @@
 # ROADMAP — AGENTFORGE
 
 > Status legend: **Not started** · **Planned** (detailed plan exists) · **In progress** · **Done** (implemented + verified).
-> Last updated: 2026-11-04 (Session 10). Phase 1.1 is approved and in progress (T1 to T3 and T4a done; T4b in progress). The Phase 2 row is a **proposal**. Learning progress is tracked in `docs/LEARNING.md`, not here.
+> Last updated: 2026-11-04 (Session 10). Phase 1.1 is approved and in progress (T1 to T4 done; T5a in progress). The Phase 2 row is a **proposal**. Learning progress is tracked in `docs/LEARNING.md`, not here.
 
 | Phase | Name | Status | Prerequisites |
 |---|---|---|---|
 | 0 | Project bootstrap (docs, rules, architecture proposal) | **Done** (architecture approved 2026-11-03) | — |
 | 1 | Visual workflow builder (frontend only) | **Accepted as functionally complete by the PO (D-020), subject to Phase 1.1.** Contract pending final code review (D-013) | — |
-| 1.1 | Contract hardening and follow-ups: Playwright + CI with SHA-pinned actions (D-019), shared fixtures, JSON Schema config with explicit defaults (H1), node migrations (H3), branch semantics (H4), strict parsing and canonical JSON (H5), `groq`, category-aware warnings, secret detection with explicit export confirmation (D-023) | **APPROVED; IN PROGRESS.** T1, T2, T3 **done** (MS-A reviewed and approved by the PO). **T4 split (D-031): T4a done** (strict parsing; Opus-reviewed, fixed, accepted); **T4b in progress** (canonical and export JSON). T5 to T10 not started. Order: T1 → T2 → T3 → T4 → T5 → T6 → T8 → T7 → T9 → T10. **PO milestones:** MS-B after T6, MS-C after T10 (D-029). Plan: `docs/PHASE1_1_PLAN.md` | Opus review of every task; PO review at milestones; D-013 review |
+| 1.1 | Contract hardening and follow-ups: Playwright + CI with SHA-pinned actions (D-019), shared fixtures, JSON Schema config with explicit defaults (H1), node migrations (H3), branch semantics (H4), strict parsing and canonical JSON (H5), `groq`, category-aware warnings, secret detection with explicit export confirmation (D-023) | **APPROVED; IN PROGRESS.** T1, T2, T3 **done** (MS-A reviewed and approved by the PO). **T4 done (D-031): T4a** (strict parsing) and **T4b** (canonical and export JSON; `dd33e84`, review fixes `d2ef493`; 707 unit, 30 e2e) Opus-reviewed, fixed, accepted. **T5 split (D-032): T5a in progress** (pure JSON Schema subset validator, `applyDefaults`, schema fixtures); T5b, T6 to T10 not started. Order: T1 → T2 → T3 → T4 → T5 → T6 → T8 → T7 → T9 → T10. **PO milestones:** MS-B after T6, MS-C after T10 (D-029). Plan: `docs/PHASE1_1_PLAN.md` | Opus review of every task; PO review at milestones; D-013 review |
 | 2 | Backend: FastAPI, Pydantic schemas, workflow API, PostgreSQL | **Proposed only; NOT approved; not started.** Ten-step plan in `docs/PHASE2_PLAN.md` | PO approval of the plan; D-013 contract review (blocks step 2 onward); Docker Desktop (blocks step 6 onward); D-008, D-009 approved |
 | 3 | Execution engine (registry, validator, DAG scheduler, run logs, SSE) | Not started | Phase 2; D-006 |
 | 4 | AI runtime (LLM node, Agent node, LangGraph, tools, memory) | Not started | Phase 3 |

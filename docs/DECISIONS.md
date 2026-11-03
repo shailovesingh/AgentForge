@@ -38,6 +38,7 @@
 | D-029 | Review cadence (Opus reviews every task, Architect accepts, PO at milestones) and learning-check protocol (Knowledge Check at the end of each lesson; one evaluation session at the end) | **Approved** |
 | D-030 | Claude works on local files only; the Product Owner pushes to GitHub when they choose | **Approved** |
 | D-031 | T4 split into T4a (strict parsing and policy checks) and T4b (canonical and export JSON); number policy as one magnitude rule; editor values obey the same policy | **Approved** (Principal Architect, within D-022 and D-026) |
+| D-032 | T4b outcomes: export-only error code, export never throws, distinct internal parser error; T5 split into T5a and T5b | **Approved** (Principal Architect, within D-022 and D-026) |
 
 ---
 
@@ -261,3 +262,12 @@
   - **Fixture format:** a workflow case may use exactly one of `input`, `inputText`, `inputRepeat` or the new `inputBytesBase64` (raw bytes, for invalid UTF-8 and BOM cases).
   - **Import takes bytes:** `importWorkflow(input: string | Uint8Array, ...)`; the size limit is 5,000,000 UTF-8 bytes (C2), checked before parsing; a UTF-8 BOM is stripped; invalid UTF-8 is `doc.invalid-encoding` (the browser's `File.text()` would silently substitute replacement characters, hiding corrupt input).
 - **Consequences:** `JSON.parse` leaves the import path; Python must later implement the same checks (planned Phase 2; not claimed).
+
+## D-032 — T4b outcomes (export-only error code, internal parser error) and the T5 split
+- **Status:** Approved (Principal Architect, 2026-11-04, Session 10; within D-022 and D-026; the Product Owner may overrule).
+- **Decision:**
+  - **Export-only error code.** `value.not-json-data` is produced only by `exportWorkflowText` (a value the editor holds that is not JSON data). An imported file can never produce it, so it is exempt from the "every code has an import fixture" guards through an explicit `EXPORT_ONLY_CODES` list; a fixture that expects it is a shape error. All other codes stay under the strict guards.
+  - **Export never throws.** `exportWorkflowText` projects to the known Workflow fields, checks the projected value and writes inside one try/catch; `serializeWorkflow` stays the low-level, throwing writer.
+  - **Internal parser failures** are reported with a distinct message ("Not valid JSON: internal parser error (please report this)") under the same code `doc.not-json`; the config panel shows it instead of "must be valid JSON".
+  - **T5 is split like T4:** **T5a** (a pure JSON Schema subset validator, explicit `applyDefaults`, the `schema` fixture family, nothing existing changes) and **T5b** (catalog conversion, store defaults, ConfigPanel, `groq`, and the C1 behaviour in the importer). Each is implemented, independently reviewed and accepted on its own; the order T1 to T10 and the milestones are unchanged.
+- **Consequences:** old and new validators coexist between T5a and T5b (intentional; T5b deletes the old code). Soft spot recorded: the pointer of `value.not-json-data` is parsed from the writer's message (a structured error from `canonicalJson.ts` would be sturdier).

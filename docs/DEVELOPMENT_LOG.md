@@ -604,8 +604,31 @@ Phase 1.1: milestone MS-A approved; T4a (strict JSON parsing) implemented, revie
 
 **Process disclosures:** the `a0abf63` fix commit had only the Principal Architect's verification, no second Opus pass (as with earlier fix commits). The Opus reviewer ran `npx --no-install vitest` once (local binary only, no network) and copied three source files to the scratchpad for probing; nothing in the repository was edited. No remote git operation by Claude. `main` was ahead of `origin/main` by 15 commits at the last check; whether the PO has pushed since is unknown.
 
+**T4b: canonical compact JSON, pretty export JSON, serialization fixtures (commits in order):**
+
+| Commit | What |
+|---|---|
+| `dd33e84` | Sonnet implementer: `canonicalJson.ts` with two named profiles, `canonical-json/1` (compact, the form meant for hashing) and `export-json/1` (pretty, 2-space, LF, one trailing LF; never hashed). Keys sorted by UTF-16 code units with an explicit sort and the text written directly (a rebuilt object plus `JSON.stringify` would put integer-like keys first); numbers via `String(v)`; strings via one `JSON.stringify` per string. `serialize.ts`: `serializeWorkflow` (low-level writer) and `exportWorkflowText` (guard: value policy for the whole workflow, then 5,000,000 UTF-8 bytes, before a file is written; the Toolbar shows "Export failed. No file was created."). `parseConfigInput` now uses the strict parser. `contracts/CANONICAL_JSON.md` and the `serialization` fixture family (109 cases; 262 fixtures in total). 460 to 679 unit tests, 29 e2e. |
+| `d2ef493` | Sonnet implementer, review fixes (below). 707 unit tests, 30 e2e. |
+
+**Independent review (Opus 5.5, read-only) of `dd33e84`: PASS WITH FINDINGS, no blockers, no majors.** The reviewer **wrote its own writer from the specification and it reproduced all 100 valid serialization fixtures with zero mismatches**, which answers the circularity worry ("are the expected values a copy of the code?"). The implementer's own mutation run (17 deliberate breaks of the writer: code-point sort, no sort, rebuild-and-stringify, `toFixed`, CRLF, missing trailing LF, escaping U+007F, uppercase hex ...) had every break fail a test, except one **equivalent mutant** (number text via `JSON.stringify(n)` is the same algorithm as `String(n)`). Findings and triage (all fixed in `d2ef493`):
+
+| # | Finding | Disposition |
+|---|---|---|
+| M1 | `exportWorkflowText` promised structured errors but `exportPretty` throws for values the policy check does not see (`undefined`, array holes, `Date`, functions, bigint) | **Fixed**: projection, policy check and writer run inside one try/catch; one new **export-only** code `value.not-json-data` (31 codes in total; see D-032); `serializeWorkflow` stays throwing and says so. The coverage guards stay strict through an explicit `EXPORT_ONLY_CODES` exemption. Mutation proof: removing the catch fails 8 tests |
+| M2 | The old "project to the known fields" step was lost, so an extra in-memory field (for example React Flow's `selected`) would leak into a file and break export-import-export identity | **Fixed**: `projectWorkflow` copies only the known fields; the policy check runs on the projected value. Mutation proof: skipping the projection fails 3 tests |
+| M3 | No test covered the export-failure panel | **Fixed**: one Playwright test (NUL typed into the name: heading, code `value.nul-character`, `at /name`, no download). The no-download assertion is a 1-second negative wait (timing based); not mutation-proved |
+| M4 | An internal parser exception was reported as `doc.not-json` with the same words as a typo | **Fixed and recorded (D-032)**: distinct message "Not valid JSON: internal parser error (please report this)"; the config panel shows it instead of "must be valid JSON"; forced by passing a non-string |
+| Nits | CANONICAL_JSON.md missed the BOM/encoding rule (12 vs the plan's 13 rules) and had a present-tense Python-parity claim; `ser-workflow-*` fixtures were not asserted through `importWorkflow`; a stale comment in `validate.ts`; a weak generator assertion | **Fixed**: rule restored (13 rules), wording "is meant to ... (planned for Phase 2; not yet verified)", 12 whole-workflow fixtures round-trip, comment corrected, the generator now measured on generated values (22 mixed-key objects, 17 reordered-key objects) |
+
+**Known soft spots (accepted, recorded):** the JSON Pointer in `value.not-json-data` is parsed out of the writer's error text because `canonicalJson.ts` was not in scope for the fix (a structured error class would be sturdier; candidate follow-up); the e2e no-download check is timing based. A one-time effect of T4b: exported files list top-level keys alphabetically (`schemaVersion` last); older files still import.
+
+**Verification by the Principal Architect (commands actually run, `frontend/`):** at `d2ef493` `npm test`: **13 files, 707 tests passed**; `npm run verify`: **exit 0, 30 e2e passed**; `git show --stat`: 13 files, all inside the allowed list; `serialize.ts` diff read. At `dd33e84` (before the fixes): exit 0, 679 unit, 29 e2e. The implementer's mutation proofs and scans were not repeated by Claude. **Process disclosure:** the `d2ef493` fix commit has only the Principal Architect's verification, no second Opus pass (as with earlier fix commits). The Opus reviewer's own-writer comparison is the reviewer's report; Claude did not repeat it.
+
+**Lesson L5** (canonical and export JSON) written by the tutor and revised after the fix; the Product Owner's answers are collected at the end of the project (D-029).
+
 **Status:**
-T4a **accepted** by the Principal Architect. T4b in progress (implementer); Lesson L4 in progress (tutor).
+T4 (T4a and T4b) **accepted** by the Principal Architect. T5 is split like T4 (D-032): **T5a** (pure JSON Schema subset validator, explicit `applyDefaults`, `schema` fixture family, no UI or catalog change) in progress with the implementer; T5b (catalog conversion, store, ConfigPanel, `groq`, C1 in the importer) follows.
 
 **Next Task:**
-T4b, then its review; then T5 (JSON Schema subset, defaults, `groq`).
+T5a review, then T5b, then T6 (node migrations); **MS-B report to the Product Owner after T6.**
