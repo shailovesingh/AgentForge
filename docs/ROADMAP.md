@@ -1,13 +1,14 @@
 # ROADMAP — AGENTFORGE
 
 > Status legend: **Not started** · **Planned** (detailed plan exists) · **In progress** · **Done** (implemented + verified).
-> Last updated: 2026-11-03 (Session 1).
+> Last updated: 2026-11-03 (Session 3). Phase 1.1 and Phase 2 rows are **proposals**, not commitments.
 
 | Phase | Name | Status | Prerequisites |
 |---|---|---|---|
 | 0 | Project bootstrap (docs, rules, architecture proposal) | **Done** (architecture approved 2026-11-03) | — |
-| 1 | Visual workflow builder (frontend only) | **Implemented and verified; awaiting PO acceptance** (Session 2) | — |
-| 2 | Backend: FastAPI, Pydantic schemas, workflow API, PostgreSQL | Not started | Docker installed; D-008, D-009 approved |
+| 1 | Visual workflow builder (frontend only) | **Implemented and verified; under final acceptance review** (Session 2). Contract pending final code review (D-013) | — |
+| 1.1 | Follow-up: `groq` provider enum, non-blocking editor warnings (D-017/D-018), Playwright E2E | **Proposed**, not started. Definitions in `docs/PHASE1_REVIEW.md` §2 Q6 and §3 | PO approval; Playwright needs a dev-dependency approval |
+| 2 | Backend: FastAPI, Pydantic schemas, workflow API, PostgreSQL | **Proposed only; NOT approved; not started.** Ten-step plan in `docs/PHASE2_PLAN.md` | PO approval of the plan; D-013 contract review (blocks step 2 onward); Docker Desktop (blocks step 6 onward); D-008, D-009 approved |
 | 3 | Execution engine (registry, validator, DAG scheduler, run logs, SSE) | Not started | Phase 2; D-006 |
 | 4 | AI runtime (LLM node, Agent node, LangGraph, tools, memory) | Not started | Phase 3 |
 | 5 | AI workflow generation (NL create, patch-based edit) | Not started | Phases 2–4; D-007 |
@@ -46,10 +47,10 @@ Note: credential encryption, `owner_id` scoping and execution limits are built *
 | 1 | Done | `build`, `lint`, `test` exit 0; dev server answered HTTP 200; commit `2466b26` |
 | 2 | Done | Unit: unique `type@version`, unique port names, defaults satisfy `configSchema`, config validator cases |
 | 3 | Done | Unit: every store action, including node removal cascading to edges (commit `5af36e5`) |
-| 4 | Done | Chrome: store renders; Delete/Backspace remove nodes and edges. Pan, zoom and MiniMap are React Flow defaults and were not separately exercised |
+| 4 | Done | Chrome: store renders; Delete/Backspace remove nodes and edges. Pan and wheel zoom verified in the follow-up Chrome run; MiniMap renders but was not interacted with |
 | 5 | Done | Chrome: all six catalog nodes render labels, icons and handles; handle ids equal port names (edges connected through them) |
 | 6 | Done | Chrome: drop lands at the cursor (within 40 px); search filter and empty state; click and Enter add |
-| 7 | Done | Unit: every rule. Chrome: occupied input, duplicate and type mismatch create no edge. **Cycle rejection is unit-tested only.** The green/red handle styling during a drag was **not** visually verified |
+| 7 | Done | Unit: every rule. Chrome: occupied input, duplicate and type mismatch create no edge. Cycle rejection and the green/red handle feedback while dragging were verified in Chrome in a follow-up run (8/8 checks) |
 | 8 | Done | Unit: input parsing. Chrome: label edit, enum select, invalid number and invalid JSON flagged and not committed (confirmed via export) |
 | 9 | Done | Unit: round trip byte-identical, 8 rejection cases, migration chain. Chrome: export, fresh-page import, byte-identical re-export, failed imports leave the graph untouched (commit `35fe3bc`) |
 | 10 | Done | This documentation update |

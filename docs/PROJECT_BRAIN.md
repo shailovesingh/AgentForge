@@ -8,7 +8,7 @@
 
 - **Name:** AgentForge
 - **Product:** Visual AI Agent Builder
-- **Status:** Architecture approved (D-001 to D-011). Phase 1 (visual builder) **implemented and verified; awaiting Product Owner acceptance**. No backend exists.
+- **Status:** Architecture approved (D-001 to D-011). Phase 1 (visual builder) **implemented and verified; under final acceptance review** (ChatGPT review positive; PO acceptance pending). Workflow contract **pending final code review** (D-013). **Phase 2 is proposed only, not approved**; no backend exists.
 - **Product Owner:** User
 - **Principal Architect:** ChatGPT
 - **Implementation Engineer:** Claude Code
@@ -79,7 +79,9 @@ Branch `main`. Commits:
 | `5af36e5` | Phase 1 steps 2–3: Workflow v1 types, catalog, store |
 | `35fe3bc` | Phase 1 steps 4–9: canvas, library, config panel, connection rules, import/export |
 
-The documentation commit for step 10 follows `35fe3bc`; see `git log`.
+Latest commit: **`5c89203`** (documentation sync). **There is no Git remote and nothing has been pushed to GitHub**; all work exists only in this local repository.
+
+**Uncommitted working-tree changes (as of Session 3, deliberately not committed until the PO approves):** `docs/DECISIONS.md` (D-012 to D-018), `docs/PROJECT_BRAIN.md`, `docs/ROADMAP.md`, `docs/DEVELOPMENT_LOG.md`, and the new `docs/PHASE1_REVIEW.md` and `docs/PHASE2_PLAN.md`. No application code is modified (`git diff HEAD -- frontend` is empty).
 
 ### Repository layout (actual)
 
@@ -88,6 +90,8 @@ AgentForge/
   CLAUDE.md  .gitignore  .gitattributes
   .claude/rules/{architecture,frontend,backend}.md
   docs/{PROJECT_BRAIN,ARCHITECTURE,DECISIONS,ROADMAP,DEVELOPMENT_LOG}.md
+  docs/PHASE1_REVIEW.md   (PROPOSED review package, uncommitted: contract review, six questions, Playwright proposal)
+  docs/PHASE2_PLAN.md     (PROPOSED, not approved, uncommitted)
   frontend/
     src/
       app/           App.tsx, Toolbar.tsx (New / Import / Export, import error panel)
@@ -129,7 +133,7 @@ Status legend: **Implemented** = code exists. **Tested** = verified as stated in
 - [x] Custom node components (one generic catalog-driven component) — Implemented, Tested (Chrome)
 - [x] Node library sidebar (categories, search) — Implemented, Tested (unit + Chrome)
 - [x] Drag-and-drop nodes (plus click / Enter add) — Implemented, Tested (Chrome)
-- [x] Node connections with rules (self-loop, duplicate, single input, data types, cycles) — Implemented, Tested (unit + Chrome; cycle rule is unit-tested only)
+- [x] Node connections with rules (self-loop, duplicate, single input, data types, cycles) — Implemented, Tested (unit + Chrome; cycle rule also verified in Chrome)
 - [x] Configuration panel (schema-driven, invalid input not committed) — Implemented, Tested (unit for parsing + Chrome)
 - [x] Workflow JSON export — Implemented, Tested (unit + Chrome)
 - [x] Workflow JSON import with migrate + validate — Implemented, Tested (unit + Chrome)
@@ -183,8 +187,8 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1 — implementation complete, awaiting acceptance.
-- **Last completed task:** Session 2. Phase 1 steps 0–10.
+- **Current phase:** Phase 1 — implementation complete; under final acceptance review. Phase 1.1 and Phase 2 are **proposed only**.
+- **Last completed task:** Session 3 (review documentation, uncommitted); before that Session 2, Phase 1 steps 0–10.
 - **Last code commit:** `35fe3bc`.
 
 ### Verification results (actual, run 2026-11-03)
@@ -203,11 +207,15 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 **The browser script is not in the repository.** It ran from a scratch directory with `playwright-core` and the locally installed Chrome. It is therefore not reproducible from the repo, and repo-based E2E remains deferred (open question 2).
 
-**Not tested:** Firefox, Safari, Edge; dark mode appearance; screen-reader behavior; keyboard-only canvas operation (moving or connecting nodes without a mouse); large graphs; touch devices.
+**Re-run in Session 3 (code unchanged vs `HEAD`):** `npx tsc -b` exit 0; `npm run lint` exit 0; `npm test` 6 files / 48 tests passed; `npm run build` exit 0.
+
+**Follow-up browser run (second ad hoc script, Chrome, 8/8 checks):** cycle rejection (llm2 -> llm1 creates no edge); handle feedback while dragging (occupied input shows the danger colour, a valid free input shows the ok colour, releasing on it creates the edge); pan and wheel zoom change the viewport; dark colour scheme applies and was inspected in a screenshot (legible).
+
+**Not tested:** Firefox, Safari, Edge; screen-reader behavior; keyboard-only canvas operation (moving or connecting nodes without a mouse); large graphs; touch devices.
 
 ## 8. Technical Decisions
 
-Full log: `docs/DECISIONS.md`. **All of D-001 to D-011 are Approved.** D-006 carries the PO clarification (dependency-based DAG executor with branching, skipping and concurrency-capable design; cycles rejected in v1; LangGraph handles loops inside the Agent node).
+Full log: `docs/DECISIONS.md`. **D-001 to D-012 are Approved.** Session 3 review decisions (recorded but uncommitted): D-012 keep TypeScript 7 / Vite 8 / Oxlint / Vitest 5 (Approved); **D-013 Workflow JSON v1 and catalog architecture: Pending final code review**; D-014 providers Groq, OpenAI, Anthropic, Ollama (Approved, catalog not yet updated); D-015 provider-neutral adapter (Approved, not implemented); D-016 no credentials in workflow JSON (Approved, holds today); D-017 non-blocking editor warnings (Approved, not implemented); D-018 errors separate from warnings (Approved, not implemented). D-006 carries the PO clarification (dependency-based DAG executor with branching, skipping and concurrency-capable design; cycles rejected in v1; LangGraph handles loops inside the Agent node).
 
 Small implementation choices made in Session 2 without a decision entry (flagged for architect review):
 - Followed Vite template defaults: **oxlint** instead of ESLint, **TypeScript 7**, Vite 8, Vitest 5.
@@ -227,31 +235,46 @@ Small implementation choices made in Session 2 without a decision entry (flagged
 7. **The workflow `description` and `metadata` are preserved on import/export but have no UI.**
 8. **Toolchain versions are newer than typical** (TypeScript 7, Vite 8, oxlint). They work, but the architect should confirm they are acceptable; falling back to ESLint is possible.
 9. **Windows encoding incident (fixed):** early in Session 2, PowerShell 5.1 `Set-Content -Encoding utf8` added UTF-8 BOMs and re-encoded non-ASCII characters in `docs/PROJECT_BRAIN.md` and `docs/DECISIONS.md` (e.g. `§` became `Â§`). Both were repaired and verified by scanning all docs for mojibake. These two files were committed with the damage in `798ab84`; the repair is in the documentation commit.
-10. Node ids are 8-character random strings; collision risk is negligible at editor scale but unchecked.
+10. **Edge stroke is low-contrast in dark mode** (cosmetic; React Flow default colours).
+11. Node ids are 8-character random strings; collision risk is negligible at editor scale but unchecked.
+12. **No GitHub remote.** The repository is local only; there is no off-machine backup and CI cannot run until a remote exists.
+13. **HTTP Request `headers` is free-form JSON** and could hold a pasted secret; only its description warns against this (D-016). No technical guard yet.
+14. **Workflow contract concerns for Phase 2** (5 high, 9 medium, 7 low) are listed in `docs/PHASE1_REVIEW.md` §1.4. The high ones (H1 config schema is a hand-rolled subset, H2 rules exist only in TypeScript, H3 no `typeVersion` migration, H4 branching not expressible, H5 JSONB key order vs byte-identical export) need decisions before the Pydantic models are written.
+15. The provider enum lacks `groq` (D-014); it is not changed during the review because the contract is frozen.
 
 ## 10. Open Questions
 
-1. **LLM providers.** Which are first-class in Phase 4 (e.g. OpenAI, Anthropic, Ollama for local)? Affects the node `provider` enum, `get_chat_model` and the test fakes.
-2. **Repo-based E2E tests.** Approve adding Playwright as a dev dependency now, or keep it deferred until after Phase 2?
-3. **Toolchain.** Accept TypeScript 7 / Vite 8 / oxlint, or switch to ESLint?
-4. **Phase 1 acceptance.** Does the PO / architect accept Phase 1 as complete? If so, Phase 2 needs its own plan and review before any backend work begins.
-5. **Auth.** Is multi-user auth a hard requirement before any deployment, or is single-user local mode acceptable until Phase 7?
-6. **Editor-side validation UX.** Should the editor show non-blocking warnings (unconnected required inputs, empty required fields) before Phase 3, or wait for the engine's validator?
+The six questions below are the original §10 questions. Full answers and reasoning: `docs/PHASE1_REVIEW.md` §2. **Settled** = decided by the PO's 2026-11-03 review message. **Proposed** = my recommendation, awaiting PO confirmation.
 
+| # | Question | Status | Answer (summary) |
+|---|---|---|---|
+| 1 | **LLM providers.** Which are first-class in Phase 4? | **Settled** (D-014) | Groq, OpenAI, Anthropic, Ollama. Catalog enum needs `groq` (additive, not yet done). |
+| 2 | **Repo-based E2E tests.** Add Playwright as a dev dependency now, or defer until after Phase 2? | Proposed | Approve now as a small Phase 1.1 task before Phase 2 step 10. Needs a GitHub remote for CI. |
+| 3 | **Toolchain.** Accept TypeScript 7 / Vite 8 / oxlint, or switch to ESLint? | **Settled** (D-012) | Keep; no ESLint. |
+| 4 | **Phase 1 acceptance.** Does the PO / architect accept Phase 1 as complete? | Proposed | Accept as functionally complete and verified, with two tracked conditions: D-013 final contract code review (blocks Phase 2 step 2) and a Phase 1.1 follow-up (groq, warnings, Playwright). Phase 2 is not approved by this. |
+| 5 | **Auth.** Is multi-user auth a hard requirement before any deployment, or is single-user local mode acceptable until Phase 7? | Proposed | Single-user local mode until Phase 7, but include `users` and `owner_id` from the first migration with one `get_current_user()` seam; never expose beyond localhost without auth. |
+| 6 | **Editor-side validation UX.** Should the editor show non-blocking warnings before Phase 3, or wait for the engine's validator? | **Settled in direction** (D-017, D-018) | Yes, before Phase 3, including unused nodes. Exact definitions proposed in the review (unconnected required inputs, empty required strings, isolated nodes) await PO confirmation. |
+
+**Other pending decisions and blockers (none resolved yet):**
+- **Pending:** D-013 final code review of the Workflow contract (`types.ts`, `nodes.ts`, `connections.ts`, `validate.ts`), including decisions on concerns H1 to H5.
+- **Pending:** PO approval of `docs/PHASE2_PLAN.md` and of decisions X1 to X9 listed in it.
+- **Proposed, not started:** Phase 1.1 (groq enum, editor warnings, Playwright).
+- **Blocked:** Phase 2 step 2 onward on the D-013 review; Phase 2 step 6 onward on Docker Desktop (PO will install); CI on a GitHub remote (none exists).
 ## 11. Last Session Handoff
 
-- **Date:** 2026-11-03 (Session 2)
-- **Last task:** Phase 1 steps 0–10 (git init, scaffold, types and catalog, store, canvas, node component, library, connection rules, config panel, import/export).
-- **Implemented changes:** see §6 layout and `docs/DEVELOPMENT_LOG.md` Session 2.
-- **Tests:** see §7 (all executed checks passed).
-- **Next task:** Product Owner / Principal Architect review of Phase 1.
+- **Date:** 2026-11-03 (Session 3)
+- **Last task:** Phase 1 review follow-up: recorded review decisions (D-012 to D-018), prepared the workflow contract review, answered the six open questions, wrote the Playwright proposal, wrote the proposed Phase 2 plan, and synced documentation.
+- **Implemented changes:** documentation only (see the uncommitted list in §6). No application code, contract, dependency or configuration change.
+- **Tests:** see §7. Re-run this session: `tsc`, `oxlint`, 48 Vitest tests and `vite build` all pass. No new browser run was needed (code unchanged).
+- **Commits:** none this session; review documents are deliberately left uncommitted.
+- **Next task:** PO review of the review package, decisions and Phase 2 plan.
 
 ## 12. Next Recommended Action
 
-1. PO and Principal Architect review the Phase 1 handoff and answer §10 questions 1–6.
-2. PO moves `Downloads\CLAUDE.md` out of the AgentForge parent path.
-3. If Phase 1 is accepted, Claude drafts a **Phase 2 plan for separate review**: FastAPI scaffold under `backend/` on Python 3.12 via uv; Pydantic models for Workflow JSON v1 and the node catalog as the canonical source; generating the TypeScript types from the exported JSON Schema with a CI drift check; `GET /api/catalog`; workflow CRUD with versioned JSONB snapshots; PostgreSQL through Docker Compose. **No backend work begins before that review.**
-
+1. **PO:** review `docs/PHASE1_REVIEW.md`, `docs/PHASE2_PLAN.md` and decisions D-012 to D-018, then either approve them for commit or request changes.
+2. **Principal Architect:** complete the D-013 final code review and decide concerns H1 to H5.
+3. **PO:** confirm Q2, Q4, Q5 and the warning definitions in Q6; create a GitHub repository if CI and an off-machine backup are wanted; move `Downloads\CLAUDE.md` out of the AgentForge parent path; install Docker Desktop before Phase 2 step 6.
+4. **Only after explicit approval:** commit the review documents, then (separately) Phase 1.1 and/or Phase 2 step 1. **No Phase 2 or backend work begins before that approval.**
 ## 13. Update Rules
 
 After every meaningful implementation task:

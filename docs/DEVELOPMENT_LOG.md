@@ -174,7 +174,8 @@ Deliver the visual builder: canvas, generic node component, node library with dr
   - `tsc` flagged an overwritten `position` key in a test; two oxlint warnings (component created during render; non-component export). All fixed.
   - Library icons rendered squashed in the screenshot; fixed with `flex-shrink: 0`.
 - Manual verification: screenshots of the editor and of the imported workflow were inspected.
-- Not verified: Firefox/Safari/Edge, dark mode appearance, screen readers, keyboard-only canvas use, large graphs, the red/green handle feedback colours while dragging, and cycle rejection in the browser (unit-tested only).
+- Follow-up run (same session, second ad hoc script, 8/8 checks): cycle rejection in the browser, red/green handle feedback while dragging, pan and zoom, dark colour scheme (screenshot inspected; edges are low-contrast, cosmetic).
+- Not verified: Firefox/Safari/Edge, screen readers, keyboard-only canvas use, large graphs.
 
 **Incidents:**
 - Windows PowerShell 5.1 `Set-Content -Encoding utf8` wrote UTF-8 BOMs and double-encoded non-ASCII characters (e.g. `§` to `Â§`) in `docs/PROJECT_BRAIN.md` and `docs/DECISIONS.md`, and a BOM into the steps 2-3 commit message. That commit message was amended (local, unpushed; the commit is now `5af36e5`). Both docs were repaired and every doc was scanned for remaining mojibake. The damaged versions exist in the first commit; the repair is in the Session 2 documentation commit.
@@ -187,3 +188,52 @@ Completed for Phase 1 scope. Awaiting PO and Principal Architect acceptance.
 
 **Next Task:**
 Review of Phase 1 and the open questions in PROJECT_BRAIN §10. If accepted, draft a Phase 2 plan for separate review. No backend work before that review.
+
+---
+
+### Session: 3 / 2026-11-03
+
+**Phase:**
+Phase 1 final acceptance review (documentation only)
+
+**Task:**
+Record the Phase 1 review decisions, prepare the workflow contract review, answer the six open questions, propose Playwright, and propose a Phase 2 plan. The PO instructed: do not start Phase 2, do not change application code or the frozen contract, and do not commit or push until approved.
+
+**Objective:**
+Give the Product Owner and the Principal Architect (ChatGPT) everything needed to accept Phase 1 and to decide on Phase 2.
+
+**Implementation:**
+- `docs/DECISIONS.md`: added D-012 to D-018. D-013 (workflow contract) is marked **Pending final code review**; the others are Approved with their implementation status stated.
+- `docs/PHASE1_REVIEW.md` (new): contract review (what each of the four files does, how they interact, document structure, ports, data-type matrix, config schema, versioning, validation rules, and 21 Phase 2 concerns graded high/medium/low), the six original §10 questions with proposed answers, and the Playwright proposal.
+- `docs/PHASE2_PLAN.md` (new): ten steps, each with objective, dependencies, scope, acceptance criteria and tests; preconditions, decisions needed, dependency order and risks. Marked PROPOSED and not approved.
+- `docs/PROJECT_BRAIN.md`, `docs/ROADMAP.md`, `docs/DEVELOPMENT_LOG.md`: synced. Completed, proposed, pending and blocked work are listed separately.
+
+**Files Created:**
+- `docs/PHASE1_REVIEW.md`
+- `docs/PHASE2_PLAN.md`
+
+**Files Modified:**
+- `docs/DECISIONS.md`, `docs/PROJECT_BRAIN.md`, `docs/ROADMAP.md`, `docs/DEVELOPMENT_LOG.md`
+
+**Files Inspected (read-only):**
+- `frontend/src/workflow/{types,connections,validate,migrate,configSchema,serialize}.ts`, `frontend/src/catalog/nodes.ts`, `docs/PROJECT_BRAIN.md` §10, `git` state.
+
+**Technical Decisions:**
+- Recorded D-012 to D-018 as described above. No decision was made unilaterally; items needing PO or architect choices are listed in `docs/PHASE2_PLAN.md` §2 (X1 to X9) and `docs/PHASE1_REVIEW.md` §1.4.
+
+**Verification:**
+- Commands executed: `git status`, `git log`, `git diff --stat HEAD -- frontend` (empty: no app code changed), `git remote -v` (empty: no remote), `npm view @playwright/test version` (1.64.1), `npx tsc -b`, `npm run lint`, `npm test`, `npm run build`.
+- Tests passed: `tsc` exit 0; `oxlint` exit 0; **48 Vitest tests in 6 files**; `vite build` exit 0.
+- Tests failed: none.
+- Also earlier in this session (before the review request): a second ad hoc Chrome script, **8 of 8 checks passed** (cycle rejection, handle colour feedback, release on valid target, pan, zoom, dark scheme). Its first run hit a script error after 7 passing checks (my pan and zoom moved a node under the toolbar); the script was fixed, the app was not changed.
+- Not executed: nothing in the proposals (Playwright, Phase 2) has been implemented or run.
+
+**Known Issues:**
+- No GitHub remote exists and nothing has been pushed. The PO asked whether the repository was on their GitHub account; it is not, because no remote was ever configured.
+- Plus everything in PROJECT_BRAIN §9, including the 21 contract concerns.
+
+**Status:**
+Completed for the requested documentation scope. **Uncommitted by instruction.** Awaiting PO approval of the review documents.
+
+**Next Task:**
+PO review and approval. Then, only on explicit approval: commit the review documents; Phase 1.1 and/or Phase 2 step 1.
