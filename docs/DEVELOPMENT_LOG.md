@@ -462,3 +462,53 @@ Governance and learning system in place. T1 implemented, reviewed, fixed; accept
 
 **Next Task:**
 PO review of T1 and the new team model; decide the review cadence (D-027 keeps per-task PO review until changed). Then T2 only after approval.
+
+---
+
+### Session: 8 / 2026-11-03
+
+**Phase:**
+Phase 1.1: T1 accepted, T2 implemented, reviewed twice, fixed and accepted
+
+**PO decisions this session (D-029, D-030):**
+- T1 acceptance: the PO reported the GitHub Actions run green (all 48 unit tests and 26 Playwright tests). **PO-reported; Claude cannot see GitHub and the commit that ran was not specified.**
+- Review cadence: Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones (proposed MS-A after T3, MS-B after T6, MS-C after T10). Every lesson ends with a Knowledge Check / Interview Questions section; the PO answers all of them once, at the end of the project; statuses change only after that evaluation (D-029).
+- Claude works on local files only and does not need GitHub; the PO pushes when they choose (D-030).
+
+**T2: structured validation errors (commits in order):**
+
+| Commit | Author role | What |
+|---|---|---|
+| `29b8aeb` | Sonnet implementer | `{code, path, message}` on the whole import path; `errors.ts` (23 `ERROR_CODES`, `ValidationError`, RFC 6901 `jsonPointer`); `validateConfig` returns `{key, code, message}[]`; Toolbar shows code and message; 78 unit and 26 e2e tests |
+| `b9d136a` | Sonnet implementer | Review fixes: own-property lookups (`Object.hasOwn`) in `configSchema.ts` and `migrate.ts`; accessible error path; test tidy-ups; 80 unit tests |
+| `60b1609` | Sonnet implementer | Follow-up found by the implementer's audit: node sizes in `flowMapping.ts` and `Canvas.tsx` were keyed by imported node ids in a plain object; now a `Map`; 84 unit and 27 e2e tests |
+| `6e97207` | Sonnet implementer | Final minor fixes: the error path is shown as visible text (the first version hid it in a tooltip); a vacuous test deleted; `.srOnly` `nowrap`; rename; 83 unit and 27 e2e tests |
+
+**Independent reviews (Opus 5.5, read-only):**
+- **Review 1 of `29b8aeb`: PASS WITH FINDINGS, no blockers.** One Major: a config key named like an `Object.prototype` member (`constructor`, `toString`, `hasOwnProperty`, `valueOf`, or an own `__proto__` key) bypassed the unknown-key check (a pre-existing bug on the import trust boundary, present since Phase 1). Minor: the path was only in a non-focusable tooltip. Nits: a stale test title and loose regex, a redundant cast, a comment, e2e not asserting paths. The reviewer compared every message string before and after and found **none changed**, verified the code-per-test table and confirmed the claim that the old "cycle" test never produced a cycle (the occupied-input rule fires first).
+- **Architect's own addition:** the same pattern in `migrate.ts` (`migrations[version]` with an untrusted `schemaVersion`): reviewer-confirmed afterwards; `"__proto__"` made the old code throw.
+- **Review 2 of `b9d136a` and `60b1609`: PASS WITH FINDINGS, no blockers, no majors.** Confirmed both fixes and the `Map` change correct and behaviour-preserving, and that the bug class is closed in `frontend/src`. Findings: the path should be visible text, not tooltip plus hidden span (**fixed**); `.srOnly` lacked `white-space: nowrap` (**fixed**); the e2e should assert the nodes are visible (**fixed**); a "does not pollute Object.prototype" test can never fail (**deleted**); a stale variable name (**fixed**, as `occupiedInput`, since `occupied` was already taken); two of three cases in the `schemaVersion` test do not discriminate between old and new code, only `__proto__` does (**accepted, recorded**); `icons[name]` is fed from the trusted catalog (**not a bug**).
+
+**Verification by the Principal Architect (commands actually run, each time a fix landed):** `npm run verify` in `frontend/`. Final state at `6e97207`: **exit 0; 8 test files, 83 unit tests passed; 27 e2e tests passed.** The diffs of the fix commits were read (configSchema, migrate, Toolbar, flowMapping). The implementer also ran fault injection each time (reverting the own-property checks fails the new tests; breaking the path text fails the e2e tests); I did not repeat those runs.
+
+**Lesson L2 (written by the Sonnet tutor, the first use of that agent):** structured errors, JSON Pointer, stable codes as a contract, compile-time and runtime guards, trust-boundary key bugs (including the real `constructor` and canvas examples), table-driven tests. Ends with a Knowledge Check of 6 questions and no answers. The Principal Architect read its structure and the stories and corrected stale wording after the fixes landed; **the tutor's external-world facts (RFC 9457, FastAPI's error shape, Ajv, TypeScript `TS2322`) are from general knowledge and were not verified in the repository**, and the Reviewer should spot-check them when Module 3 is completed.
+
+**Files this session (code, all under `frontend/`):** created `src/workflow/errors.ts`, `src/workflow/errors.test.ts`, `src/canvas/flowMapping.test.ts`; modified `src/workflow/{validate,configSchema,migrate,serialize}.ts`, `src/workflow/serialize.test.ts`, `src/catalog/catalog.test.ts`, `src/canvas/{flowMapping,Canvas}.ts*`, `src/app/Toolbar.tsx`, `src/app/Toolbar.module.css`, `e2e/import-export.e2e.ts`. Docs: `docs/DECISIONS.md` (D-029, D-030), `docs/PHASE1_1_PLAN.md` (milestones, carry-overs), `docs/LEARNING.md`, `docs/LEARNING_GUIDE.md`, `.claude/agents/tutor.md`, `CLAUDE.md`, plus brain, roadmap, log.
+
+**Carry-overs recorded in `docs/PHASE1_1_PLAN.md`:** T3 fixtures must include the prototype-named keys and `schemaVersion` values; T5 and T7 must handle `schema.required` under decision C1 and use own-property lookups; T6 must fix the path wording (paths point into the migrated document) and revisit `node.unknown-type` for known types with unknown versions.
+
+**Process disclosures:**
+- The `6e97207` fix and the T2 lesson were not independently re-reviewed beyond the Principal Architect's own verification (D-029 reviews every task; the original task and its first fixes were reviewed twice).
+- A subagent ran a stray, harmless `python` command; the second Opus reviewer wrote a log file to `/tmp` and deleted it (a small breach of the "scratchpad only" rule). Neither touched the repository.
+- Claude made no remote git operation this session.
+
+**Known Issues / limitations:**
+- Screen-reader behaviour of the error list was not tested with a real assistive technology.
+- The e2e suite runs Chromium on the Vite dev server only; Linux behaviour is unverified until the PO pushes and reports CI.
+- Whether the T2 commits have been pushed, and their CI result, are unknown to Claude.
+
+**Status:**
+T2 **accepted** by the Principal Architect. Next: T3 (shared fixtures and the TypeScript runner), the last task before milestone **MS-A**, when the PO reviews.
+
+**Next Task:**
+T3.

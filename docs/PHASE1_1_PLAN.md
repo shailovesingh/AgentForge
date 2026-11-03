@@ -397,7 +397,7 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
 - **Acceptance:** `npm run verify` passes on a clean clone; 49 checks run as automated tests; a deliberately broken selector or behaviour makes a test fail (demonstrated once and recorded); CI runs green on GitHub with every action pinned to a verified commit SHA (G1).
 - **Tests:** the e2e suite itself, plus all existing 48 unit tests unchanged.
 
-### T2 — Structured validation errors (S)
+### T2 — Structured validation errors (S) — **DONE** (commits `29b8aeb`, `b9d136a`, `60b1609`, `6e97207`; Opus-reviewed twice; accepted by the Principal Architect). Results in `docs/DEVELOPMENT_LOG.md` Session 8.
 - **Dependencies:** T1.
 - **Files:** `workflow/{validate,connections,configSchema,serialize}.ts`, `app/Toolbar.tsx` (show code and message), tests.
 - **Change:** every error becomes `{ code, path, message }` using the code table in §3.2; message text stays the same.
@@ -405,6 +405,7 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
 - **Tests:** existing unit tests re-expressed on `{code, path}`; one test per code.
 
 ### T3 — Shared fixtures and the TypeScript runner (M)
+- **Carry-over from the T2 review:** the shared fixtures must include config keys named `constructor`, `toString`, `hasOwnProperty`, `valueOf` and an **own** `__proto__` key (each expects `schema.additionalProperties`), and a `schemaVersion` of `"constructor"` or `"toString"` (expects `doc.unsupported-version`). Compare error lists as multisets: the order of integer-like config keys differs between a JavaScript object and a Python dict.
 - **Dependencies:** T2.
 - **Files:** `contracts/**` (README, format, initial corpus), `frontend/src/contracts/fixtures.test.ts`.
 - **Acceptance:** at least 40 cases across `workflow`, `connection`, `config`, `catalog`; the runner fails if a fixture file is malformed; the README documents the format and the multiset rule.
@@ -422,18 +423,21 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
 - **Tests:** the fixture runner; a property-style round trip over generated documents; a mutation check (change one rule and a fixture must fail); a lightweight truncation fuzz (a truncated file always produces a structured error, never an exception); updated Playwright import/export checks.
 
 ### T5 — JSON Schema subset, UI separation, providers (H1) (L)
+- **Carry-over from the T2 review / decision C1:** `schema.required` is currently reported as a structural error. When T5 adds the `checkRequired` option (C1, D-025), document import stops reporting it; update `errors.test.ts` and decide whether `schema.required` stays in `ERROR_CODES` for execution-time validation (Phase 3) or moves out. Use own-property lookups (`Object.hasOwn`) for every lookup keyed by imported data.
 - **Dependencies:** T2, T3.
 - **Files:** `workflow/types.ts`, `workflow/configSchema.ts` (generalized validator), `catalog/nodes.ts` (all six definitions converted; `PROVIDERS` constant with `groq`; `defaults` removed), `catalog/index.ts`, `store/editorStore.ts` (defaults from schema), `config-panel/ConfigPanel.tsx` (render from schema + `ui`; JSON editor for arrays and nested objects), `contracts/CONFIG_SCHEMA.md`, `contracts/fixtures/config/*`, `contracts/fixtures/catalog/builtin.catalog.json`, tests.
 - **Acceptance:** the validator supports every keyword in §3.1 including `integer`, `array`/`items`, nested objects, `default`, `required`, `additionalProperties`; `multiline` no longer exists in `configSchema`; accepted configs for all existing nodes are unchanged (except the planned `maxIterations` change in T6); catalog tests (unique ports, schema defaults valid against their own schemas, applied only by the explicit `applyDefaults` at creation (no requirement that required properties have defaults, see C1), enums derived from `PROVIDERS`) pass; the config panel behaves as before for existing nodes.
 - **Tests:** config fixtures (types, ranges, code-point length with emoji, nested and array cases, unknown keys, `checkRequired` on and off cases (C1)); catalog consistency tests (unique ports, defaults valid against their schemas, enums derived from `PROVIDERS`); Playwright config-panel checks.
 
 ### T6 — Node migrations and the first real migration (H3) (M)
+- **Carry-over from the T2 review:** the comment in `errors.ts` says paths point into "the imported document"; once real migrations exist they point into the **migrated** document, so fix the wording and decide the path semantics. `node.unknown-type` always points at `/nodes/<i>/type`, even for a known type with an unknown version; revisit together with `node.version-newer`.
 - **Dependencies:** T5.
 - **Files:** `workflow/nodeMigrations.ts`, `workflow/migrate.ts` (pipeline), `workflow/serialize.ts` (`importWorkflow` returns upgrades), `catalog/nodes.ts` (`agent.autonomous` to version 2), `store/editorStore.ts` (upgrade report), `app/Toolbar.tsx` or a small `UpgradeBanner`, `contracts/fixtures/migration/*`.
 - **Acceptance:** a v1 agent workflow with `maxIterations: 2.5` imports as v2 with `3`, a visible banner and a note; the original file is byte-unchanged; newer-than-known and gap cases are rejected with `node.version-newer` and `node.no-migration-path` and leave the open workflow untouched; every migration result validates against the new schema. A migration that introduces a property sets it by calling `applyDefaults` explicitly.
 - **Tests:** migration fixtures; round trip after migration; Playwright check for the banner; test that the importer never writes.
 
 ### T7 — Editor warnings (Q6, D-017, D-018) (M)
+- **Carry-over from the T2 review / decision C1:** absent required config keys become `required-field-empty` **warnings** (not errors) in the editor and on import; make sure no structural error path remains for them (see T5).
 - **Dependencies:** T5 (and T8 for `branch`-aware `result-unused`, otherwise a conservative rule is used until T8 lands).
 - **Files:** `workflow/lint.ts`, `workflow/lint.test.ts`, `contracts/fixtures/warnings/*`, `canvas`/`nodes` (badge), `app/Toolbar.tsx` (count and list), `config-panel/ConfigPanel.tsx` (node warnings), CSS modules, e2e spec.
 - **Acceptance:** every rule in §3.6 fires and does not fire in the documented cases; category and direction cases (Trigger without outputs connected, Output without input, Condition with one branch wired, orphan chain) are covered; warnings never block any action (explicit tests); `validateWorkflow` is untouched in meaning.

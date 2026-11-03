@@ -36,6 +36,7 @@
 | D-027 | Team model: Claude as Principal Architect, Sonnet 5.5 implements, Opus 5.5 reviews, user is Product Owner | **Approved** |
 | D-028 | Learning requirement: curriculum, teaching record, tutor agent, evidence rule (permanent; evaluation protocol amended by D-029) | **Approved** |
 | D-029 | Review cadence (Opus reviews every task, Architect accepts, PO at milestones) and learning-check protocol (Knowledge Check at the end of each lesson; one evaluation session at the end) | **Approved** |
+| D-030 | Claude works on local files only; the Product Owner pushes to GitHub when they choose | **Approved** |
 
 ---
 
@@ -244,3 +245,8 @@
 - **Milestones for Phase 1.1 (proposed by the Principal Architect, adjustable by the Product Owner):** **MS-A** after T3 (structured errors and shared fixtures: the validation foundation); **MS-B** after T6 (strict and canonical JSON, JSON Schema configs, node migrations: the contract complete); **MS-C** after T10 (warnings, secret detection, documentation: Phase 1.1 complete, which is also the gate to any Phase 2 discussion).
 - **T1 acceptance:** the Product Owner reports the GitHub Actions run green (all 48 unit tests and 26 Playwright tests passed). This is **PO-reported**; Claude cannot see GitHub and the commit that was run was not specified.
 - **Learning-check protocol:** every lesson in `docs/LEARNING_GUIDE.md` ends with a **Knowledge Check / Interview Questions** section as its very last part. There are no per-lesson questions in conversation. At the end of the project the Product Owner studies `LEARNING.md` and `LEARNING_GUIDE.md`, answers all questions in a dedicated learning session and submits the answers for evaluation; **only then** are learning statuses updated. Until then no topic is above In Progress. For now the focus is building.
+
+## D-030 — Local-only working mode; the Product Owner pushes
+- **Status:** Approved (Product Owner, 2026-11-03, Session 8)
+- **Decision:** Claude (all roles and subagents) works only on the local repository and **does not need GitHub**. All checks that matter for acceptance run locally (`npm run verify`). The Product Owner pushes to GitHub when they choose. Claude never pushes, fetches or pulls, and does not read GitHub state. Any CI result is **PO-reported**.
+- **Consequences:** GitHub CI adds one thing the local run cannot: a Linux run (the local runs are Windows). It is checked when the Product Owner pushes and reports. There is no off-machine backup until the Product Owner pushes, so the Principal Architect suggests pushing at the milestones (after T3, T6 and T10). Pushes have previously happened automatically shortly after local commits (see `docs/DEVELOPMENT_LOG.md` Sessions 5 to 7); if the Product Owner wants to push only at completion, any automatic sync in their own tooling should be turned off. Claude cannot control that.
