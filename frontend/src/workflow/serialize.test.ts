@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { nodeDefinitions } from '../catalog'
 import { parseConfigInput } from './configSchema'
 import { MIGRATIONS, migrate } from './migrate'
-import { importWorkflow, serializeWorkflow } from './serialize'
+import { MAX_IMPORT_BYTES, importWorkflow, serializeWorkflow } from './serialize'
+import serializeSource from './serialize.ts?raw'
 import type { Workflow } from './types'
 
 const node = (id: string, type: string, config: Record<string, unknown> = {}) => ({
@@ -157,9 +158,70 @@ describe('import rejects bad files with specific codes, paths and messages', () 
   })
 
   test('oversized input', () => {
-    const e = errorsOf(' '.repeat(5 * 1024 * 1024 + 1))[0]
+    const e = errorsOf(' '.repeat(MAX_IMPORT_BYTES + 1))[0]
     expect(e).toMatchObject({ code: 'doc.too-large', path: '' })
     expect(e.message).toMatch(/too large/)
+  })
+})
+
+describe('importWorkflow: bytes, size limit and the strict parser', () => {
+  const text = JSON.stringify(sample)
+  const bytes = (t: string) => new TextEncoder().encode(t)
+
+  test('the import path does not use the built-in JSON parser', () => {
+    expect(serializeSource).not.toContain('JSON.parse(')
+    expect(serializeSource).toContain('strictParse(')
+  })
+
+  test('text and the same text as UTF-8 bytes import identically', () => {
+    const fromText = imp(text)
+    const fromBytes = importWorkflow(bytes(text), nodeDefinitions)
+    expect(fromText.ok).toBe(true)
+    expect(fromBytes).toEqual(fromText)
+  })
+
+  test('a leading byte order mark is tolerated (bytes and text), but only one', () => {
+    expect(importWorkflow(new Uint8Array([0xef, 0xbb, 0xbf, ...bytes(text)]), nodeDefinitions).ok).toBe(true)
+    expect(imp('﻿' + text).ok).toBe(true)
+    const twice = importWorkflow(new Uint8Array([0xef, 0xbb, 0xbf, 0xef, 0xbb, 0xbf, ...bytes(text)]), nodeDefinitions)
+    expect(twice.ok).toBe(false)
+    if (!twice.ok) expect(twice.errors[0]).toMatchObject({ code: 'doc.not-json', path: '' })
+  })
+
+  test('invalid UTF-8 is doc.invalid-encoding at the document root', () => {
+    for (const raw of [[0xff], [0xc0, 0xaf], [0xed, 0xa0, 0x80], [0xe2, 0x82]]) {
+      const r = importWorkflow(new Uint8Array([0x22, ...raw, 0x22]), nodeDefinitions)
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.errors).toEqual([{ code: 'doc.invalid-encoding', path: '', message: expect.any(String) }])
+    }
+  })
+
+  test('the size limit counts UTF-8 bytes, not characters, for text and for bytes', () => {
+    const atLimit = text + ' '.repeat(MAX_IMPORT_BYTES - text.length)
+    expect(imp(atLimit).ok).toBe(true)
+    expect(importWorkflow(bytes(atLimit), nodeDefinitions).ok).toBe(true)
+    expect(errorsOf(atLimit + ' ')[0].code).toBe('doc.too-large')
+    expect(importWorkflow(new Uint8Array(MAX_IMPORT_BYTES + 1), nodeDefinitions)).toMatchObject({ ok: false })
+    // 2,500,001 two-byte characters: 5,000,002 bytes, but only 2,500,001 characters.
+    const multibyte = 'é'.repeat(MAX_IMPORT_BYTES / 2 + 1)
+    expect(multibyte.length).toBeLessThan(MAX_IMPORT_BYTES)
+    expect(errorsOf(multibyte)[0].code).toBe('doc.too-large')
+    // Exactly at the limit in bytes: not too large (the text is not JSON, which is a different error).
+    expect(errorsOf('é'.repeat(MAX_IMPORT_BYTES / 2))[0].code).toBe('doc.not-json')
+    // 4-byte characters (surrogate pairs) and a lone surrogate (3 bytes) are counted too.
+    expect(errorsOf('😀'.repeat(MAX_IMPORT_BYTES / 4 + 1))[0].code).toBe('doc.too-large')
+    expect(errorsOf('�'.repeat(MAX_IMPORT_BYTES / 3 + 1))[0].code).toBe('doc.too-large')
+  })
+
+  test('a duplicate key is reported with its pointer, not silently collapsed', () => {
+    const dup = text.replace('"metadata":{"note":"x"}', '"metadata":{"note":"x","note":"y"}')
+    expect(dup).not.toBe(text)
+    expect(errorsOf(dup)[0]).toMatchObject({ code: 'doc.duplicate-key', path: '/metadata/note' })
+  })
+
+  test('truncating the file at every byte never throws and never imports', () => {
+    const doc = bytes(JSON.stringify({ ...sample, name: 'café 😀' }))
+    for (let i = 0; i < doc.length; i++) expect(importWorkflow(doc.subarray(0, i), nodeDefinitions).ok).toBe(false)
   })
 })
 

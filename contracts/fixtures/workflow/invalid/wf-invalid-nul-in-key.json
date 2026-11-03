@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-nul-in-key",
+  "description": "A \\u0000 escape in an object key is rejected, and the path is the pointer of that member.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"a\\u0000b\":1}}",
+  "expect": {"valid":false,"errors":[{"code":"value.nul-character","path":"/metadata/a\u0000b"}]}
+}

@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-number-zero-forms",
+  "description": "Zero in every spelling is accepted in a node position: 0, -0, 0.0e5, 0e0, -0.0.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"n0\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":-0}},{\"id\":\"n1\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0.0e5,\"y\":0e0}},{\"id\":\"n2\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":-0.0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":true}
+}

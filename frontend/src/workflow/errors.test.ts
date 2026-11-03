@@ -3,7 +3,7 @@ import { nodeDefinitions } from '../catalog'
 import { CONNECTION_ERROR_MESSAGES } from './connections'
 import { ERROR_CODES, jsonPointer } from './errors'
 import type { ErrorCode } from './errors'
-import { MAX_IMPORT_CHARS, importWorkflow } from './serialize'
+import { MAX_IMPORT_BYTES, importWorkflow } from './serialize'
 import type { Workflow } from './types'
 
 const node = (id: string, type: string, config: Record<string, unknown> = {}) => ({
@@ -42,11 +42,24 @@ const edited = (edit: (wf: Workflow) => void): string => {
   return JSON.stringify(wf)
 }
 
+/** The base workflow as text, with the raw text of the first node's position.x replaced. */
+const withPosition = (raw: string): string => JSON.stringify(base()).replace('"x":0', `"x":${raw}`)
+
+/** The base workflow as text, with the raw text of "metadata" replaced (for duplicate keys, depth, numbers). */
+const withMetadata = (raw: string): string => JSON.stringify(base()).replace('"metadata":{}', `"metadata":${raw}`)
+
 // One real input per code. Record<ErrorCode, ...> makes the compiler reject a missing entry too.
-const CASES: Record<ErrorCode, { path: string; input: () => string }> = {
+const CASES: Record<ErrorCode, { path: string; input: () => string | Uint8Array }> = {
   'doc.not-json': { path: '', input: () => '{nope' },
   'doc.not-object': { path: '', input: () => '[]' },
-  'doc.too-large': { path: '', input: () => ' '.repeat(MAX_IMPORT_CHARS + 1) },
+  'doc.too-large': { path: '', input: () => ' '.repeat(MAX_IMPORT_BYTES + 1) },
+  // 65 nested arrays inside metadata: metadata is depth 2, so the 63rd array (depth 65) is the first too deep.
+  'doc.too-deep': {
+    path: '/metadata' + '/a'.repeat(1) + '/0'.repeat(62),
+    input: () => withMetadata(`{"a":${'['.repeat(63)}${']'.repeat(63)}}`),
+  },
+  'doc.duplicate-key': { path: '/metadata/a', input: () => withMetadata('{"a":1,"a":2}') },
+  'doc.invalid-encoding': { path: '', input: () => new Uint8Array([0x7b, 0xff, 0x7d]) },
   'doc.unsupported-version': { path: '/schemaVersion', input: () => edited((w) => (w.schemaVersion = '9.9')) },
   'doc.invalid-field': { path: '/id', input: () => edited((w) => delete (w as Partial<Workflow>).id) },
   'node.malformed': { path: '/nodes/1', input: () => edited((w) => (w.nodes[1] = 5 as never)) },
@@ -104,6 +117,10 @@ const CASES: Record<ErrorCode, { path: string; input: () => string }> = {
   },
   'schema.minimum': { path: '/nodes/1/config/temperature', input: () => edited((w) => (w.nodes[1].config.temperature = -1)) },
   'schema.maximum': { path: '/nodes/1/config/temperature', input: () => edited((w) => (w.nodes[1].config.temperature = 5)) },
+  'value.not-finite': { path: '/nodes/0/position/x', input: () => withPosition('1e400') },
+  'value.unsafe-integer': { path: '/nodes/0/position/x', input: () => withPosition('9007199254740993') },
+  'value.invalid-unicode': { path: '/metadata/k', input: () => withMetadata('{"k":"\\ud800"}') },
+  'value.nul-character': { path: '/metadata/k', input: () => withMetadata('{"k":"a\\u0000b"}') },
 }
 
 describe('error codes', () => {

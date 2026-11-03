@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-number-1e400",
+  "description": "The number 1e400 is beyond the range of a double.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":1e400,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"value.not-finite","path":"/nodes/0/position/x"}]}
+}

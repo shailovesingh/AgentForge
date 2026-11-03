@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-dup-key-non-ascii-escape",
+  "description": "The key \"\\u00e9\" and the literal key é are the same key.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"\\u00e9\":1,\"é\":2}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.duplicate-key","path":"/metadata/é"}]}
+}

@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-json-plus-sign",
+  "description": "The token +1 (a leading plus) is not a JSON number, so the document is rejected with doc.not-json.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":+1,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

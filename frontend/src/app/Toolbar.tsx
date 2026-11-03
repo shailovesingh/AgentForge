@@ -5,7 +5,7 @@ import type { ChangeEvent } from 'react'
 import { nodeDefinitions } from '../catalog'
 import { useEditorStore } from '../store/editorStore'
 import type { ValidationError } from '../workflow/errors'
-import { importWorkflow, serializeWorkflow } from '../workflow/serialize'
+import { MAX_IMPORT_BYTES, importTooLarge, importWorkflow, serializeWorkflow } from '../workflow/serialize'
 import styles from './Toolbar.module.css'
 
 function downloadName(name: string): string {
@@ -35,7 +35,12 @@ export function Toolbar() {
     const file = e.target.files?.[0]
     e.target.value = '' // allow re-importing the same file
     if (!file) return
-    const result = importWorkflow(await file.text(), nodeDefinitions)
+    if (file.size > MAX_IMPORT_BYTES) {
+      // Refused before the file is read into memory.
+      setImportErrors([importTooLarge()])
+      return
+    }
+    const result = importWorkflow(new Uint8Array(await file.arrayBuffer()), nodeDefinitions)
     if (result.ok) {
       // Only a fully valid file replaces the current graph.
       useEditorStore.getState().loadWorkflow(result.workflow)

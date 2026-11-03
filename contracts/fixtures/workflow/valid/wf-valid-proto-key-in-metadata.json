@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-proto-key-in-metadata",
+  "description": "An own __proto__ key (and constructor) in metadata is ordinary data and stays an own property.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"__proto__\":{\"x\":1},\"constructor\":2}}",
+  "expect": {"valid":true}
+}

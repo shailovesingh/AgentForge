@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-number-in-array",
+  "description": "An unsafe number inside an array reports the index in its path.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"n\":[1,9007199254740993]}}",
+  "expect": {"valid":false,"errors":[{"code":"value.unsafe-integer","path":"/metadata/n/1"}]}
+}

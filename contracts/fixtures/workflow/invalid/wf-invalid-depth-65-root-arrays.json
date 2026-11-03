@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-depth-65-root-arrays",
+  "description": "Sixty-five nested arrays are rejected for depth before the document is checked to be an object.",
+  "inputText": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+  "expect": {"valid":false,"errors":[{"code":"doc.too-deep","path":"/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0"}]}
+}

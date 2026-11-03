@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-dup-key-differs-by-escape",
+  "description": "The keys \"a\" and \"\\u0061\" are the same key once the escape is decoded.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"a\":1,\"\\u0061\":2}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.duplicate-key","path":"/metadata/a"}]}
+}

@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-unicode-reversed-surrogate-pair",
+  "description": "A low surrogate followed by a high surrogate is not a pair and is rejected.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"\\udc00\\ud800\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"value.invalid-unicode","path":"/nodes/0/label"}]}
+}

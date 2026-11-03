@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-number-2pow53-with-fraction-zero",
+  "description": "The number 9007199254740992.0 is the integer 2^53 written with a fraction.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":9007199254740992.0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"value.unsafe-integer","path":"/nodes/0/position/x"}]}
+}

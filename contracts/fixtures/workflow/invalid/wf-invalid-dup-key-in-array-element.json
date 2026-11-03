@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-dup-key-in-array-element",
+  "description": "A repeated key inside the second element of an array is rejected with that element index in the path.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}},{\"id\":\"u\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"x\",\"label\":\"y\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.duplicate-key","path":"/nodes/1/label"}]}
+}

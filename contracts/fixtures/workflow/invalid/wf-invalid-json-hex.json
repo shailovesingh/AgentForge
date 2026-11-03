@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-json-hex",
+  "description": "The token 0x10 (hexadecimal) is not a JSON number, so the document is rejected with doc.not-json.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0x10,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

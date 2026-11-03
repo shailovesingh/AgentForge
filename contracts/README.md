@@ -51,8 +51,9 @@ file is malformed, a name is duplicated, or a code is not a known code.
 ```
 
 `input` is a JSON value. Instead of `input` a case may use `inputText` (a string with the raw text to
-import; only when the exact text matters: line endings, escapes, whitespace) or `inputRepeat` (below).
-Give **exactly one** of `input`, `inputText`, `inputRepeat`.
+import; only when the exact text matters: line endings, escapes, whitespace, duplicate keys, number spellings),
+`inputRepeat` (below) or `inputBytesBase64` (below).
+Give **exactly one** of `input`, `inputText`, `inputRepeat`, `inputBytesBase64`.
 
 `inputRepeat` builds a large or repetitive import text without a large file:
 
@@ -64,6 +65,10 @@ The text is `prefix + unit.repeat(times) + suffix` (the example is `[1,1,1,1]`).
 optional strings, `unit` is a string and `times` is an integer from 0 to **10,000,000** (the runner rejects
 anything larger so a typo cannot allocate gigabytes). The fixture format version stays 1.
 
+`inputBytesBase64` is a standard, padded base64 string of the **raw bytes** of the import file, for cases that
+text cannot express: invalid UTF-8 and a leading byte order mark. The runner decodes it to bytes and passes the
+bytes to the importer (so `doc.invalid-encoding` is reachable). An empty string is allowed (empty file).
+
 The import must succeed, and the resulting workflow must deep-equal the parsed input (valid cases are
 written in canonical shape, so importing changes nothing).
 
@@ -74,9 +79,35 @@ written in canonical shape, so importing changes nothing).
   "expect": { "valid": false, "errors": [ { "code": "node.duplicate-id", "path": "/nodes/1/id" } ] } }
 ```
 
-`input` / `inputText` / `inputRepeat` as above. `errors` must be non-empty. The import must fail with
-exactly these errors (see the comparison rule below). `wf-invalid-doc-too-large.json` uses `inputRepeat`
-(5,242,881 spaces) so the repository holds no large file.
+`input` / `inputText` / `inputRepeat` / `inputBytesBase64` as above. `errors` must be non-empty. The import must
+fail with exactly these errors (see the comparison rule below). `wf-invalid-doc-too-large.json` uses `inputRepeat`
+(5,000,001 spaces) so the repository holds no large file.
+
+#### Parsing and policy rules (AgentForge policy; written down here for a second implementation)
+
+Import text is parsed by a strict RFC 8259 parser, **not** the platform's built-in parser. It reports the
+**first** problem only. These limits are **AgentForge policy** (decisions C2 and D-026), not RFC 8785 rules:
+
+- **Size:** at most **5,000,000 UTF-8 bytes** (bytes, not characters), checked before anything is parsed
+  (`doc.too-large`). A file of exactly 5,000,000 bytes is accepted.
+- **Encoding:** a single leading UTF-8 byte order mark is tolerated and ignored (never written); a second one
+  is ordinary content. Invalid UTF-8 is `doc.invalid-encoding`.
+- **Depth:** at most **64**, with the root value at depth **1**: an array or object adds one level when it
+  opens, scalars add none. The 65th level is rejected when it opens (`doc.too-deep`, path = that container).
+- **Duplicate keys** are `doc.duplicate-key`, path = the **second** occurrence. Keys are compared after escapes
+  are decoded (`"a"` and `"a"` collide).
+- **Strings and keys:** U+0000 is `value.nul-character` (AgentForge/PostgreSQL rule, not an RFC 8785 rule); an
+  unpaired surrogate, however it is written, is `value.invalid-unicode`. A pair written as two escapes is fine.
+- **Numbers:** the magnitude of every number must be at most **2^53 - 1** (9007199254740991). A token whose
+  value is 2^53 or more is `value.unsafe-integer`, unless it is beyond the double range (for example `1e400`),
+  which is `value.not-finite`. The decision is made from the token text, before any conversion to a number; a
+  token just below 2^53 that rounds to 2^53 (such as `9007199254740991.7`) is also rejected. Zero in any
+  spelling and tiny values (`5e-324`) are accepted.
+- **Grammar errors** (`NaN`, `Infinity`, leading zeros, `+1`, `.5`, `1.`, trailing commas, comments, raw control
+  characters in strings, invalid escapes, trailing garbage, empty input) are `doc.not-json`.
+- A key named `__proto__` is an ordinary key.
+
+TypeScript runs these fixtures only; **no Python parity is claimed** until a Python runner exists.
 
 #### Import semantics a second runner must follow
 

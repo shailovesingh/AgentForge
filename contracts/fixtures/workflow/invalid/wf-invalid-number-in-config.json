@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-number-in-config",
+  "description": "An unsafe number in a node config is reported by the parser before schema checks.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{\"n\":1e21}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"value.unsafe-integer","path":"/nodes/0/config/payload/n"}]}
+}

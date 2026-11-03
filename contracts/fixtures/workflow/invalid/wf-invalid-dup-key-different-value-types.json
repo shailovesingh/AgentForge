@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-dup-key-different-value-types",
+  "description": "Repeated keys are rejected even when the values have different types.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"k\":1,\"k\":\"s\"}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.duplicate-key","path":"/metadata/k"}]}
+}

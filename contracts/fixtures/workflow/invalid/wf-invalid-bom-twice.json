@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-bom-twice",
+  "description": "Only one leading byte order mark is tolerated; a second one is ordinary content that is not JSON.",
+  "inputBytesBase64": "77u/77u/eyJzY2hlbWFWZXJzaW9uIjoiMS4wIiwiaWQiOiJ3Zl8xIiwibmFtZSI6IlQiLCJkZXNjcmlwdGlvbiI6IiIsIm5vZGVzIjpbeyJpZCI6InQiLCJ0eXBlIjoidHJpZ2dlci5tYW51YWwiLCJ0eXBlVmVyc2lvbiI6MSwibGFiZWwiOiJTdGFydCIsImNvbmZpZyI6eyJwYXlsb2FkIjp7fX0sInBvc2l0aW9uIjp7IngiOjAsInkiOjB9fV0sImVkZ2VzIjpbXSwibWV0YWRhdGEiOnt9fQ==",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

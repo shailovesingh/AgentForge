@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-json-trailing-comma-object",
+  "description": "A trailing comma after the last object member is rejected.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],,\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

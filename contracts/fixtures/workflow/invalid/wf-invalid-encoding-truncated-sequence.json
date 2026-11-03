@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-encoding-truncated-sequence",
+  "description": "A three-byte sequence cut short (E2 82) followed by an ASCII byte is invalid.",
+  "inputBytesBase64": "eyJzY2hlbWFWZXJzaW9uIjoiMS4wIiwiaWQiOiJ3Zl8xIiwibmFtZSI6IlQiLCJkZXNjcmlwdGlvbiI6IiIsIm5vZGVzIjpbeyJpZCI6InQiLCJ0eXBlIjoidHJpZ2dlci5tYW51YWwiLCJ0eXBlVmVyc2lvbiI6MSwibGFiZWwiOiJh4oJiIiwiY29uZmlnIjp7InBheWxvYWQiOnt9fSwicG9zaXRpb24iOnsieCI6MCwieSI6MH19XSwiZWRnZXMiOltdLCJtZXRhZGF0YSI6e319",
+  "expect": {"valid":false,"errors":[{"code":"doc.invalid-encoding","path":""}]}
+}

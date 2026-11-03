@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-doc-multibyte-at-limit-not-too-large",
+  "description": "Exactly 5,000,000 bytes (2,500,000 two-byte characters) is within the limit, so the only problem is that the text is not JSON.",
+  "inputRepeat": {"unit":"é","times":2500000},
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

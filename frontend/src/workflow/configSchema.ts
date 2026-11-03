@@ -1,5 +1,8 @@
 import type { ErrorCode } from './errors'
 import type { ConfigProperty, ConfigSchema } from './types'
+import { findPolicyViolations } from './valuePolicy'
+
+const CONFIG_PARENT_DEPTH = 4
 
 export type ConfigErrorCode = Extract<ErrorCode, `schema.${string}`>
 export interface ConfigError {
@@ -62,7 +65,11 @@ export function parseConfigInput(
     }
   }
   const error = validateConfigValue(prop, value)
-  return error ? { ok: false, error } : { ok: true, value }
+  if (error) return { ok: false, error }
+  // Round-trip integrity: a value the importer would reject must never be committed. The value
+  // sits under Workflow(1) > nodes(2) > node(3) > config(4), so an object here is at depth 5.
+  const violation = findPolicyViolations(value, CONFIG_PARENT_DEPTH)[0]
+  return violation ? { ok: false, error: violation.message } : { ok: true, value }
 }
 
 /**

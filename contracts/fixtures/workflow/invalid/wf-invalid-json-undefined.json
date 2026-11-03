@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-json-undefined",
+  "description": "The literal undefined is not JSON.",
+  "inputText": "undefined",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-same-key-in-sibling-objects",
+  "description": "The same key in sibling objects, and keys that differ only by case, are not duplicates.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"a\":{\"k\":1},\"b\":{\"k\":2},\"k\":3,\"K\":4}}",
+  "expect": {"valid":true}
+}

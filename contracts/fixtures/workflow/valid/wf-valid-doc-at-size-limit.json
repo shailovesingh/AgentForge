@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-doc-at-size-limit",
+  "description": "A valid workflow padded with trailing spaces to exactly 5,000,000 bytes is accepted.",
+  "inputRepeat": {"prefix":"{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}","unit":" ","times":4999786},
+  "expect": {"valid":true}
+}

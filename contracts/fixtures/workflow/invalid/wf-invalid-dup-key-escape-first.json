@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-dup-key-escape-first",
+  "description": "The same collision when the escaped spelling comes first.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"\\u0061\":1,\"a\":2}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.duplicate-key","path":"/metadata/a"}]}
+}

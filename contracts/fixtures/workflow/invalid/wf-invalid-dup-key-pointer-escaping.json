@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-dup-key-pointer-escaping",
+  "description": "The JSON Pointer of a repeated key escapes \"/\" as ~1.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{\"a/b\":1,\"a/b\":2}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.duplicate-key","path":"/metadata/a~1b"}]}
+}

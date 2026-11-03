@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-number-largest-double",
+  "description": "The number 1.7976931348623157e308 is the largest finite double, which is above 2^53.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":1.7976931348623157e308,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"value.unsafe-integer","path":"/nodes/0/position/x"}]}
+}

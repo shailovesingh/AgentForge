@@ -1,6 +1,6 @@
 {
   "name": "wf-invalid-doc-too-large",
-  "description": "Documents the Phase 1 limit, which counts characters: import text one character over 5 MiB (5242880 characters, so 5242881 spaces) is rejected with doc.too-large before parsing. Task T4 changes the limit to 5,000,000 UTF-8 bytes and adds boundary fixtures.",
-  "inputRepeat": { "unit": " ", "times": 5242881 },
-  "expect": { "valid": false, "errors": [{ "code": "doc.too-large", "path": "" }] }
+  "description": "One byte over the 5,000,000-byte limit (5,000,001 spaces) is rejected with doc.too-large before parsing.",
+  "inputRepeat": {"unit":" ","times":5000001},
+  "expect": {"valid":false,"errors":[{"code":"doc.too-large","path":""}]}
 }

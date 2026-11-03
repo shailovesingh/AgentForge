@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-unicode-literal-and-surrogate-pair",
+  "description": "A label with a literal é, a combining accent sequence and a literal emoji (a surrogate pair) is valid.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"café é 😀\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":true}
+}

@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-number-largest-safe-integer",
+  "description": "The largest safe integer, its negative and 9007199254740991.0 are accepted.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"n0\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":9007199254740991,\"y\":-9007199254740991}},{\"id\":\"n1\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":9007199254740991.0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":true}
+}

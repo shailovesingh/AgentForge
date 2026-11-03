@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-json-empty-input",
+  "description": "Empty input is not JSON.",
+  "inputText": "",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-depth-64-root-arrays-not-object",
+  "description": "Sixty-four nested arrays are within the depth limit, so the only problem is that the root is not an object.",
+  "inputText": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-object","path":""}]}
+}

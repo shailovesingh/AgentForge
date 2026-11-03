@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-json-unterminated-string",
+  "description": "A string with no closing quote is rejected.",
+  "inputText": "{\"schemaVersion\":\"1.0",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

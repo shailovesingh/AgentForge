@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-unicode-lone-low-surrogate",
+  "description": "A lone low surrogate escape (\\udc00) in a string is rejected.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"\\udc00\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"value.invalid-unicode","path":"/nodes/0/label"}]}
+}

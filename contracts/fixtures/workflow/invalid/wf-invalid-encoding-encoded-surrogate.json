@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-encoding-encoded-surrogate",
+  "description": "ED A0 80 encodes the surrogate U+D800 directly, which UTF-8 forbids.",
+  "inputBytesBase64": "eyJzY2hlbWFWZXJzaW9uIjoiMS4wIiwiaWQiOiJ3Zl8xIiwibmFtZSI6IlQiLCJkZXNjcmlwdGlvbiI6IiIsIm5vZGVzIjpbeyJpZCI6InQiLCJ0eXBlIjoidHJpZ2dlci5tYW51YWwiLCJ0eXBlVmVyc2lvbiI6MSwibGFiZWwiOiJh7aCAYiIsImNvbmZpZyI6eyJwYXlsb2FkIjp7fX0sInBvc2l0aW9uIjp7IngiOjAsInkiOjB9fV0sImVkZ2VzIjpbXSwibWV0YWRhdGEiOnt9fQ==",
+  "expect": {"valid":false,"errors":[{"code":"doc.invalid-encoding","path":""}]}
+}

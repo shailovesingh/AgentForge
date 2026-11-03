@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-encoding-stray-byte",
+  "description": "The byte 0xFF can never occur in UTF-8, so the file is rejected.",
+  "inputBytesBase64": "eyJzY2hlbWFWZXJzaW9uIjoiMS4wIiwiaWQiOiJ3Zl8xIiwibmFtZSI6IlQiLCJkZXNjcmlwdGlvbiI6IiIsIm5vZGVzIjpbeyJpZCI6InQiLCJ0eXBlIjoidHJpZ2dlci5tYW51YWwiLCJ0eXBlVmVyc2lvbiI6MSwibGFiZWwiOiJh/2IiLCJjb25maWciOnsicGF5bG9hZCI6e319LCJwb3NpdGlvbiI6eyJ4IjowLCJ5IjowfX1dLCJlZGdlcyI6W10sIm1ldGFkYXRhIjp7fX0=",
+  "expect": {"valid":false,"errors":[{"code":"doc.invalid-encoding","path":""}]}
+}

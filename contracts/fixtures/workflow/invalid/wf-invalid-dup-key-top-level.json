@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-dup-key-top-level",
+  "description": "A repeated top-level key is rejected at the second occurrence.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"name\":\"U\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.duplicate-key","path":"/name"}]}
+}

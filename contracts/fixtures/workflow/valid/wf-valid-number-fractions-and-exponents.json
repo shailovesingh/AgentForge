@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-number-fractions-and-exponents",
+  "description": "Ordinary decimals and exponent spellings are accepted: 1e2, 1E2, 1e+2, 0.1, 0.000001, 1.5e-7, 123e-20, 100.5.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"n0\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":1e2,\"y\":1E2}},{\"id\":\"n1\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":1e+2,\"y\":0.1}},{\"id\":\"n2\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0.000001,\"y\":1.5e-7}},{\"id\":\"n3\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":123e-20,\"y\":100.5}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":true}
+}

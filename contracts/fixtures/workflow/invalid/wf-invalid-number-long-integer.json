@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-number-long-integer",
+  "description": "The number 123456789012345680000 has 21 digits, far above 2^53.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":123456789012345680000,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"value.unsafe-integer","path":"/nodes/0/position/x"}]}
+}

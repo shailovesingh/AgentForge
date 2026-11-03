@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-bom-text",
+  "description": "A U+FEFF at the start of import text is tolerated and ignored.",
+  "inputText": "\ufeff{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":true}
+}

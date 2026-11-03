@@ -6,6 +6,9 @@ export const ERROR_CODES = [
   'doc.not-json',
   'doc.not-object',
   'doc.too-large',
+  'doc.too-deep',
+  'doc.duplicate-key',
+  'doc.invalid-encoding',
   'doc.unsupported-version',
   'doc.invalid-field',
   'node.malformed',
@@ -26,6 +29,10 @@ export const ERROR_CODES = [
   'schema.additionalProperties',
   'schema.minimum',
   'schema.maximum',
+  'value.not-finite',
+  'value.unsafe-integer',
+  'value.invalid-unicode',
+  'value.nul-character',
 ] as const
 
 export type ErrorCode = (typeof ERROR_CODES)[number]

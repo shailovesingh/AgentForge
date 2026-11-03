@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-json-block-comment",
+  "description": "A block comment inside the document is not JSON.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[] /* c */,\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

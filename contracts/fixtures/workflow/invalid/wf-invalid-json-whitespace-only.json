@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-json-whitespace-only",
+  "description": "Input with only whitespace is not JSON.",
+  "inputText": " \n\t ",
+  "expect": {"valid":false,"errors":[{"code":"doc.not-json","path":""}]}
+}

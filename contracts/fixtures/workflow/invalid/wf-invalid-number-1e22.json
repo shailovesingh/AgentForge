@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-number-1e22",
+  "description": "The number 1e22 is far above 2^53.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":1e22,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"value.unsafe-integer","path":"/nodes/0/position/x"}]}
+}

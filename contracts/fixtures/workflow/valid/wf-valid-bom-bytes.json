@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-bom-bytes",
+  "description": "A UTF-8 byte order mark before the document (bytes EF BB BF) is tolerated and ignored.",
+  "inputBytesBase64": "77u/eyJzY2hlbWFWZXJzaW9uIjoiMS4wIiwiaWQiOiJ3Zl8xIiwibmFtZSI6IlQiLCJkZXNjcmlwdGlvbiI6IiIsIm5vZGVzIjpbeyJpZCI6InQiLCJ0eXBlIjoidHJpZ2dlci5tYW51YWwiLCJ0eXBlVmVyc2lvbiI6MSwibGFiZWwiOiJTdGFydCIsImNvbmZpZyI6eyJwYXlsb2FkIjp7fX0sInBvc2l0aW9uIjp7IngiOjAsInkiOjB9fV0sImVkZ2VzIjpbXSwibWV0YWRhdGEiOnt9fQ==",
+  "expect": {"valid":true}
+}

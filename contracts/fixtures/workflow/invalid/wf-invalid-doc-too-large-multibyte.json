@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-doc-too-large-multibyte",
+  "description": "The limit counts bytes, not characters: 2,500,001 two-byte characters (é) are 5,000,002 bytes but only 2,500,001 characters.",
+  "inputRepeat": {"unit":"é","times":2500001},
+  "expect": {"valid":false,"errors":[{"code":"doc.too-large","path":""}]}
+}

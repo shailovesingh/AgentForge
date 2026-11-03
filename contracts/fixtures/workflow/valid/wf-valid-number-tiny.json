@@ -1,0 +1,6 @@
+{
+  "name": "wf-valid-number-tiny",
+  "description": "The smallest positive double (5e-324) and other tiny magnitudes are accepted: only large magnitudes are limited.",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"n0\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":5e-324,\"y\":1e-7}},{\"id\":\"n1\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"Start\",\"config\":{\"payload\":{}},\"position\":{\"x\":1e-400,\"y\":0.0000001}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":true}
+}

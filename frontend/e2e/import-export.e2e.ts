@@ -95,6 +95,20 @@ test.describe('import', () => {
     await expect(editor.nodes).toHaveCount(3)
   })
 
+  test('rejects a duplicate key with its code and path and leaves the graph untouched', async ({ editor }) => {
+    await editor.buildPipeline()
+    const exported = (await editor.exportWorkflow()).text
+    const withDuplicate = exported.replace('"metadata": {}', '"metadata": { "k": 1, "k": 2 }')
+    expect(withDuplicate).not.toBe(exported)
+
+    await editor.importText(withDuplicate)
+    const alert = editor.toolbar.getByRole('alert')
+    await expect(alert.getByText('doc.duplicate-key', { exact: true })).toBeVisible()
+    await expect(alert.getByText('at /metadata/k', { exact: true })).toBeVisible()
+    await expect(editor.nodes).toHaveCount(3)
+    await expect(editor.edges).toHaveCount(2)
+  })
+
   test('reports an unknown node type specifically and leaves the graph untouched', async ({ editor }) => {
     await editor.buildPipeline()
     const workflow = JSON.parse((await editor.exportWorkflow()).text) as ExportedWorkflow

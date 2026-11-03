@@ -1,0 +1,6 @@
+{
+  "name": "wf-invalid-nul-in-value",
+  "description": "A \\u0000 escape in a string value is rejected (AgentForge/PostgreSQL rule).",
+  "inputText": "{\"schemaVersion\":\"1.0\",\"id\":\"wf_1\",\"name\":\"T\",\"description\":\"\",\"nodes\":[{\"id\":\"t\",\"type\":\"trigger.manual\",\"typeVersion\":1,\"label\":\"a\\u0000b\",\"config\":{\"payload\":{}},\"position\":{\"x\":0,\"y\":0}}],\"edges\":[],\"metadata\":{}}",
+  "expect": {"valid":false,"errors":[{"code":"value.nul-character","path":"/nodes/0/label"}]}
+}

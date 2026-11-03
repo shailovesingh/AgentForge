@@ -18,13 +18,16 @@ import type { Workflow } from '../workflow/types'
 type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config'
 
 const FAMILY_FIELDS: Record<Family, readonly string[]> = {
-  'workflow/valid': ['input', 'inputText', 'inputRepeat', 'expect'],
-  'workflow/invalid': ['input', 'inputText', 'inputRepeat', 'expect'],
+  'workflow/valid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
+  'workflow/invalid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
   connection: ['nodes', 'edges', 'source', 'target', 'expect'],
   config: ['nodeType', 'config', 'configText', 'expect'],
 }
 
 const KNOWN_CODES: readonly string[] = ERROR_CODES
+
+// A workflow case gives exactly one of these.
+const INPUT_FIELDS = ['input', 'inputText', 'inputRepeat', 'inputBytesBase64']
 
 // A typo in `inputRepeat.times` must not allocate gigabytes.
 export const MAX_REPEAT_TIMES = 10_000_000
@@ -81,12 +84,19 @@ export function checkShape(file: string, value: unknown): string[] {
     if (hasText && typeof value[`${field}Text`] !== 'string') bad(`${field}Text must be a string`)
   }
 
-  // Workflow cases: exactly one of `input`, `inputText`, `inputRepeat`.
+  // Workflow cases: exactly one of `input`, `inputText`, `inputRepeat`, `inputBytesBase64`.
   const workflowInput = () => {
-    const present = ['input', 'inputText', 'inputRepeat'].filter((k) => Object.hasOwn(value, k))
-    if (present.length === 0) return bad('needs input, inputText or inputRepeat')
-    if (present.length > 1) return bad(`has more than one of input, inputText, inputRepeat (${present.join(', ')}); use exactly one`)
+    const present = INPUT_FIELDS.filter((k) => Object.hasOwn(value, k))
+    if (present.length === 0) return bad('needs input, inputText, inputRepeat or inputBytesBase64')
+    if (present.length > 1) return bad(`has more than one of ${INPUT_FIELDS.join(', ')} (${present.join(', ')}); use exactly one`)
     if (present[0] === 'inputText' && typeof value.inputText !== 'string') bad('inputText must be a string')
+    if (present[0] === 'inputBytesBase64') {
+      const b = value.inputBytesBase64
+      if (typeof b !== 'string' || b.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(b)) {
+        bad('inputBytesBase64 must be a base64 string (standard alphabet, padded)')
+      }
+      return
+    }
     if (present[0] !== 'inputRepeat') return
     const r = value.inputRepeat
     if (!isObject(r) || Object.keys(r).some((k) => !['prefix', 'unit', 'times', 'suffix'].includes(k))) {
@@ -188,6 +198,7 @@ interface WorkflowCase extends CaseBase {
   input?: unknown
   inputText?: string
   inputRepeat?: { prefix?: string; unit: string; times: number; suffix?: string }
+  inputBytesBase64?: string
   expect: { valid: boolean; errors?: Expected[] }
 }
 interface ConnectionCase extends CaseBase {
@@ -269,11 +280,17 @@ const asMultiset = (list: Expected[]): Expected[] =>
       return x < y ? -1 : x > y ? 1 : 0
     })
 
-const workflowText = (c: WorkflowCase): string => {
+/** What the importer is given: raw bytes for inputBytesBase64, otherwise import text. */
+const workflowInput = (c: WorkflowCase): string | Uint8Array => {
+  if (c.inputBytesBase64 !== undefined) return new Uint8Array(Buffer.from(c.inputBytesBase64, 'base64'))
   const r = c.inputRepeat
   if (r) return (r.prefix ?? '') + r.unit.repeat(r.times) + (r.suffix ?? '')
   return c.inputText ?? JSON.stringify(c.input)
 }
+
+/** The JSON text behind an input, for comparing a valid result (a BOM is tolerated, so it is dropped). */
+const asText = (input: string | Uint8Array): string =>
+  typeof input === 'string' ? input.replace(/^﻿/, '') : new TextDecoder('utf-8').decode(input) // the decoder drops one leading BOM
 
 function connectionWorkflow(c: ConnectionCase): Workflow {
   return {
@@ -298,7 +315,7 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
   }
 }
 
-const MIN_COUNTS = { total: 75, valid: 7, invalid: 31, connection: 22, config: 15 }
+const MIN_COUNTS = { total: 153, valid: 19, invalid: 97, connection: 22, config: 15 }
 
 describe('fixture corpus', () => {
   test('format.json declares fixtureFormat 1', () => {
@@ -365,10 +382,10 @@ describe('catalog fixture', () => {
 describe('workflow/valid fixtures', () => {
   for (const c of corpus.valid) {
     test(c.name, () => {
-      const text = workflowText(c)
-      const result = importWorkflow(text, nodeDefinitions)
+      const input = workflowInput(c)
+      const result = importWorkflow(input, nodeDefinitions)
       expect(result.ok, `${c.file}: expected a valid workflow, got ${JSON.stringify(result.ok ? [] : result.errors)}`).toBe(true)
-      if (result.ok) expect(result.workflow, `${c.file}: imported workflow differs from the input`).toEqual(JSON.parse(text))
+      if (result.ok) expect(result.workflow, `${c.file}: imported workflow differs from the input`).toEqual(JSON.parse(asText(input)))
     })
   }
 })
@@ -376,7 +393,7 @@ describe('workflow/valid fixtures', () => {
 describe('workflow/invalid fixtures', () => {
   for (const c of corpus.invalid) {
     test(c.name, () => {
-      const result = importWorkflow(workflowText(c), nodeDefinitions)
+      const result = importWorkflow(workflowInput(c), nodeDefinitions)
       expect(result.ok, `${c.file}: expected import to fail`).toBe(false)
       if (result.ok) return
       expect(asMultiset(result.errors), `${c.file}: errors ({code, path}, order-insensitive)`).toEqual(asMultiset(c.expect.errors ?? []))
@@ -463,13 +480,13 @@ describe('checkShape', () => {
   })
 
   test('both input and inputText', () => {
-    some(checkShape(files.invalid, { ...good.invalid, inputText: '[]' }), 'has more than one of input, inputText, inputRepeat')
+    some(checkShape(files.invalid, { ...good.invalid, inputText: '[]' }), 'has more than one of input, inputText, inputRepeat, inputBytesBase64')
     some(checkShape(files.config, { ...good.config, configText: '{}' }), 'has both config and configText')
   })
 
   test('neither input nor inputText', () => {
     const { input: _input, ...noInput } = good.invalid
-    some(checkShape(files.invalid, noInput), 'needs input, inputText or inputRepeat')
+    some(checkShape(files.invalid, noInput), 'needs input, inputText, inputRepeat or inputBytesBase64')
   })
 
   describe('inputRepeat', () => {
@@ -499,6 +516,26 @@ describe('checkShape', () => {
       some(checkShape(files.invalid, withRepeat({ unit: ' ', times: 3, suffix: null })), 'inputRepeat.suffix must be a string')
       some(checkShape(files.invalid, withRepeat({ unit: ' ', times: 3, extra: 1 })), 'only prefix, unit, times, suffix')
       some(checkShape(files.invalid, withRepeat([])), 'inputRepeat must be an object')
+    })
+  })
+
+  describe('inputBytesBase64', () => {
+    const { input: _input, ...base } = good.invalid
+    const withBytes = (inputBytesBase64: unknown) => ({ ...base, inputBytesBase64 })
+
+    test('a valid base64 string (also empty, with padding) has no problems', () => {
+      for (const b of ['', '/w==', '77u/e30=', 'e30=', 'AAAA']) expect(checkShape(files.invalid, withBytes(b)), b).toEqual([])
+      const { input: _validInput, ...validBase } = good.valid
+      expect(checkShape(files.valid, { ...validBase, inputBytesBase64: 'e30=' })).toEqual([])
+    })
+    test('not base64, wrong padding or length, not a string', () => {
+      for (const b of ['e30', '!!!!', '/w=', 'e3 0', 7, null]) {
+        some(checkShape(files.invalid, withBytes(b)), 'inputBytesBase64 must be a base64 string')
+      }
+    })
+    test('together with another input field', () => {
+      some(checkShape(files.invalid, { ...withBytes('e30='), inputText: '{}' }), 'has more than one of')
+      some(checkShape(files.invalid, { ...good.invalid, inputBytesBase64: 'e30=' }), 'has more than one of')
     })
   })
 
