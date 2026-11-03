@@ -26,7 +26,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 |---|---|
 | The visual editor in the browser: drag nodes from a library, connect them with rules, edit each node's settings, save the workflow to a `.json` file and load it back | Running workflows (the "engine") |
 | A catalog of 6 node types | AI models, agents, tools (Phase 4) |
-| 184 unit tests and 27 browser tests | Natural-language workflow generation (Phase 5) |
+| 185 unit tests and 27 browser tests | Natural-language workflow generation (Phase 5) |
 | A CI workflow that runs the checks on GitHub | The backend server, database, saving to a server (Phase 2) |
 
 **Important:** today everything runs **in your browser only**. There is no server. Nothing runs a workflow yet. The editor produces a *description* of a workflow; later phases will execute it.
@@ -159,7 +159,7 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 | Kind | Tool | What it does | Command |
 |---|---|---|---|
-| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, and the shared fixtures in `contracts/`). 184 today. | `npm test` |
+| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, and the shared fixtures in `contracts/`). 185 today. | `npm test` |
 | **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 27 today. | `npm run test:e2e` |
 | **Type check** | TypeScript | Catches mismatched data shapes before running | part of `npm run build` |
 | **Lint** | Oxlint | Catches suspicious code patterns | `npm run lint` |
@@ -561,12 +561,12 @@ An honest limit, stated up front: **in Phase 1.1 only TypeScript runs these fixt
 
 Read it as: "if a node of type `output.result` has a setting named `constructor`, the checker must report one error, code `schema.additionalProperties`, at `/constructor`." Nothing in the file says TypeScript or Python.
 
-**The four families** (74 case files today; counts verified in the folder):
+**The four families** (75 case files today; counts verified in the folder):
 
 | Folder under `contracts/fixtures/` | Cases | Question the case asks |
 |---|---|---|
 | `workflow/valid/` | 7 | Does this whole file import successfully (and come out unchanged)? |
-| `workflow/invalid/` | 30 | Is this whole file rejected, with exactly these `{code, path}` errors? |
+| `workflow/invalid/` | 31 | Is this whole file rejected, with exactly these `{code, path}` errors? |
 | `connection/` | 22 | In this small graph, may this one edge be added? If not, which rule says no? |
 | `config/` | 15 | Does this one node's settings object produce exactly these schema errors? |
 
@@ -587,7 +587,7 @@ Two more files are not cases: `format.json` (the version of the fixture format, 
 
 ```mermaid
 flowchart TD
-  F["contracts/fixtures/**/*.json<br/>74 case files in 4 families"] --> L["loadCorpus: find every file and parse the JSON"]
+  F["contracts/fixtures/**/*.json<br/>75 case files in 4 families"] --> L["loadCorpus: find every file and parse the JSON"]
   L --> S["checkShape and checkUniqueNames<br/>strict: unknown fields, names, codes, pointers"]
   S -- "any problem" --> X["test fails and names the file"]
   S -- "well-formed" --> RV["runner: workflow/valid"]
@@ -620,7 +620,7 @@ The solid arrows are built and run by `npm test`. The dashed arrow is **planned 
 **The guards on the suite itself**, all in `frontend/src/contracts/fixtures.test.ts`:
 
 - **Coverage guards.** One test checks that *every* error code in `ERROR_CODES` is expected by at least one `workflow/invalid` fixture. Another checks that every `connection.*` code is the expected result of at least one `connection` fixture. Add a code and forget a fixture, and the run fails.
-- **Minimum-count floors** (`MIN_COUNTS`: 74 total, 7, 30, 22, 15). Deleting fixtures to make a failure go away would shrink the counts and fail the run. The README says the floors are raised when you add cases and never lowered.
+- **Minimum-count floors** (`MIN_COUNTS`: 75 total, 7, 31, 22, 15). Deleting fixtures to make a failure go away would shrink the counts and fail the run. The README says the floors are raised when you add cases and never lowered.
 - **A drift test for the catalog.** `builtin.catalog.json` is an export of `nodeDefinitions` from `frontend/src/catalog/nodes.ts`. The test asserts the stored file equals the code's catalog, so the catalog contract cannot change silently. If you change the catalog on purpose, you regenerate the file by running the tests with the environment variable `UPDATE_FIXTURES` set. In that mode the test rewrites the file and then **fails on purpose** ("catalog fixture regenerated; unset UPDATE_FIXTURES and run again"). Why fail deliberately? If a forgotten environment variable made the test rewrite and then pass, the drift check would **pass silently forever**, because the file would always be regenerated to match the code. Failing forces you to unset it and run again, so the next run really compares.
 
 **Rule order, pinned by fixtures.** `checkConnection` (`frontend/src/workflow/connections.ts`) returns the **first** rule that fails, in this order: `unknown-node`, `unknown-port`, `self-loop`, `duplicate`, `input-occupied`, `type-mismatch`, `cycle`. That order is observable: when a proposed edge breaks two rules at once, the first one in the list is what you see. Python has to reproduce the order, so the order is part of the contract, and fixtures that break two rules at once pin each neighbouring pair (for example `conn-input-occupied-before-type-mismatch`, `conn-type-mismatch-before-cycle`, `conn-input-occupied-before-cycle`, `conn-unknown-port-before-self-loop`).
@@ -647,7 +647,7 @@ The solid arrows are built and run by `npm test`. The dashed arrow is **planned 
 | Where | What it does |
 |---|---|
 | `contracts/README.md` | The documented format of every family, the import semantics, the multiset rule, how to add a case and why never to edit expected values just to pass |
-| `contracts/fixtures/{workflow/valid,workflow/invalid,connection,config}/*.json` | The 74 cases (one per file) |
+| `contracts/fixtures/{workflow/valid,workflow/invalid,connection,config}/*.json` | The 75 cases (one per file) |
 | `contracts/fixtures/catalog/builtin.catalog.json` | JSON export of `nodeDefinitions`, protected by the drift test |
 | `contracts/fixtures/format.json` | `{ "fixtureFormat": 1 }`, asserted by the runner |
 | `frontend/src/contracts/fixtures.test.ts` | The runner: `checkShape`, `checkUniqueNames`, `loadCorpus`, `asMultiset`, `workflowText` (builds `inputRepeat`), `connectionWorkflow`, `MIN_COUNTS`, the coverage guards, the drift test, and the tests of `checkShape` itself |

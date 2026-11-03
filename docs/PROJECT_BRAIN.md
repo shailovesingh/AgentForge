@@ -231,8 +231,8 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 | Check | Result |
 |---|---|
-| `npm run verify` at `b299782` (run by the Principal Architect) | **exit 0**: oxlint clean; **9 files, 184 unit tests passed** (83 before T3; 166 after `e28483d`; 184 after `b299782`); build ok; **27 e2e tests passed** (unchanged) |
-| Fixtures | 74 case files: workflow/valid 7, workflow/invalid 30, connection 22, config 15; plus `format.json` and the catalog export; largest fixture file now 9 KB |
+| `npm run verify` at `058faae` (run by the Principal Architect) | **exit 0**: oxlint clean; **9 files, 185 unit tests passed** (83 before T3; 166 after `e28483d`; 184 after `b299782`; 185 after `058faae`); build ok; **27 e2e tests passed** (unchanged) |
+| Fixtures | 75 case files: workflow/valid 7, workflow/invalid 31, connection 22, config 15; plus `format.json` and the catalog export; largest fixture file now 9 KB |
 | Type-check separation | `npm exec --no -- tsc -p tsconfig.app.json --listFilesOnly` lists 0 `@types/node` files (the browser app does not see Node types) |
 | Opus review of `e28483d` | PASS WITH FINDINGS (no blockers, no majors); the reviewer ran `npm run verify` itself: green |
 | Mutation checks (by the implementer; not repeated by Claude) | four deliberate breaks of `connections.ts` each fail exactly the intended fixture; swapping `input-occupied` and `type-mismatch` is caught only by a new fixture |
@@ -320,8 +320,8 @@ The six original questions are all decided (see `docs/PHASE1_REVIEW.md` §4 and 
 
 - **Date:** 2026-11-03 (Session 9)
 - **Last task:** T3 (shared fixtures and the TypeScript runner): Sonnet implementer, Opus review (PASS WITH FINDINGS, no blockers), one fix commit, accepted. Lesson L3 (Sonnet tutor). **Milestone MS-A (T1 to T3) reached.**
-- **Implemented changes:** `contracts/` (README, format, 74 fixtures, catalog export), `frontend/src/contracts/fixtures.test.ts`, `frontend/tsconfig.contracts.json` and the tsconfig reference changes. No application source changed.
-- **Tests:** `npm run verify` exit 0 at `b299782` (184 unit, 27 e2e), run by the Principal Architect and by the reviewer.
+- **Implemented changes:** `contracts/` (README, format, 75 fixtures, catalog export), `frontend/src/contracts/fixtures.test.ts`, `frontend/tsconfig.contracts.json` and the tsconfig reference changes. No application source changed.
+- **Tests:** `npm run verify` exit 0 at `058faae` (185 unit, 27 e2e), run by the Principal Architect and by the reviewer.
 - **Git:** local commits only (D-030); the last `git status` showed `main` ahead of `origin/main` by 10 commits. Whether the PO has pushed since is unknown to Claude.
 - **Learning:** Lessons L1, L2 and L3 delivered, each ending in a Knowledge Check; nothing marked Understood; evaluation at the end of the project.
 - **Next task:** the PO's MS-A review, then T4.

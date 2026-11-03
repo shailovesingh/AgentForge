@@ -404,7 +404,7 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
 - **Acceptance:** no string-only errors remain; the import error panel shows codes; all existing tests pass with updated assertions.
 - **Tests:** existing unit tests re-expressed on `{code, path}`; one test per code.
 
-### T3 — Shared fixtures and the TypeScript runner (M) — **DONE** (commits `e28483d`, `b299782`; Opus-reviewed; accepted by the Principal Architect; 74 fixtures, TypeScript runner only, **no Python parity claimed**). Results in `docs/DEVELOPMENT_LOG.md` Session 9.
+### T3 — Shared fixtures and the TypeScript runner (M) — **DONE** (commits `e28483d`, `b299782`, `058faae`; Opus-reviewed; accepted by the Principal Architect; 75 fixtures, TypeScript runner only, **no Python parity claimed**). Results in `docs/DEVELOPMENT_LOG.md` Session 9.
 - **Carry-over from the T2 review:** the shared fixtures must include config keys named `constructor`, `toString`, `hasOwnProperty`, `valueOf` and an **own** `__proto__` key (each expects `schema.additionalProperties`), and a `schemaVersion` of `"constructor"` or `"toString"` (expects `doc.unsupported-version`). Compare error lists as multisets: the order of integer-like config keys differs between a JavaScript object and a Python dict.
 - **Dependencies:** T2.
 - **Files:** `contracts/**` (README, format, initial corpus), `frontend/src/contracts/fixtures.test.ts`.
