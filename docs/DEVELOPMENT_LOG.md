@@ -339,3 +339,71 @@ Completed for the requested documentation scope. **Uncommitted by instruction.**
 
 **Next Task:**
 Final approval of `docs/PHASE1_1_PLAN.md` (§6.2 decisions C1 to C5 and §6.3 scope). Then commit the documents and start T1 (Playwright harness and CI).
+
+---
+
+### Session: 6 / 2026-11-03
+
+**Phase:**
+Phase 1.1: T1 only (Playwright harness and CI)
+
+**Task:**
+Phase 1.1 **T1**. The PO and Principal Architect gave final implementation authorization for Phase 1.1 (task order T1 → T2 → T3 → T4 → T5 → T6 → T8 → T7 → T9 → T10; one local commit per task; `npm run verify` after each; PO review after each task). C1 to C5 approved with clarifications. Local commits only: **no push, fetch, pull, remote changes or force-push; ask before any remote operation.** Phase 2 remains unauthorized.
+
+**Objective:**
+A reproducible browser regression net (Playwright, Chromium) and a CI workflow, so the later contract changes (T2 to T9) are protected.
+
+**Implementation:**
+- Added `@playwright/test` (`^1.64.1`, resolved 1.64.1) as a dev dependency; Chromium installed with `npx playwright install chromium`.
+- `playwright.config.ts`: `testDir: 'e2e'`, `testMatch: '**/*.e2e.ts'` (keeps Vitest from collecting them), Chromium only, fixed 1400x900 viewport, reduced motion, `webServer` starts `npm run dev` on port 5173 (`reuseExistingServer` outside CI), CI mode: 1 retry, 2 workers, traces on first retry, GitHub and HTML reporters.
+- `e2e/editor.ts` (helpers), `e2e/fixtures.ts` (fresh page per test; **fails on any console error or uncaught page error**), and five specs: `library`, `canvas-editing`, `connections`, `config-panel`, `import-export`: **26 tests covering 49 of the 52 ad hoc checks** (the 3 deliberately not automated are pan, wheel zoom and the exact dark-mode colour).
+- `tsconfig.e2e.json` added to the `tsc -b` references so the specs are type-checked by `npm run build`.
+- Scripts: `test:e2e` and `verify` (`lint`, unit tests, `build` (which runs `tsc -b`), `test:e2e`).
+- `.github/workflows/ci.yml` and `frontend/README.md` (commands, clean-checkout procedure, SHA re-verification procedure); `.gitignore` gains `playwright-report/`, `test-results/`, `blob-report/`.
+- **No application source file was changed** (`git diff -- frontend/src` empty).
+
+**Pinned GitHub Actions (C5).** Resolved on 2026-11-03 with `git ls-remote --tags https://github.com/<owner>/<action>` (read-only; permission granted by the PO for these three public repositories only). All three tags are **lightweight**, so the tag object is the commit.
+
+| Action | Tag | Commit SHA |
+|---|---|---|
+| `actions/checkout` | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| `actions/setup-node` | v7.1.0 | `949feb2413d6458794dcd2491c4babbbce0c15c1` |
+| `actions/upload-artifact` | v7.0.2 | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` |
+
+I selected the highest stable `vMAJOR.MINOR.PATCH` tag of each repository. This verifies that the tag exists in the official repository and which commit it points to; it does **not** verify that a GitHub "Release" object exists for it.
+
+**Files Created:**
+- `.github/workflows/ci.yml`
+- `frontend/README.md`, `frontend/playwright.config.ts`, `frontend/tsconfig.e2e.json`
+- `frontend/e2e/{editor.ts, fixtures.ts, library.e2e.ts, canvas-editing.e2e.ts, connections.e2e.ts, config-panel.e2e.ts, import-export.e2e.ts}`
+
+**Files Modified:**
+- `.gitignore`, `frontend/package.json`, `frontend/package-lock.json`, `frontend/tsconfig.json`
+- `docs/PROJECT_BRAIN.md`, `docs/DEVELOPMENT_LOG.md`, `docs/ROADMAP.md`, `docs/DECISIONS.md`, `docs/PHASE1_1_PLAN.md`
+
+**Verification (commands actually run, results):**
+- `npx tsc -b`: exit 0 (app, node and e2e projects). `npm run lint`: exit 0.
+- `npm run test:e2e`: first run 25 passed, **1 failed**; after fixing my test, **26 passed**. Four further consecutive runs and one run with `CI=1` (2 workers, retries on): all **26 passed**, no flaky tests reported. That is 5 consecutive green runs after the fix, a small sample.
+- **The failure and its cause:** the "dragging a node" test asserted an exact 40 by 120 pixel move. It first failed because the Output node sat at the canvas edge and React Flow auto-panned the viewport (my test's fault); after moving to the LLM node it was still off, and a throwaway debug test (deleted) showed the node moved 36 by 108, exactly 90%, because React Flow consumes the first of my 10 mouse steps to start the drag. The assertion now checks that the node moved substantially and that its exported position equals where it appears on screen. No application bug was involved.
+- **Fault injection** (temporary source edits, each restored; `git diff -- frontend/src` empty afterwards): removing the cycle rule failed `a connection that would create a cycle is rejected`; committing invalid config input failed `commits valid edits and never commits invalid input`; clearing the graph before import failed both `rejects malformed JSON...` and `reports an unknown node type...`. So the net catches those regressions.
+- `npm run verify`: **exit 0** (oxlint clean; **6 files, 48 unit tests passed**; build ok; **26 e2e passed**).
+- **Clean-room run:** copied the 67 files git would track into a scratch directory with no `node_modules`, then `npm ci` (exit 0), `npx playwright install chromium`, `npm run verify`: **exit 0** (48 unit, 26 e2e). Caveats: Windows only, and the Chromium download was already cached on this machine.
+- `ci.yml` parsed with Python `yaml` (valid; triggers, permissions and steps as intended) and every `uses:` is a 40-character SHA with a version comment. **The workflow has not been run on GitHub** (no push authorized).
+- Not changed: the 48 existing unit tests.
+
+**Process notes and disclosures:**
+- **My own slip:** before I had registered the new "ask before any remote operation" rule, I ran `git ls-remote origin HEAD` once to look at the remote while investigating a new commit. It was read-only, but it was a remote operation I should have asked about. I used only local refs afterwards, and I asked before the three action-repository lookups.
+- **Another commit and push outside the Claude session:** `cf738b5` (committed 12:56:14, pushed 12:56:37; `FETCH_HEAD` 12:56:34; `COMMIT_EDITMSG` holds the editor template; message `git commit -m "docs: update documentation for project progress and planning"`) contains the Session 5 documents. Same pattern as `b7e5cbc` and `db451da`; the actor is still not verifiable locally. It means the approved Phase 1.1 plan was already in `HEAD` when T1 began, so T1 needed no separate docs commit.
+- The T1 commit is **local only and unpushed**.
+
+**Known Issues / unresolved:**
+- **CI is untested.** It can only run after a push. I also could not check the v7 actions' `action.yml` input names (I was permitted tag listings only). The inputs I use (`node-version`, `cache`, `cache-dependency-path`, `persist-credentials`, `name`, `path`, `retention-days`, `if-no-files-found`) are long-standing, but unverified for these versions. Linux behaviour of the e2e suite is also unverified (the runs were on Windows).
+- E2E covers Chromium only (D-019), and the runs are on one machine.
+- The dev server prints a harmless React Flow attribution `console.warn` (we hide the attribution; a Pro licence is the library's expectation) and Node prints a `NO_COLOR`/`FORCE_COLOR` warning during Playwright runs. Neither affects results; the fixture only fails on console **errors**.
+- 5 green runs is a small stability sample.
+
+**Status:**
+T1 implemented, verified locally and committed locally. **Waiting for PO review before T2.**
+
+**Next Task:**
+PO review of T1. Then T2 (structured validation errors), only after approval.

@@ -3,7 +3,7 @@
 > Decision log. Only entries with **Status: Approved** are binding.
 > **Proposed** entries are recommendations awaiting Product Owner / Principal Architect review. **Pending** entries are accepted in direction but blocked on a named review step.
 > Never change an Approved decision silently. Supersede it with a new entry instead.
-> D-012 to D-018 were recorded on 2026-11-03 (Session 3) from the Phase 1 review and are in commit `b7e5cbc` (pushed to GitHub). D-019 to D-024 were recorded in Session 4 and are in commit `db451da` (pushed). **Session 5 revisions are uncommitted working-tree changes:** D-017 and D-019 amended; D-022, D-023, D-024 rewritten after the PO's decisions; D-025 added.
+> D-019 to D-025 were recorded in Sessions 4 and 5 and are in commits `db451da` and `cf738b5` (pushed, not by Claude). D-026 (final authorization, Session 6) is a **local, unpushed** change committed with T1.
 
 | ID | Title | Status |
 |---|---|---|
@@ -28,10 +28,11 @@
 | D-019 | Playwright added to the repository as a Phase 1.1 task; GitHub Actions CI with SHA-pinned actions | **Approved** |
 | D-020 | Phase 1 accepted as functionally complete, subject to Phase 1.1 | **Approved** |
 | D-021 | Single-user local mode with a `get_current_user()` boundary | **Approved** |
-| D-022 | Phase 1.1 contract hardening (H1 JSON Schema subset with explicit defaults, H2 shared fixtures, H3 node migrations, H4 branch semantics, H5 canonical JSON) | **Approved** (P7 subject to revisions, now applied); implementation scope pending final approval |
+| D-022 | Phase 1.1 contract hardening (H1 JSON Schema subset with explicit defaults, H2 shared fixtures, H3 node migrations, H4 branch semantics, H5 canonical JSON) | **Approved for implementation** (final authorization 2026-11-03); T1 implemented, T2 to T10 pending |
 | D-023 | Secret detection with warning and explicit export confirmation (not blocking) | **Approved as revised**; backend enforcement separate |
 | D-024 | Extensible provider architecture mechanism (Ollama stays the default) | **Approved** |
-| D-025 | Absent required config keys are a completeness concern (consequence of P1) | **Proposed** |
+| D-025 | Absent required config keys are a completeness concern (C1) | **Approved** |
+| D-026 | Phase 1.1 implementation authorization, C1 to C5 clarifications, binding T4 safeguards, Git restrictions | **Approved** |
 
 ---
 
@@ -167,7 +168,7 @@
 - **Consequences:** no auth library or login UI before Phase 7; default bind address `127.0.0.1`.
 
 ## D-022 — Phase 1.1 contract hardening (H1 to H5)
-- **Status:** **Approved** by the PO (2026-11-03, Session 5), with the revisions below applied. **Final approval of the implementation scope** (tasks T1 to T10 in `docs/PHASE1_1_PLAN.md`) is still pending. D-013 (contract code review) also remains pending.
+- **Status:** **Approved for implementation** (PO and Principal Architect, final authorization 2026-11-03, Session 6; see D-026), with the revisions below applied. T1 is implemented; T2 to T10 are pending. D-013 (contract code review) also remains pending.
 - **Decisions:**
   - **H1 / P1 (revised):** node configs move to a documented JSON Schema subset (integer, array and `items`, nested objects, `default`, `required`, `additionalProperties`); UI hints live in a separate `ui` block. Schema `default`s **replace** `NodeDefinition.defaults` and are applied **explicitly** at node creation (and by migration code), never implicitly by validators or importers. A required property need **not** have a default.
   - **H1 / P2:** our own validator for the documented subset, with shared fixtures.
@@ -191,7 +192,22 @@
 - **Details:** `docs/PHASE1_1_PLAN.md` §3.8.
 
 ## D-025 — Absent required config keys are a completeness concern
-- **Status:** Proposed (consequence C1 of the P1 revision; recommendation: approve)
+- **Status:** Approved (C1, PO and Principal Architect final authorization, 2026-11-03, Session 6)
 - **Context:** P1 says required properties need not have defaults, so a new node may lack a required value, and the editor must be able to hold and export incomplete drafts (D-017).
-- **Decision (proposed):** structural validation of a document (import, later save) does **not** reject an absent required config key. Type, enum, range, length and unknown-key violations remain errors. The editor reports absent or empty required values as `required-field-empty` warnings, and execution (Phase 3) treats them as errors. The validator implements `required` fully and exposes it as a `checkRequired` option.
+- **Decision:** structural validation of a document (import, later save) does **not** reject an absent required config key. **Clarification (final authorization): missing required config keys are completeness warnings during editing and import, and execution validation in Phase 3 enforces them as errors.** Type, enum, range, length and unknown-key violations remain errors. The editor reports absent or empty required values as `required-field-empty` warnings, and execution (Phase 3) treats them as errors. The validator implements `required` fully and exposes it as a `checkRequired` option.
 - **Consequences:** import becomes more lenient; no file that is valid today is rejected.
+
+## D-026 — Phase 1.1 implementation authorization, clarifications and Git rules
+- **Status:** Approved (Product Owner and Principal Architect, 2026-11-03, Session 6)
+- **Decision:** Phase 1.1 is **approved for implementation**.
+  - **Task order:** T1 → T2 → T3 → T4 → T5 → T6 → T8 → T7 → T9 → T10.
+  - **Rules:** one local commit per task; `npm run verify` after every task; fix failures before proceeding; the PO reviews after each task before the next begins; documentation records actual commands, results, files and unresolved issues; untested work is never marked tested; existing Git history is never rewritten.
+- **Clarifications to C1 to C5:**
+  - **C1:** missing required config keys are completeness warnings during editing and import; execution validation in Phase 3 enforces them as errors (D-025).
+  - **C2:** maximum nesting depth **64** with the root at depth **1**; maximum document size **5,000,000 UTF-8 bytes** (not characters).
+  - **C3:** every export containing a high-confidence suspected secret requires explicit confirmation; Cancel is the default, Escape cancels, there is no "don't ask again", and the secret value is never displayed.
+  - **C4:** backend secret enforcement remains a separate Phase 2 decision (X10).
+  - **C5:** GitHub Actions are pinned to verified commit SHAs resolved from official release tags; for annotated tags use the commit the tag points to; record version and SHA (done for T1 in the development log).
+- **Binding implementation safeguards for T4:** (1) the strict JSON parser detects unsafe numeric tokens **before** any JavaScript number conversion, never by `JSON.parse` followed by `Number.isSafeInteger`; (2) duplicate keys are detected **after** decoding escaped property names; (3) size and depth limits are enforced safely (size by UTF-8 bytes before parsing, depth with a counter while parsing); (4) shared fixtures are tested in TypeScript only in Phase 1.1, and **Python parity is not claimed until Phase 2 implements and runs a Python fixture runner**; (5) compact canonical JSON is for hashing and pretty export JSON is a separate deterministic profile.
+- **Git restrictions:** local commits for approved Phase 1.1 tasks only. **No push, fetch, pull, remote change or force-push, and no other remote operation without explicit permission** (read-only lookups of public repositories were permitted once, for C5, for three named repositories).
+- **Scope restrictions:** Phase 2 is unauthorized. No FastAPI, Pydantic, PostgreSQL, Redis, credentials, Python parity, workflow execution or other Phase 2 functionality.

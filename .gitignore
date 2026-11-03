@@ -17,6 +17,11 @@ coverage/
 *.pem
 *.key
 
+# Test output
+playwright-report/
+test-results/
+blob-report/
+
 # Tooling caches
 .pytest_cache/
 .ruff_cache/

@@ -1,6 +1,6 @@
-# PHASE 1.1 PLAN — CONTRACT HARDENING, WARNINGS, PLAYWRIGHT (APPROVED WITH REVISIONS)
+# PHASE 1.1 PLAN — CONTRACT HARDENING, WARNINGS, PLAYWRIGHT (APPROVED FOR IMPLEMENTATION)
 
-> **Status (2026-11-03, Session 5): the Product Owner approved most decisions and required revisions to P1, P7 and S1. This version applies those revisions. The implementation scope still awaits final approval. Nothing here is implemented.**
+> **Status (2026-11-03, Session 6): APPROVED FOR IMPLEMENTATION** by the Product Owner and Principal Architect (final authorization, D-026). Task order **T1 → T2 → T3 → T4 → T5 → T6 → T8 → T7 → T9 → T10**; one local commit per task; `npm run verify` after each; PO review after each task before the next. **T1 is implemented (Session 6); T2 to T10 are not started.** No push, fetch, pull or remote operation without explicit permission.
 > **Phase 2 is not started and not authorized.** No application code changes until the implementation scope is approved.
 > Inputs: the PO's review decisions (Q1–Q6, H1–H5, P1–P7, S1, W1, V1, G1) · `docs/PHASE1_REVIEW.md` · `docs/DECISIONS.md` (D-012 to D-025).
 > History: Session 4 first draft. Session 5 (this version): P1 explicit defaults, P7 canonical JSON, S1 secret detection revised as the PO required.
@@ -262,12 +262,19 @@ The PO approved deterministic canonical serialization **subject to five revision
 | 7 | Numbers must be finite doubles | I-JSON. Enforced as `value.not-finite` |
 | 8 | **Integers must be safe integers: -(2^53 - 1) to 2^53 - 1.** Because every double of magnitude 2^53 or more is an integer, this also bounds all numbers to that magnitude | **AgentForge policy** (not an RFC 8785 rule): keeps TypeScript and Python in exact agreement and avoids silent precision loss. Code `value.unsafe-integer` |
 | 9 | **Strings, keys and escapes must not contain U+0000** | **AgentForge / PostgreSQL `jsonb` compatibility rule** (PostgreSQL cannot store `\u0000`); **not** an RFC 8785 requirement. Code `value.nul-character` |
-| 10 | Maximum nesting depth 64 | AgentForge policy (stack safety, and Python and JavaScript recursion limits differ). Code `doc.too-deep` |
-| 11 | Maximum document size 5,000,000 characters | AgentForge policy (exists today). Code `doc.too-large` |
+| 10 | Maximum nesting depth **64, with the root value at depth 1** (so 64 nested levels including the root are accepted and 65 are rejected) | AgentForge policy (stack safety, and Python and JavaScript recursion limits differ). Code `doc.too-deep` |
+| 11 | Maximum document size **5,000,000 UTF-8 bytes** (measured as bytes, not characters, and checked **before** parsing) | AgentForge policy. Code `doc.too-large` |
 | 12 | A UTF-8 byte order mark is tolerated and stripped on input and never written; invalid UTF-8 is rejected | AgentForge policy. Code `doc.invalid-encoding` |
 | 13 | No Unicode normalization: strings and keys are preserved exactly, so `é` and `e` + U+0301 are different | AgentForge policy |
 
 **Strict parsing (revision 1).** Untrusted text is parsed by `workflow/strictJson.ts`, a small RFC 8259 parser, **not** `JSON.parse` (which silently keeps the last duplicate). It rejects: duplicate keys (compared **after** escape decoding, so `"a"` and `"a"` collide) with the JSON Pointer of the second occurrence; depth over 64; `NaN`/`Infinity` tokens, leading zeros, `+1`, `.5`, `1.`, trailing commas and trailing garbage; invalid escapes and raw control characters in strings; lone surrogates; U+0000; numbers that overflow to infinity; and unsafe integers. Objects are built with `Object.defineProperty`, so a key named `__proto__` is an ordinary own property and cannot change a prototype. **Python (Phase 2)** does the same with `json.loads(..., object_pairs_hook=<reject duplicates>, parse_constant=<reject>)` plus an iterative walk for depth, surrogates, NUL and number range. The importer (and the API) use the strict parser only.
+
+**Implementation safeguards (final authorization, binding for T4).**
+1. **Unsafe numeric tokens are detected before any JavaScript number conversion.** The parser inspects the number token text (sign, integer digits, fraction digits, exponent) and decides range and integrality with decimal or `BigInt` arithmetic: an integral value above 2^53 - 1 in magnitude (for example `9007199254740993`, `9007199254740992.0`, `1e21`) is rejected as `value.unsafe-integer`, and a magnitude beyond the double range (for example `1e400`) as `value.not-finite`. `JSON.parse` followed by `Number.isSafeInteger` is **not** acceptable, because `JSON.parse` has already lost the information.
+2. **Duplicate keys are detected after decoding escaped property names**, so `"a"` and `"\u0061"` are the same key.
+3. **Limits are enforced safely:** size in UTF-8 bytes before parsing or decoding to a string where possible (for a `File`, its `size`); depth with a counter checked as each container opens, so the 65th level is rejected before any deep recursion.
+4. **Shared fixtures are tested in TypeScript only in Phase 1.1.** **Python parity is not claimed until Phase 2 implements and runs a Python fixture runner.**
+5. **Compact canonical JSON is for hashing; pretty export JSON is a separate deterministic profile** (below).
 
 **Two named profiles, one ordering (revision 3).**
 
@@ -369,7 +376,7 @@ interface Warning { code: string; severity: 'warning'; nodeId?: string; port?: s
 
 **Package and config:** `@playwright/test` as a `devDependency` (version pinned by the lockfile; `npm view` currently reports 1.64.1). Chromium only, installed by `npx playwright install chromium`, so local runs do not depend on the machine's Chrome. `playwright.config.ts`: `testDir: 'e2e'`, `testMatch: '**/*.e2e.ts'`, fixed viewport (1400x900), `reducedMotion: 'reduce'`, `webServer` starting `npm run dev -- --port 5173 --strictPort` with `reuseExistingServer: !process.env.CI`, `retries: CI ? 1 : 0`, `trace: 'on-first-retry'`.
 
-**Scripts:** `test:e2e` (Playwright) and `verify` (`tsc -b && lint && test && build && test:e2e`), the single command that proves a clean checkout.
+**Scripts (as implemented in T1):** `test:e2e` (Playwright) and `verify` = `npm run lint && npm test && npm run build && npm run test:e2e`. The build script already runs `tsc -b`, which type-checks the app, the tooling and the e2e project, so `verify` does not repeat it.
 
 **Reproducible local run:** `cd frontend && npm ci && npx playwright install chromium && npm run verify`. Documented in a short `frontend/README.md`.
 
@@ -383,7 +390,7 @@ interface Warning { code: string; severity: 'warning'; nodeId?: string; port?: s
 
 Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`npm run verify` once T1 exists) and a documentation update.
 
-### T1 — Playwright harness and ported checks (M)
+### T1 — Playwright harness and ported checks (M) — **IMPLEMENTED in Session 6, committed locally; awaiting PO review.** Results in `docs/DEVELOPMENT_LOG.md` Session 6.
 - **Dependencies:** none. **Do this first.**
 - **Files:** `frontend/package.json` and `package-lock.json`, `frontend/playwright.config.ts`, `frontend/e2e/{fixtures,helpers}.ts`, `frontend/e2e/{library,canvas-editing,connections,config-panel,import-export}.e2e.ts`, `frontend/tsconfig.e2e.json` (or edit `tsconfig.node.json`), `frontend/README.md`, `.gitignore`, `.github/workflows/ci.yml`.
 - **Architecture change:** none (tests only).
@@ -496,17 +503,17 @@ T8 is documentation plus a tiny catalog change and can run any time before T7. T
 
 See §1.1. Approved: P1 (revised), P2, P3, P4, P5, P6, P7 (subject to revisions, applied), W1, V1, G1 and the toolchain. S1 was revised as the PO required. Recorded in `docs/DECISIONS.md` as D-017 (amended), D-019 (amended), D-022, D-023 (revised) and D-024.
 
-### 6.2 Still requested (small; each has a recommendation)
+### 6.2 Clarifications approved by the PO and Principal Architect (final authorization, Session 6; recorded as D-026)
 
-| # | Decision | Recommendation |
+| # | Decision | Outcome |
 |---|---|---|
-| C1 | Because a required property no longer needs a default (P1 revision), **an absent required config key is a completeness warning, not a structural import error**, and execution (Phase 3) is where it becomes an error | Yes |
-| C2 | Policy values: maximum nesting depth **64**, maximum document size **5,000,000 characters** (rules 10 and 11 of §3.5) | Yes |
-| C3 | Export confirmation behaviour: shown on **every** export that has a high-confidence match, **Cancel is the default**, no "don't ask again" (§3.7) | Yes |
-| C4 | Backend secret handling stays a **separate Phase 2 decision (X10)**; the local export dialog implies nothing about it | Yes |
-| C5 | CI action pinning procedure: resolve each commit SHA from the release tag with `git ls-remote --tags`, check it, and record the tag in a comment (§3.9) | Yes |
+| C1 | Missing required config keys are **completeness warnings during editing and import**; execution validation in Phase 3 enforces them as errors (D-025) | **Approved** |
+| C2 | Maximum nesting depth **64, root depth 1**; maximum document size **5,000,000 UTF-8 bytes** | **Approved** |
+| C3 | Every export containing a high-confidence suspected secret requires explicit confirmation; Cancel is the default, Escape cancels, no "don't ask again"; never display the secret value | **Approved** |
+| C4 | Backend secret enforcement remains a separate Phase 2 decision (X10) | **Approved** |
+| C5 | Pin GitHub Actions to verified commit SHAs resolved from official release tags; for annotated tags use the actual commit SHA; record version and SHA | **Approved** (applied in T1) |
 
-### 6.3 Implementation scope requested for final approval
+### 6.3 Implementation scope (APPROVED, Session 6)
 
 Approve **T1 to T10**, executed in this order, **one task per commit**, with `npm run verify` green after each, and no Phase 2 work:
 
