@@ -298,7 +298,7 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
   }
 }
 
-const MIN_COUNTS = { total: 74, valid: 7, invalid: 30, connection: 22, config: 15 }
+const MIN_COUNTS = { total: 75, valid: 7, invalid: 31, connection: 22, config: 15 }
 
 describe('fixture corpus', () => {
   test('format.json declares fixtureFormat 1', () => {

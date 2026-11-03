@@ -83,12 +83,21 @@ exactly these errors (see the comparison rule below). `wf-invalid-doc-too-large.
 - **Document-level errors stop validation.** If the document fields (`id`, `name`, `description`,
   `metadata`, `nodes`, `edges`) are wrong, those errors are returned and nodes and edges are not checked
   (see `wf-invalid-doc-error-stops-before-nodes`).
-- **Nodes** are checked in array order. A rejected node (malformed, duplicate id, unknown type, or any
-  config error) is **not added**; the **second** occurrence of a duplicate id is the one blamed.
-- **Edges** are checked in array order, each as if it were being added to the edges **already accepted**.
-  A cycle is therefore reported on the edge that closes it, and a rejected edge is not added.
-- Because rejected nodes are not added, a bad node **cascades**: an edge that uses it also fails with
-  `connection.unknown-node` (see `wf-invalid-cascade-unknown-type-edge`).
+- **Nodes** are checked in array order. Each node goes through these checks in this order: malformed
+  (`node.malformed`), duplicate id (`node.duplicate-id`), unknown type or version (`node.unknown-type`),
+  then its config. Exactly three cases are **not added**: a malformed node, a duplicate id (the **second**
+  occurrence is the one blamed and is dropped) and an unknown type. A node whose **only** problems are
+  config errors **is still added**: its config errors (`schema.*`, at `/nodes/<i>/config/<key>`) are
+  reported and the node is kept, so edges that use it are checked normally (see
+  `wf-invalid-config-error-node-still-connectable`).
+- **Edges** are checked in array order, each as if it were being added to the edges **already accepted**
+  and to the nodes **already added**. A malformed edge (`edge.malformed`) or a duplicate edge id
+  (`edge.duplicate-id`) is rejected first; then the connection rules run in the order given under
+  `connection/*.json`. A cycle is therefore reported on the edge that closes it, and a rejected edge is
+  not added.
+- Because a malformed, duplicate-id or unknown-type node is not added, such a node **cascades**: an edge
+  that uses it also fails with `connection.unknown-node` (see `wf-invalid-cascade-unknown-type-edge`). A
+  node with config errors does **not** cascade.
 - **At most 20 errors** are reported (`MAX_ERRORS` in `frontend/src/workflow/validate.ts`); the first 20 in
   the order above are kept (see `wf-invalid-error-cap`, built with `inputRepeat`).
 
