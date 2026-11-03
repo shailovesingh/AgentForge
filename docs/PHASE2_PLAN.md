@@ -2,7 +2,7 @@
 
 > **Status: PROPOSED. Phase 2 is NOT approved. No backend work has started and none will until the Product Owner explicitly approves this plan.**
 > Prepared 2026-11-03 (Session 3) as review material. Uncommitted until the PO approves.
-> Related: `docs/ARCHITECTURE.md` §3, §4, §10 · `docs/DECISIONS.md` (D-002, D-004, D-008, D-009, D-013 to D-018) · `docs/PHASE1_REVIEW.md` §1.4 (contract concerns H1–H5, M1–M9).
+> **Revision note (Session 4):** the PO's review decisions moved the contract concerns H1 to H5 into **Phase 1.1** (`docs/PHASE1_1_PLAN.md`). Steps 2, 3, 4, 8 and 9 below assume the Phase 1.1 outcomes (JSON Schema subset for configs, shared fixtures in `contracts/`, node migrations, `canonical-json/1`, structured error codes). Precondition P2 therefore means "Phase 1.1 approved and completed". Phase 2 is still **not approved**. §3, §4, §10 · `docs/DECISIONS.md` (D-002, D-004, D-008, D-009, D-013 to D-018) · `docs/PHASE1_REVIEW.md` §1.4 (contract concerns H1–H5, M1–M9).
 
 ## 0. Goal and scope
 
@@ -16,9 +16,9 @@
 | # | Precondition | Owner | State |
 |---|---|---|---|
 | P1 | PO approves this plan | PO | **Pending** |
-| P2 | D-013 workflow contract final code review completed, and decisions on H1–H5 recorded | Principal Architect + PO | **Pending** (blocks step 2 onward) |
+| P2 | D-013 workflow contract final code review completed, and H1–H5 resolved through **Phase 1.1** | Principal Architect + PO | **Pending** (blocks step 2 onward) |
 | P3 | Docker Desktop installed | PO | **Pending** (blocks step 6 onward; steps 1–5 do not need it) |
-| P4 | A GitHub remote exists, only if CI is wanted | PO | **Pending**, optional (the repo has no remote) |
+| P4 | A GitHub remote exists, only if CI is wanted | PO | **Done** (`origin` = `https://github.com/shailovesingh/AgentForge.git`) |
 
 ## 2. Decisions needed from the PO / architect before or during Phase 2
 

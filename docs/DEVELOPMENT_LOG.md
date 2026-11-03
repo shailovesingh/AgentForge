@@ -237,3 +237,50 @@ Completed for the requested documentation scope. **Uncommitted by instruction.**
 
 **Next Task:**
 PO review and approval. Then, only on explicit approval: commit the review documents; Phase 1.1 and/or Phase 2 step 1.
+
+---
+
+### Session: 4 / 2026-11-03
+
+**Phase:**
+Phase 1 acceptance follow-up (documentation only)
+
+**Task:**
+Record the PO's decisions on Q1 to Q6 and the H1 to H5 architecture decisions, and prepare a revised **Phase 1.1 plan**. The PO instructed: do not start Phase 2; do not modify application code; do not commit or push yet.
+
+**Objective:**
+Give the PO and the Principal Architect a complete Phase 1.1 plan for final approval, including which issues change Workflow JSON v1.
+
+**Observed repository events (not performed by Claude):**
+Before this session's work, the working tree was found clean. `git log` showed a new commit `b7e5cbc` (message text literally `git commit -m "docs: update documentation for project progress and planning"`) containing the Session 3 review documents, and `origin` pointed to `https://github.com/shailovesingh/AgentForge.git`. `git ls-remote origin HEAD` returned `b7e5cbc82197ba7a09438f1ebedce6a112209ed9`, equal to the local HEAD, so the history is on GitHub. **Correction to Session 3 statements:** "no remote" and "uncommitted" were true when written and are no longer true. The commit lacks the Co-Authored-By trailer and its message has the command text in it; history was not rewritten.
+
+**Implementation (documentation only):**
+- `docs/PHASE1_1_PLAN.md` (new): PO decision recap; impact matrix of H1 to H5 on Workflow JSON v1 (none change the document structure or require a `schemaVersion` bump; catalog contract changes; export bytes change once); designs for H1 (JSON Schema subset, `ui` separation, schema defaults, code-point length rule), H2 (fixture structure, expected outcomes, error codes), H3 (node migration registry, never-silent and never-overwrite rules), H4 (emission, edge-state, run/skip, join and failure semantics), H5 (`canonical-json/1`, a JCS subset), category and direction aware warning rules, secret guard, provider mechanism, Playwright with local and CI runs; ten tasks T1 to T10 with dependencies, files, acceptance criteria and tests; risks R1 to R12; decisions requested.
+- `docs/DECISIONS.md`: D-019 to D-021 Approved; D-022 (H2 approved, H1/H3/H4/H5 direction approved, designs proposed); D-023 and D-024 Proposed; D-017 amended.
+- `docs/PHASE1_REVIEW.md`: new §4 (decision record); stale remote statements corrected.
+- `docs/PHASE2_PLAN.md`: revision note (Phase 1.1 carries H1 to H5); P2 reworded; P4 marked done.
+- `docs/PROJECT_BRAIN.md`, `docs/ROADMAP.md`, `docs/DEVELOPMENT_LOG.md`: synced.
+
+**Files Created:**
+- `docs/PHASE1_1_PLAN.md`
+
+**Files Modified:**
+- `docs/DECISIONS.md`, `docs/PHASE1_REVIEW.md`, `docs/PHASE2_PLAN.md`, `docs/PROJECT_BRAIN.md`, `docs/ROADMAP.md`, `docs/DEVELOPMENT_LOG.md`
+
+**Files Inspected (read-only):**
+- `frontend/src/{workflow/types.ts, workflow/configSchema.ts, catalog/nodes.ts, config-panel/ConfigPanel.tsx, store/editorStore.ts}` (searched for `multiline`, `defaults`, `maxIterations`, `required` usage), git state and remote.
+
+**Verification:**
+- Commands executed: `git log`, `git status`, `git remote -v`, `git ls-remote origin HEAD`, `git show --stat HEAD`, `git diff --stat HEAD -- frontend` (empty), a text search of `frontend/src`, and small standalone Node and Python snippets (scratch directory, not in the repo) that confirmed: object key ordering with integer-like keys in JavaScript versus Python `sort_keys`; number formatting (`1.0`, `-0`, `1e-7`, `1e21`); string length of an emoji; behaviour of a lone surrogate and of `NaN` in `json.loads`; loss of precision for a 23-digit integer in JavaScript; duplicate keys (last wins in both).
+- Tests: the application test suite was **not re-run** this session because no code changed (last run, Session 3: `tsc`, `oxlint`, 48 Vitest tests, `vite build` all passed).
+- PostgreSQL `jsonb` behaviours cited in the H5 design come from its documentation and are **not verified** (PostgreSQL is not installed); Phase 2 step 6 must confirm them.
+- Python parity of the fixtures is **not provable until Phase 2**; the plan says so and lists the known differences.
+
+**Known Issues:**
+- See PROJECT_BRAIN §9. New: no CI yet; the GitHub history still holds the early damaged encoding of two docs (repaired in later commits).
+
+**Status:**
+Completed for the requested documentation scope. **Uncommitted by instruction.** Awaiting final PO and architect approval of the Phase 1.1 plan.
+
+**Next Task:**
+Final approval of `docs/PHASE1_1_PLAN.md`; then commit the documents and start Phase 1.1 T1 (Playwright harness and CI).

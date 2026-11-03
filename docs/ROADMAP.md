@@ -1,13 +1,13 @@
 # ROADMAP — AGENTFORGE
 
 > Status legend: **Not started** · **Planned** (detailed plan exists) · **In progress** · **Done** (implemented + verified).
-> Last updated: 2026-11-03 (Session 3). Phase 1.1 and Phase 2 rows are **proposals**, not commitments.
+> Last updated: 2026-11-03 (Session 4). Phase 1.1 and Phase 2 rows are **proposals**, not commitments (Playwright and shared fixtures are approved in principle).
 
 | Phase | Name | Status | Prerequisites |
 |---|---|---|---|
 | 0 | Project bootstrap (docs, rules, architecture proposal) | **Done** (architecture approved 2026-11-03) | — |
-| 1 | Visual workflow builder (frontend only) | **Implemented and verified; under final acceptance review** (Session 2). Contract pending final code review (D-013) | — |
-| 1.1 | Follow-up: `groq` provider enum, non-blocking editor warnings (D-017/D-018), Playwright E2E | **Proposed**, not started. Definitions in `docs/PHASE1_REVIEW.md` §2 Q6 and §3 | PO approval; Playwright needs a dev-dependency approval |
+| 1 | Visual workflow builder (frontend only) | **Accepted as functionally complete by the PO (D-020), subject to Phase 1.1.** Contract pending final code review (D-013) | — |
+| 1.1 | Contract hardening and follow-ups: Playwright + CI (approved, D-019), shared fixtures (approved), JSON Schema config (H1), node migrations (H3), branch semantics (H4), canonical JSON (H5), `groq`, category-aware warnings, secret guard | **Planned, awaiting final approval.** Ten tasks T1 to T10 in `docs/PHASE1_1_PLAN.md`. Not started | Final PO / architect approval of the plan and of D-022 to D-024; D-013 review |
 | 2 | Backend: FastAPI, Pydantic schemas, workflow API, PostgreSQL | **Proposed only; NOT approved; not started.** Ten-step plan in `docs/PHASE2_PLAN.md` | PO approval of the plan; D-013 contract review (blocks step 2 onward); Docker Desktop (blocks step 6 onward); D-008, D-009 approved |
 | 3 | Execution engine (registry, validator, DAG scheduler, run logs, SSE) | Not started | Phase 2; D-006 |
 | 4 | AI runtime (LLM node, Agent node, LangGraph, tools, memory) | Not started | Phase 3 |

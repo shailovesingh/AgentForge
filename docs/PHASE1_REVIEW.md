@@ -1,6 +1,6 @@
 # PHASE 1 REVIEW PACKAGE — AGENTFORGE
 
-> **Status: PROPOSED review material, prepared 2026-11-03 (Session 3). Uncommitted until the Product Owner approves.**
+> **Status: review material prepared 2026-11-03 (Session 3), committed in `b7e5cbc`. The PO decided Q1 to Q6 on 2026-11-03 (see §4). The answers in §2 are kept as originally proposed.**
 > Nothing here changes application code or the frozen Workflow JSON v1 contract.
 > Contents: §1 workflow contract review · §2 the six open questions with proposed answers · §3 Playwright proposal.
 > Phase 2 plan: `docs/PHASE2_PLAN.md`. Decisions: `docs/DECISIONS.md` (D-012 to D-018).
@@ -166,7 +166,7 @@ Reproduced verbatim from `docs/PROJECT_BRAIN.md` §10 (as of commit `5c89203`), 
 - The UI is stable and 52 browser checks already exist as an ad hoc script that nobody else can run.
 - Phase 2 step 10 will need browser tests against a real backend, and it is cheaper to have the harness first.
 - Cost is small (see §3) and it adds only a dev dependency.
-- Condition: GitHub Actions needs a GitHub remote, which does not exist yet (see §3.4).
+- Note: GitHub Actions needs a GitHub remote; one now exists (see §3.4).
 
 ### Q3. Toolchain
 > Accept TypeScript 7 / Vite 8 / oxlint, or switch to ESLint?
@@ -264,4 +264,27 @@ Rough estimate (engineering judgment, not measured): about 300 to 400 lines of t
 
 No application code changes. If selectors prove brittle, adding `data-testid` attributes to a few components would be a small, separate change.
 
-**Prerequisite and risk:** the repo has **no GitHub remote** (`git remote -v` is empty), so the workflow cannot run until the PO creates one. Browser tests that drag and connect can be timing-sensitive; the first ad hoc script passed on three consecutive runs after its fixes and the second passed once in full, which is too small a sample to call stable, and CI runners are slower. Hence `retries: 1` and traces on retry.
+**Prerequisite (resolved after this section was written):** a GitHub remote now exists (`origin` = `https://github.com/shailovesingh/AgentForge.git`), so the workflow can run on the first push. **Risk:** Browser tests that drag and connect can be timing-sensitive; the first ad hoc script passed on three consecutive runs after its fixes and the second passed once in full, which is too small a sample to call stable, and CI runners are slower. Hence `retries: 1` and traces on retry.
+
+---
+
+## 4. Decisions on this review (Product Owner, 2026-11-03, Session 4)
+
+| Item | Decision | Recorded as |
+|---|---|---|
+| Q1 providers | Approved: Groq, OpenAI, Anthropic, Ollama | D-014 |
+| Q2 Playwright | Approved as a Phase 1.1 task | D-019 |
+| Q3 toolchain | Keep TypeScript 7, Vite 8, Oxlint, Vitest 5 | D-012 |
+| Q4 acceptance | Phase 1 accepted as functionally complete, subject to Phase 1.1 follow-ups | D-020 |
+| Q5 auth | Single-user local mode; keep a `get_current_user()` boundary; never expose beyond localhost without proper authentication | D-021 |
+| Q6 warnings | Approved, with rules aware of node categories and port direction | D-017 (amended) |
+| H1 | Review the custom `configSchema`; propose a migration to standard JSON Schema; keep UI hints separate | D-022; design in `PHASE1_1_PLAN.md` §3.1 |
+| H2 | Approved: shared JSON fixtures for Vitest and pytest | D-022; `PHASE1_1_PLAN.md` §3.2 |
+| H3 | Design a versioned node migration mechanism; never overwrite old workflows silently | D-022; `PHASE1_1_PLAN.md` §3.3 |
+| H4 | Define condition output, branch and skip semantics, compatible with v1 | D-022; `PHASE1_1_PLAN.md` §3.4 |
+| H5 | Deterministic serialization, recursively sorted keys, across TypeScript, Python and JSONB | D-022; `PHASE1_1_PLAN.md` §3.5 |
+| Extras | HTTP header credential exposure, credentials outside JSON, extensible providers, non-blocking warnings, Playwright | D-023, D-024, D-016; `PHASE1_1_PLAN.md` §3.6 to §3.9 |
+
+**Still pending:** D-013 (final code review of the contract, which this plan now proposes to change in the catalog layer), final approval of the Phase 1.1 designs (D-022 to D-024), and Phase 2 approval.
+
+**What these decisions change in §1.4:** concerns H1 to H5 are now **assigned to Phase 1.1** with designs (not to Phase 2). M3 (integer typing), M5 (structured errors), M8 (credential exposure) and L6 (groq) are absorbed by the same plan. M1, M2, M4, M6, M7 and M9 remain Phase 2 or later.

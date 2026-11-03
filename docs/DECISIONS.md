@@ -3,7 +3,7 @@
 > Decision log. Only entries with **Status: Approved** are binding.
 > **Proposed** entries are recommendations awaiting Product Owner / Principal Architect review. **Pending** entries are accepted in direction but blocked on a named review step.
 > Never change an Approved decision silently. Supersede it with a new entry instead.
-> D-012 to D-018 were recorded on 2026-11-03 (Session 3) from the Phase 1 review. These are **uncommitted review-document changes** until the PO approves them.
+> D-012 to D-018 were recorded on 2026-11-03 (Session 3) from the Phase 1 review and are in commit `b7e5cbc` (pushed to GitHub). D-019 to D-024 were recorded on 2026-11-03 (Session 4) from the PO's Phase 1 review decisions; they are **uncommitted working-tree changes**.
 
 | ID | Title | Status |
 |---|---|---|
@@ -23,8 +23,14 @@
 | D-014 | Initial LLM providers: Groq, OpenAI, Anthropic, Ollama | **Approved** (catalog not yet updated) |
 | D-015 | Provider-neutral LLM adapter architecture | **Approved** (not yet implemented) |
 | D-016 | Credentials never stored in workflow JSON | **Approved** (already holds in Phase 1) |
-| D-017 | Non-blocking editor warnings | **Approved** (not yet implemented) |
+| D-017 | Non-blocking editor warnings (amended: aware of node categories and port direction) | **Approved** (not yet implemented; rules proposed in PHASE1_1_PLAN §3.6) |
 | D-018 | Structural errors kept separate from warnings | **Approved** (not yet implemented) |
+| D-019 | Playwright added to the repository as a Phase 1.1 task | **Approved** |
+| D-020 | Phase 1 accepted as functionally complete, subject to Phase 1.1 | **Approved** |
+| D-021 | Single-user local mode with a `get_current_user()` boundary | **Approved** |
+| D-022 | Phase 1.1 contract hardening (H1 JSON Schema subset, H2 shared fixtures, H3 node migrations, H4 branch semantics, H5 canonical JSON) | **H2 Approved; direction of H1, H3, H4, H5 Approved; designs Proposed** (final approval pending) |
+| D-023 | Secret guard for workflow JSON (HTTP headers and free-text config) | **Proposed** |
+| D-024 | Extensible provider architecture mechanism | **Proposed** (providers themselves Approved in D-014) |
 
 ---
 
@@ -136,10 +142,47 @@
 
 ## D-017 — Non-blocking editor warnings
 - **Status:** Approved (not yet implemented; proposed as Phase 1.1).
-- **Decision:** the editor shows warnings, never blocking export or import, for: (1) unconnected required inputs, (2) empty required fields, (3) unused nodes.
+- **Decision:** the editor shows warnings, never blocking export or import, for: (1) unconnected required inputs, (2) empty required fields, (3) unused nodes. **Amendment (PO, 2026-11-03): the warning rules must be aware of node categories and port direction** (for example Triggers are sources, Output nodes are sinks, required inputs are checked on input ports, results on output ports). The concrete rules are proposed in `docs/PHASE1_1_PLAN.md` §3.6.
 - **Consequences:** a pure `lintWorkflow(workflow, catalog)` function is added next to the validator; the exact definitions (e.g. what counts as "unused") are in `docs/PHASE1_REVIEW.md` §2, question 6, and need PO confirmation before implementation.
 
 ## D-018 — Structural errors are separate from warnings
 - **Status:** Approved (not yet implemented).
 - **Decision:** `validateWorkflow` keeps returning **errors** only (invalid structure, unknown types, bad configs, illegal edges), and these block import and, later, save. **Warnings** come from a separate function with a separate type and are never mixed into the error list.
 - **Consequences:** the same split applies on the backend in Phase 2: the API returns 422 for errors and may return warnings separately.
+
+## D-019 — Playwright added to the repository
+- **Status:** Approved (PO, 2026-11-03)
+- **Decision:** add `@playwright/test` as a development dependency in `frontend/` as a Phase 1.1 task, with Chromium-only reproducible local runs and GitHub Actions CI. The first Phase 1.1 task, so it protects the later contract changes.
+- **Details:** `docs/PHASE1_1_PLAN.md` §3.9 and task T1; test selection in `docs/PHASE1_REVIEW.md` §3.2.
+
+## D-020 — Phase 1 acceptance
+- **Status:** Approved (PO, 2026-11-03)
+- **Decision:** Phase 1 is accepted as **functionally complete**, **subject to the Phase 1.1 follow-ups**.
+- **Consequences:** D-013 (the workflow contract) is still pending final code review. Phase 2 remains **unapproved**.
+
+## D-021 — Single-user local mode and the authentication boundary
+- **Status:** Approved (PO, 2026-11-03)
+- **Decision:** single-user local development mode initially. The backend keeps a `get_current_user()` authentication boundary from the start (every owned row has `owner_id`). The application must **not** be exposed beyond localhost without proper authentication.
+- **Consequences:** no auth library or login UI before Phase 7; default bind address `127.0.0.1`.
+
+## D-022 — Phase 1.1 contract hardening (H1 to H5)
+- **Status:** **H2 Approved** (shared JSON fixtures for Vitest and pytest). **H1, H3, H4, H5: direction Approved** by the PO's instructions; **the designs in `docs/PHASE1_1_PLAN.md` §3.1 to §3.5 are Proposed and await final PO and architect approval.**
+- **Decision (requirements set by the PO):**
+  - H1: move toward standard JSON Schema-compatible definitions (integer, array, nested objects, defaults, required, items); UI hints such as multiline stay separate from validation.
+  - H2: shared JSON fixtures consumed by both Vitest and pytest, with a clear structure and common expected outcomes.
+  - H3: a versioned node migration mechanism keyed by `type` and `typeVersion`; old saved workflows are preserved and never overwritten silently.
+  - H4: define named condition outputs, selected branches and skipped nodes for the future DAG engine, compatible with Workflow JSON v1.
+  - H5: deterministic serialization with recursively sorted object keys and preserved array order, consistent across TypeScript, Python and PostgreSQL JSONB.
+- **Impact on Workflow JSON v1:** none of H1 to H5 changes the document structure or requires a `schemaVersion` bump (`docs/PHASE1_1_PLAN.md` §2). The catalog contract changes (H1, H4, providers), and export bytes change once (H5).
+- **Consequences:** D-013 stays pending until the architect reviews the contract files together with this plan.
+
+## D-023 — Secret guard for workflow JSON
+- **Status:** Proposed
+- **Context:** `http.request.config.headers` is free-form JSON and can hold pasted credentials; the same applies to any free-text config and `metadata` (conflicts with D-016).
+- **Decision (proposed):** a shared detector scans all config strings and keys. High-confidence matches (known credential header names with literal values; well-known token shapes) **block export** (and, in Phase 2, save) with no override and never echo the value; medium-confidence matches only warn. Credentials themselves stay outside workflow JSON; references arrive with backend credential management.
+- **Details and limits:** `docs/PHASE1_1_PLAN.md` §3.7. Needs PO decision S1.
+
+## D-024 — Extensible provider architecture (mechanism)
+- **Status:** Proposed (the providers Groq, OpenAI, Anthropic and Ollama are Approved in D-014; the neutral adapter is Approved in D-015)
+- **Decision (proposed):** one `PROVIDERS` constant is the only list of providers in Phase 1.1, and the node `provider` enums are built from it. From Phase 2/4 the backend registry of adapters generates the catalog enum, so adding a provider never changes the contract shape. `model` stays free text.
+- **Details:** `docs/PHASE1_1_PLAN.md` §3.8.
