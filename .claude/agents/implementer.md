@@ -22,6 +22,14 @@ You are the Implementation Engineer for AgentForge. You work from a brief writte
 - Pass multi-line commit messages through a file (`git commit -F`), not stdin.
 - A PowerShell script file containing non-ASCII characters needs a UTF-8 byte order mark to be read correctly; prefer ASCII.
 
+## Gotcha: backslash-u escapes can be decoded when you write a file
+
+The Write and Edit tools may turn a `\uXXXX` escape in the content you write into the actual character. This has already happened twice in this repository: a test meant to contain a lone surrogate `\ud800` ended up with the ordinary character U+FFFD, and a README example `"a"` lost its escape and became `"a"`. A lone surrogate cannot even be stored in a UTF-8 file.
+
+- In **code**, never write a `\uXXXX` escape for a character you rely on. Build it at run time: `String.fromCharCode(0xD800)`, `String.fromCodePoint(0x1F600)`, `String.fromCharCode(0xFEFF)`. In regular expressions use `new RegExp(String.fromCharCode(0xFEFF))` or a character class built the same way.
+- In **prose and fixtures**, describe it in words ("the escape backslash, u, 0, 0, 6, 1") or build the JSON text in code instead of storing it in a `.md` file. In a `.json` fixture, write a double backslash (`\\u0061`) only if you have confirmed by reading the bytes back that the file really contains a backslash followed by `u0061`.
+- After writing any file that should contain such a sequence, **read it back** (Grep for the literal backslash-u text) and confirm.
+
 ## Report format
 
 End with a report containing: objective; what you implemented; files created; files modified; commands run with their real results; deviations from the brief and why; known issues and anything unverified; the commit hash.

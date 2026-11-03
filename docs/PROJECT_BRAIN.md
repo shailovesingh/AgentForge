@@ -120,7 +120,7 @@ No `backend/` directory exists. No Docker files exist.
 | Node / npm | 24.13.0 / 11.16.0 |
 | Python | 3.14.2 default; uv-managed 3.11.14 and 3.14.2 available |
 | uv | 0.9.24 |
-| Docker | **Not installed** (PO will install Docker Desktop before Phase 2) |
+| Docker | Docker Desktop 4.97.0 installed and running (per-user install; client and server 29.9.2; Compose v5.6.1); not on this shell's PATH |
 | PostgreSQL / Redis | **Not installed** |
 | Browser used for verification | Google Chrome (headless) |
 | OS | Windows 11 |
@@ -153,7 +153,7 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 - [x] T3 Shared JSON fixtures in `contracts/` (74 case files in four families plus the catalog export) and the TypeScript runner (strict shape checker, multiset comparison, coverage guards, minimum-count floors, catalog drift test) — **done**: Sonnet-implemented (`e28483d`), Opus-reviewed (PASS WITH FINDINGS, no blockers; the reviewer verified the expectations against the spec, not the code), fixes `b299782`, accepted by the Principal Architect; `npm run verify` exit 0 (184 unit, 27 e2e). **Tested in TypeScript only; no Python parity is claimed** (a Python runner is a Phase 2 task).
 - [ ] T2 Structured validation errors `{code, path, message}`
 - [ ] T3 Shared JSON fixtures in `contracts/` with a Vitest runner (H2, approved)
-- [ ] T4 Strict parsing (duplicate keys rejected), canonical JSON (compact, hashing) and export JSON (pretty), 120+ fixtures (H5, P7 revised)
+- [ ] T4 Strict parsing, canonical JSON (compact, hashing) and export JSON (pretty) (H5, P7 revised): **split (D-031).** **T4a done**: strict RFC 8259 parser (`strictJson.ts`: duplicate keys after decoding, depth 64 with root = 1, NUL, lone surrogates, token-level number analysis, safe object building), import by bytes with a 5,000,000-UTF-8-byte limit, BOM, fatal UTF-8 decoding, `valuePolicy.ts` for editor values, 7 new error codes (30), `inputBytesBase64`, 153 fixtures; Sonnet-implemented (`9477df7`), Opus-reviewed (PASS WITH FINDINGS), fixes `a0abf63`, accepted; `npm run verify` exit 0 (460 unit, 28 e2e). **T4b in progress** (canonical and export JSON, serialization fixtures, export guard).
 - [ ] T5 JSON Schema subset for `configSchema`, UI hints separated, explicit `applyDefaults`, `groq` and a single `PROVIDERS` constant (H1, P1 revised)
 - [ ] T6 Versioned node migrations; `agent.autonomous` v2 as the first real migration (H3)
 - [ ] T7 Non-blocking editor warnings, category- and direction-aware (D-017, D-018)
@@ -207,8 +207,8 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1, T2, T3 done; milestone MS-A reached and awaiting the PO's review; T4 starts after that review.** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones. Phase 2 is **proposed only** and unauthorized.
-- **Last completed task:** Session 9: T3 (shared fixtures and the TypeScript runner) implemented, reviewed by Opus, fixed and accepted; Lesson L3 written; milestone MS-A reached. Earlier: T2 (Session 8), T1 (Session 6). Documentation commits `b7e5cbc`, `db451da`, `cf738b5` were made and pushed by others.
+- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 to T3 and T4a done (MS-A approved by the PO); T4b in progress.** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones (next: MS-B after T6). Phase 2 is **proposed only** and unauthorized.
+- **Last completed task:** Session 10: T4a (strict JSON parsing and policy limits) implemented, reviewed by Opus, fixed and accepted; Lesson L4 written; Docker Desktop verified. Earlier: T3 (Session 9), T2 (Session 8), T1 (Session 6). Documentation commits `b7e5cbc`, `db451da`, `cf738b5` were made and pushed by others.
 - **Last code commit:** `35fe3bc`.
 
 ### Verification results (actual, run 2026-11-03)
@@ -227,6 +227,15 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 **The browser script is not in the repository.** It ran from a scratch directory with `playwright-core` and the locally installed Chrome. It is therefore not reproducible from the repo, and repo-based E2E remains deferred (open question 2).
 
+### Verification results, Session 10 (Phase 1.1 T4a; actual, 2026-11-04)
+
+| Check | Result |
+|---|---|
+| `npm run verify` at `a0abf63` (run by the Principal Architect) | **exit 0**: oxlint clean; **12 files, 460 unit tests passed** (185 before T4a; 456 after `9477df7`; 460 after `a0abf63`); build ok; **28 e2e tests passed** (27 before) |
+| Fixtures | 153 case files: workflow/valid 19, workflow/invalid 97, connection 22, config 15 |
+| Opus review of `9477df7` | PASS WITH FINDINGS, no blockers/majors; the reviewer ran `npm run verify` itself (green), compared the number classifier with a post-conversion classifier on 300,000 tokens (0 differences), verified depth and size boundaries independently, timed 5 MB inputs as linear |
+| Invisible/decoded-escape scan of `frontend/src`, `frontend/e2e`, `contracts` | only the deliberate `é` and an emoji remain |
+| Mutation checks (by the implementer; not repeated by Claude) | `Number.isSafeInteger(Number(token))`: 50 failures; duplicates before decoding: 6; characters not bytes: 2; plain assignment (`__proto__`): 5; one mutation (post-conversion magnitude check) is an **equivalent mutant**, undetectable by design and recorded |
 ### Verification results, Session 9 (Phase 1.1 T3; actual, 2026-11-03)
 
 | Check | Result |
@@ -303,6 +312,9 @@ Small implementation choices made in Session 2 without a decision entry (flagged
 24. **The `b299782` fix and Lesson L3 had no second Opus review**, only the Principal Architect's verification (same limitation as T2's last fix). The tutor's real-world parallels (conformance suites, golden files) are general knowledge and unverified in the repository.
 25. **Fixture files are read with `JSON.parse`**, so a duplicate key inside a fixture file is not detected until the strict parser exists (T4). The fixture runner needs Node 20.12 or newer (`package.json` has no `engines` field; CI and local use Node 24).
 26. **A 5 MB fixture blob is in the history of `e28483d`** (about 23 KB compressed). History is never rewritten, so it stays; the working tree no longer contains it.
+27. **Docker Desktop is installed and running (verified by Claude, 2026-11-04).** It is a **per-user install** (`C:\Users\shail\AppData\Local\Programs\DockerDesktop`, Docker Desktop 4.97.0, found through the registry and running processes; an earlier check looked only in `Program Files` and wrongly concluded it was missing). The engine answers on its named pipe: `docker` client and server 29.9.2 (linux/amd64), Docker Compose v5.6.1, WSL 2 backend (Ubuntu), 8 CPUs and about 8 GB of memory available to it, context `desktop-linux`, **0 containers and 0 images**. `docker` is **not on this shell's PATH**: use `C:\Users\shail\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe` (or add that folder to the PATH). Nothing was pulled or started. It unblocks nothing yet: Phase 2 is unauthorized.
+28. **An untracked `.kilo/` folder** (2 small files from another tool, created 2026-11-04 00:35) exists in the repository root. It is not ours, is not committed and is left alone; the PO may want to add it to `.gitignore` or delete it.
+29. **Safeguard 1 (token-level number decision) is met in structure but cannot be observed in behaviour** (equivalent mutant, see `docs/PHASE1_1_PLAN.md`). **Other messages that echo attacker-controlled ids, types or `schemaVersion` are not length-bounded** (the Toolbar truncates the display to 200 characters). The config panel's typed JSON still uses the built-in `JSON.parse` until T4b.
 
 ## 10. Open Questions
 
@@ -350,13 +362,14 @@ Do not invent implementation status, test results, commit IDs, or decisions.
 
 > Tracked **separately from implementation progress** (D-028). The curriculum is `docs/LEARNING.md`; the evidence is in `docs/LEARNING_GUIDE.md`. A topic is Understood only with evidence from the Product Owner's answers.
 
-- **Current learning module:** Module 3, Workflow JSON and State Management (structured validation errors, shared fixtures), via **Lessons L2 and L3**; Module 1 (contract-first design) via **Lesson L3**; Module 12 (testing and CI, data-driven tests) via **Lessons L1 and L3**. Recommended next: Modules 1, 2 and the rest of Module 3 (they describe code that already exists).
+- **Current learning module:** Module 3, Workflow JSON and State Management (structured validation errors, shared fixtures, strict parsing and the policy limits), via **Lessons L2, L3 and L4**; Module 1 (contract-first design, the limits as part of the contract) via **Lessons L3 and L4**; Module 12 (testing and CI, data-driven tests, trust boundaries, mutation testing) via **Lessons L1, L3 and L4**. Recommended next: Modules 1, 2 and the rest of Module 3 (they describe code that already exists).
 - **Concepts explained:**
   - **L1 (taught 2026-11-03):** end-to-end versus unit tests, fixtures and helpers, auto-waiting assertions, flaky tests and retries, vacuous tests and fault injection, continuous integration, supply-chain pinning by commit SHA.
   - **L2 (taught 2026-11-03, after Phase 1.1 T2):** machine-readable versus human-readable errors, stable namespaced error codes, JSON Pointer (RFC 6901), string-literal union types and compile-time exhaustiveness, validating untrusted input at a boundary (own-property lookups), table-driven and guard tests, errors versus warnings (D-018).
   - **L3 (taught 2026-11-03, after Phase 1.1 T3):** contract-first design with a shared contract between two implementations (language-neutral fixtures in `contracts/`; the Python runner is planned for Phase 2 and no parity is claimed), data-driven tests with data kept apart from code, comparing `{code, path}` as multisets and never the message, rule order in `checkConnection` as part of the contract, the import semantics a second implementation must follow, coverage guards and minimum-count floors, the catalog drift test with fail-on-purpose regeneration, `inputRepeat` (a generator spec instead of a 5 MB file), circular tests and expectations written from the specification, and mutation checks.
+  - **L4 (taught 2026-11-04, after Phase 1.1 T4a):** why the built-in `JSON.parse` is not enough for an untrusted file (last duplicate key wins, lenient decoding of invalid bytes, big integers rounded), the strict RFC 8259 parser (`strictJson.ts`), the policy limits and where each rule comes from (RFC, I-JSON / RFC 8785, AgentForge policy, PostgreSQL compatibility), deciding a number's range from its token text, size in UTF-8 bytes, depth counted as containers open, the byte order mark and strict UTF-8, safe object construction (`__proto__`), round-trip integrity for values typed in the editor (`valuePolicy.ts`), rejecting rather than repairing, bounded error messages, boundary-value and differential tests, and mutation testing with an equivalent mutant (TypeScript only; Python parity is planned for Phase 2 and not claimed).
   - **Primer (reference only, no lesson, no evidence):** workflow, node, port, edge, catalog, config schema, `schemaVersion` versus `typeVersion`, validation versus warnings, DAG, credentials.
 - **Topics understood:** **none yet.** By design (D-029) answers are collected in one dedicated learning session at the end of the project; no per-lesson questions are asked in conversation.
 - **Topics requiring revision:** none recorded.
-- **Next learning objective:** keep building; each completed task gets a lesson ending in a Knowledge Check (next: Lesson L4 after T4, strict parsing and canonical JSON). The evaluation session happens at the end of the project.
+- **Next learning objective:** keep building; each completed task gets a lesson ending in a Knowledge Check (next: Lesson L5 after T4b, canonical and export JSON). The evaluation session happens at the end of the project.
 - **Module status summary:** Modules 1, 3 and 12 In Progress; Modules 2 and 4 to 11 Not Started.

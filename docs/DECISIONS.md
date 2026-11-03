@@ -37,6 +37,7 @@
 | D-028 | Learning requirement: curriculum, teaching record, tutor agent, evidence rule (permanent; evaluation protocol amended by D-029) | **Approved** |
 | D-029 | Review cadence (Opus reviews every task, Architect accepts, PO at milestones) and learning-check protocol (Knowledge Check at the end of each lesson; one evaluation session at the end) | **Approved** |
 | D-030 | Claude works on local files only; the Product Owner pushes to GitHub when they choose | **Approved** |
+| D-031 | T4 split into T4a (strict parsing and policy checks) and T4b (canonical and export JSON); number policy as one magnitude rule; editor values obey the same policy | **Approved** (Principal Architect, within D-022 and D-026) |
 
 ---
 
@@ -250,3 +251,13 @@
 - **Status:** Approved (Product Owner, 2026-11-03, Session 8)
 - **Decision:** Claude (all roles and subagents) works only on the local repository and **does not need GitHub**. All checks that matter for acceptance run locally (`npm run verify`). The Product Owner pushes to GitHub when they choose. Claude never pushes, fetches or pulls, and does not read GitHub state. Any CI result is **PO-reported**.
 - **Consequences:** GitHub CI adds one thing the local run cannot: a Linux run (the local runs are Windows). It is checked when the Product Owner pushes and reports. There is no off-machine backup until the Product Owner pushes, so the Principal Architect suggests pushing at the milestones (after T3, T6 and T10). Pushes have previously happened automatically shortly after local commits (see `docs/DEVELOPMENT_LOG.md` Sessions 5 to 7); if the Product Owner wants to push only at completion, any automatic sync in their own tooling should be turned off. Claude cannot control that.
+
+## D-031 — T4 split, number policy and editor value policy
+- **Status:** Approved (Principal Architect, 2026-11-04, Session 10; within the scope approved in D-022 and D-026, so no Product Owner decision is required; the Product Owner may overrule).
+- **Decision:**
+  - T4 is split into **T4a** (strict JSON parsing with the AgentForge policy limits) and **T4b** (canonical compact JSON, pretty export JSON, `serializeWorkflow` and the serialization fixtures), each implemented, independently reviewed and accepted separately. The order T1 to T10 and the milestones are unchanged.
+  - **Number policy:** one rule, **the magnitude of every number must be at most 2^53 - 1**, decided from the **token text before any JavaScript number conversion** (binding safeguard 1 of D-026). It is equivalent to "integers must be safe integers" because every IEEE double of magnitude 2^53 or more is an integer. A token beyond the double range is `value.not-finite`. A post-conversion backstop rejects a token that passed the text check but rounds up to 2^53. This is **AgentForge policy**, not an RFC 8785 requirement.
+  - **Editor values obey the same policy** (`valuePolicy.ts`): a number, string or nested JSON a user types into the config panel is checked with the same limits (finite, magnitude, no NUL, no lone surrogates, depth counted from the config's position in the document), so a workflow the editor lets you export can always be re-imported.
+  - **Fixture format:** a workflow case may use exactly one of `input`, `inputText`, `inputRepeat` or the new `inputBytesBase64` (raw bytes, for invalid UTF-8 and BOM cases).
+  - **Import takes bytes:** `importWorkflow(input: string | Uint8Array, ...)`; the size limit is 5,000,000 UTF-8 bytes (C2), checked before parsing; a UTF-8 BOM is stripped; invalid UTF-8 is `doc.invalid-encoding` (the browser's `File.text()` would silently substitute replacement characters, hiding corrupt input).
+- **Consequences:** `JSON.parse` leaves the import path; Python must later implement the same checks (planned Phase 2; not claimed).

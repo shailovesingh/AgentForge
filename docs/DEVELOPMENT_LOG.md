@@ -562,3 +562,50 @@ T4 (strict parsing, canonical JSON and export JSON), only after the MS-A review 
 **Addendum to Session 9: a documentation bug found by the tutor, fixed in `058faae`.**
 While writing Lesson L3 the tutor compared `contracts/README.md` with the code and found that the README said a node rejected for "any config error" is not added. In `validate.ts` a node whose only problems are config errors **is** still added (the errors are reported, the node is kept), so edges to it are checked normally. Only three cases are not added: a malformed node, a duplicate id (the second occurrence is blamed and dropped) and an unknown type. A second implementation (the future Python runner) following the README would have got this wrong, and no fixture pinned it. Fix by the Sonnet implementer: the README import-semantics section was corrected and re-read against the code (including the edge-checking order), one fixture was added (`wf-invalid-config-error-node-still-connectable`: a config-error node with a valid edge to it yields exactly one `schema.enum` error and no `connection.unknown-node`), and the floors were raised (total 75, invalid 31). The implementer's mutation check (making `validate.ts` drop config-error nodes) failed the new fixture and also an existing serialize test.
 Principal Architect verification of `058faae`: `npm run verify` exit 0, **185 unit tests and 27 e2e tests**; fixtures now 75 (valid 7, invalid 31, connection 22, config 15); `git diff b299782 HEAD -- frontend/src` shows only the one-line floor change in `fixtures.test.ts`. The counts quoted earlier in Session 9 (74 fixtures, 184 unit tests) were correct at `b299782`.
+
+---
+
+### Session: 10 / 2026-11-04
+
+**Phase:**
+Phase 1.1: milestone MS-A approved; T4a (strict JSON parsing) implemented, reviewed, fixed and accepted; T4b started
+
+**Product Owner decisions this session:** MS-A reviewed; **continue with T4**. Docker Desktop installed; the PO asked me to access it (below).
+
+**Docker Desktop (verified by Claude, read-only):** a per-user install (`C:\Users\shail\AppData\Local\Programs\DockerDesktop`, Docker Desktop 4.97.0), running on the WSL 2 backend; the engine answers: client and server 29.9.2 (linux/amd64), Docker Compose v5.6.1, context `desktop-linux`, 8 CPUs and about 8 GB of memory, 0 containers, 0 images. `docker` is not on this shell's PATH (full path: `...\DockerDesktop\resources\bin\docker.exe`). An earlier check in this session looked only in `Program Files` and wrongly concluded Docker was missing; it was corrected. Nothing was pulled or started. Phase 2 remains unauthorized.
+
+**Other observation:** an untracked `.kilo/` folder (2 small files from another tool) appeared in the repository root. It is not ours; left untracked and uncommitted.
+
+**Decision D-031 (Principal Architect, within D-022 and D-026):** T4 split into **T4a** (strict parsing and policy checks) and **T4b** (canonical compact JSON, pretty export JSON, serialization fixtures); number policy stated as one rule (magnitude at most 2^53 - 1, decided from the token text before conversion); values typed in the editor obey the same policy; fixture field `inputBytesBase64`; `importWorkflow` takes bytes.
+
+**T4a: strict JSON parsing (commits in order):**
+
+| Commit | What |
+|---|---|
+| `9477df7` | Sonnet implementer: `strictJson.ts` (`strictParse`, `classifyNumber`): RFC 8259 grammar, duplicate keys rejected after decoding escapes, depth 64 with root = 1, NUL, lone surrogates, token-level number analysis with a rounding backstop, safe object building (`Object.defineProperty`); `valuePolicy.ts` and its use in `parseConfigInput`; `importWorkflow(string or bytes)` with a 5,000,000-UTF-8-byte limit, BOM stripped, fatal UTF-8 decoding; seven new error codes (30 total); fixture field `inputBytesBase64`; 78 new fixtures (153 total: valid 19, invalid 97, connection 22, config 15). 185 to 456 unit tests, 28 e2e. |
+| `a0abf63` | Sonnet implementer, review fixes (below). 460 unit tests, 28 e2e. |
+
+**Independent review (Opus 5.5, read-only) of `9477df7`: PASS WITH FINDINGS, no blockers, no majors.** What it verified: it compared `classifyNumber` with a post-conversion-only classifier on **300,000 generated tokens: 0 differences**; checked depth with its own bracket counter (valid 64, invalid 65, 64 pointer segments); confirmed a 200,000-deep input is rejected in about 1 ms with no stack overflow; timed 5 MB inputs as linear (0.03 to 0.63 s depending on shape); sampled about 35 fixtures against the plan's rules, not the code, and found them correct. Findings and triage (all fixed in `a0abf63` unless stated):
+
+| # | Finding | Disposition |
+|---|---|---|
+| Minor 1 | A test commented "a lone surrogate" actually contained the ordinary character U+FFFD (the file tool decoded the escape on write), so the lone-surrogate branch of the size function was untested | **Fixed**: built with `String.fromCharCode(0xD800)` at run time; boundaries for lone surrogate (3 bytes) and valid pair (4 bytes); mutation proof (counting every high surrogate as 4 bytes fails the test) |
+| Minor 2 | Messages echoed attacker text without a length cap (a 2,000,000-character duplicate key gave a 2 MB message) | **Fixed**: echoed text in messages bounded to 100 characters plus an ellipsis; the exact `path` stays in the error object; the Toolbar displays at most 200 characters of a message or path. *Not bounded:* other messages that echo ids, types or `schemaVersion` (the display truncation covers the UI); recorded as a minor follow-up |
+| Minor 3 | The editor policy has no size check, so a huge pasted text could be exported but not re-imported | **Carried to T4b** (export guard checks byte length) |
+| Minor 4 | The number-token analysis is an **equivalent mutant**: no test can distinguish it from a post-conversion check | **Accepted and recorded** in the plan: safeguard 1 is met in structure but cannot be observed in behaviour; the mutation D-026 names (`JSON.parse` + `Number.isSafeInteger`) is caught by 50 tests |
+| Nits | Invisible U+FEFF literals typed in four source files; README example lost its escape; the `JSON.parse` guard test covered one file; the truncation fuzz asserted only `ok === false`; two wrong test comments; a dead `-0` in a generator | **Fixed**: run-time construction; README reworded; guard covers `serialize.ts`, `strictJson.ts`, `migrate.ts`, `validate.ts`; fuzz asserts one structured error with a known code; comments corrected; "at position N" documented as UTF-16 code units. *Accepted, not changed:* non-canonical base64 padding in the fixture shape check; the parser's internal catch-all reports `doc.not-json` (kept; carried to T4b as a possible distinct internal-error message) |
+| Docs | `LEARNING_GUIDE.md` (lines about the 5 MiB limit) and the plan (an example that had lost its escape) were stale | **Fixed by the Principal Architect** |
+
+**A tool hazard found and fixed at the source:** twice the file-writing tool turned a backslash-u escape in written content into the actual character (the surrogate test above, and the README example). It is now a documented rule in `.claude/agents/implementer.md` ("Gotcha": build such characters at run time, describe escapes in words, read the file back). One more implementer note: a `sed` replacement can swallow a backslash-u as well.
+
+**Verification by the Principal Architect (commands actually run):** `npm run verify` in `frontend/` at `9477df7`: exit 0, 11 files, 456 unit tests, 28 e2e; and at `a0abf63`: **exit 0, 12 files, 460 unit tests, 28 e2e**. Also: `git show --stat`, fixture counts (valid 19, invalid 97, connection 22, config 15), no `JSON.parse(` on the import path (the only remaining one is the config panel's typed JSON, carried to T4b), and a scan of `frontend/src`, `frontend/e2e` and `contracts` showing the only non-ASCII characters are the deliberate `é` and an emoji in tests. The implementer's mutation checks (a1 `Number.isSafeInteger(Number(token))`: 50 failures; b duplicates before decoding: 6; c characters not bytes: 2; d plain assignment so `__proto__` sets a prototype: 5) were not repeated by Claude.
+
+**Carry-overs into T4b (also in `docs/PHASE1_1_PLAN.md`):** export guard (policy for the whole workflow including name and labels, byte length, refuse non-JSON data); strict parser for typed JSON in the config panel; a possible distinct internal-error message.
+
+**Process disclosures:** the `a0abf63` fix commit had only the Principal Architect's verification, no second Opus pass (as with earlier fix commits). The Opus reviewer ran `npx --no-install vitest` once (local binary only, no network) and copied three source files to the scratchpad for probing; nothing in the repository was edited. No remote git operation by Claude. `main` was ahead of `origin/main` by 15 commits at the last check; whether the PO has pushed since is unknown.
+
+**Status:**
+T4a **accepted** by the Principal Architect. T4b in progress (implementer); Lesson L4 in progress (tutor).
+
+**Next Task:**
+T4b, then its review; then T5 (JSON Schema subset, defaults, `groq`).
