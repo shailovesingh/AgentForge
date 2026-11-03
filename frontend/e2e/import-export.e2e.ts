@@ -39,6 +39,24 @@ test.describe('export', () => {
     expect(text.includes('\r')).toBe(false)
   })
 
+  test('refuses to export a name with a NUL character: error panel, no file', async ({ editor }) => {
+    await editor.buildPipeline()
+    const NUL = String.fromCharCode(0) // built at run time: a NUL cannot be stored in a source file
+    await editor.page.getByLabel('Workflow name').fill('a' + NUL + 'b')
+
+    let downloads = 0
+    editor.page.on('download', () => downloads++)
+    await editor.page.getByRole('button', { name: 'Export' }).click()
+
+    const alert = editor.toolbar.getByRole('alert')
+    await expect(alert.getByText('Export failed. No file was created.', { exact: true })).toBeVisible()
+    await expect(alert.getByText('value.nul-character', { exact: true })).toBeVisible()
+    await expect(alert.getByText('at /name', { exact: true })).toBeVisible()
+    // A download would be reported shortly after the click; give it a moment, then require silence.
+    await editor.page.waitForTimeout(1000)
+    expect(downloads).toBe(0)
+  })
+
   test('contains no React Flow fields', async ({ editor }) => {
     await editor.buildPipeline()
     const { text } = await editor.exportWorkflow()

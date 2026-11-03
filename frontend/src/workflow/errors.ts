@@ -33,6 +33,9 @@ export const ERROR_CODES = [
   'value.unsafe-integer',
   'value.invalid-unicode',
   'value.nul-character',
+  // EXPORT-ONLY: produced by exportWorkflowText for a value that is not JSON data (undefined, a Date,
+  // a function, a bigint ...). An imported file can never produce it, because parsed JSON is always data.
+  'value.not-json-data',
 ] as const
 
 export type ErrorCode = (typeof ERROR_CODES)[number]

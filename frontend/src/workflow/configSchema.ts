@@ -1,6 +1,6 @@
 import type { ErrorCode } from './errors'
 import type { ConfigProperty, ConfigSchema } from './types'
-import { strictParse } from './strictJson'
+import { INTERNAL_PARSER_ERROR, strictParse } from './strictJson'
 import { POLICY_MESSAGES, findPolicyViolations } from './valuePolicy'
 import type { PolicyCode } from './valuePolicy'
 
@@ -65,7 +65,8 @@ export function parseConfigInput(
     const parsed = strictParse(raw)
     if (!parsed.ok) {
       const { code, message } = parsed.error
-      if (code === 'doc.not-json') return { ok: false, error: 'must be valid JSON' }
+      // A typo in the text is "must be valid JSON"; an internal parser failure must not look like a typo.
+      if (code === 'doc.not-json') return { ok: false, error: message === INTERNAL_PARSER_ERROR ? message : 'must be valid JSON' }
       // Policy problems keep the wording used for typed values; a duplicate key shows the parser's bounded message.
       return { ok: false, error: Object.hasOwn(POLICY_MESSAGES, code) ? POLICY_MESSAGES[code as PolicyCode] : message }
     }

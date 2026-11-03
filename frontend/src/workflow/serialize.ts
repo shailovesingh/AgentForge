@@ -29,12 +29,40 @@ export const exportTooLarge = (): ValidationError => ({
 })
 
 /**
+ * Copies only the known Workflow fields, so an extra field on an in-memory object (for example a React
+ * Flow `selected`) can never reach a file. `config` and `metadata` are arbitrary JSON and stay as they are.
+ */
+function projectWorkflow(w: Workflow): Workflow {
+  return {
+    schemaVersion: w.schemaVersion,
+    id: w.id,
+    name: w.name,
+    description: w.description,
+    nodes: w.nodes.map((n) => ({
+      id: n.id,
+      type: n.type,
+      typeVersion: n.typeVersion,
+      label: n.label,
+      config: n.config,
+      position: { x: n.position.x, y: n.position.y },
+    })),
+    edges: w.edges.map((e) => ({
+      id: e.id,
+      source: { nodeId: e.source.nodeId, port: e.source.port },
+      target: { nodeId: e.target.nodeId, port: e.target.port },
+    })),
+    metadata: w.metadata,
+  }
+}
+
+/**
  * Serializes a workflow to the exported JSON text (profile `export-json/1`: keys sorted at every level,
- * so the top level is alphabetical). Throws for values that are not valid JSON data; the UI calls
- * `exportWorkflowText`, which checks first and returns structured errors instead.
+ * so the top level is alphabetical), writing only the known Workflow fields. This is the low-level
+ * writer and THROWS for values that are not valid JSON data; the UI calls `exportWorkflowText`, which
+ * checks first and returns structured errors instead.
  */
 export function serializeWorkflow(workflow: Workflow): string {
-  return exportPretty(workflow)
+  return exportPretty(projectWorkflow(workflow))
 }
 
 /** UTF-8 byte length of a string without encoding it; stops counting once the limit is passed. */
@@ -55,12 +83,21 @@ function utf8Length(text: string, limit: number): number {
 /**
  * The export guard: checks the whole workflow against the value policy (name, labels, config values,
  * metadata) and the size limit BEFORE a file is written, and returns structured errors instead of
- * throwing. A workflow that passes can always be imported again.
+ * throwing, whatever the value. A workflow that passes can always be imported again.
  */
 export function exportWorkflowText(workflow: Workflow): { ok: true; text: string } | { ok: false; errors: ValidationError[] } {
-  const violations = findPolicyViolations(workflow, 0)
-  if (violations.length > 0) return { ok: false, errors: violations }
-  const text = exportPretty(workflow)
+  let text: string
+  try {
+    const projected = projectWorkflow(workflow) // checked and written the same way: what is not written cannot block the export
+    const violations = findPolicyViolations(projected, 0)
+    if (violations.length > 0) return { ok: false, errors: violations }
+    text = exportPretty(projected)
+  } catch (e) {
+    // Not JSON data (undefined, an array hole, a Date, a function, a bigint ...): the policy check does not see those.
+    const message = e instanceof Error ? e.message : ''
+    const at = message.startsWith('Cannot write JSON: ') ? message.indexOf(' at /') : -1 // the writer names the JSON Pointer
+    return { ok: false, errors: [{ code: 'value.not-json-data', path: at < 0 ? '' : message.slice(at + 4), message: 'The workflow contains a value that is not JSON data.' }] }
+  }
   if (utf8Length(text, MAX_IMPORT_BYTES) > MAX_IMPORT_BYTES) return { ok: false, errors: [exportTooLarge()] }
   return { ok: true, text }
 }

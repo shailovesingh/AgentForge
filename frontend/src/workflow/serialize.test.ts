@@ -3,6 +3,7 @@ import { nodeDefinitions } from '../catalog'
 import { parseConfigInput } from './configSchema'
 import { ERROR_CODES } from './errors'
 import { MIGRATIONS, migrate } from './migrate'
+import { INTERNAL_PARSER_ERROR } from './strictJson'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importWorkflow, serializeWorkflow } from './serialize'
 import configSchemaSource from './configSchema.ts?raw'
 import serializeSource from './serialize.ts?raw'
@@ -161,6 +162,86 @@ describe('exportWorkflowText (the export guard)', () => {
     const name = 'é'.repeat(MAX_IMPORT_BYTES / 2 + 1)
     expect(name.length).toBeLessThan(MAX_IMPORT_BYTES)
     expect(toPairs(exportWorkflowText(withName(name)))).toEqual([{ code: 'doc.too-large', path: '' }])
+  })
+
+  // Values that are not JSON data are invisible to the policy check; the writer refuses them, and the
+  // guard must turn that refusal into a structured error instead of letting it throw.
+  describe('values that are not JSON data (value.not-json-data, export only)', () => {
+    const sparse: unknown[] = [1, 2, 3]
+    delete sparse[1] // an array hole
+    const cases: [string, Record<string, unknown>, string][] = [
+      ['undefined', { payload: { a: undefined } }, '/nodes/0/config/payload/a'],
+      ['an array hole', { payload: { a: sparse } }, '/nodes/0/config/payload/a/1'],
+      ['a Date', { payload: new Date(0) }, '/nodes/0/config/payload'],
+      ['a function', { payload: { f: () => 1 } }, '/nodes/0/config/payload/f'],
+      ['a bigint', { payload: { n: BigInt(5) } }, '/nodes/0/config/payload/n'],
+    ]
+
+    test.each(cases)('%s is a structured error with its pointer, and nothing throws', (_what, config, path) => {
+      const wf = structuredClone(sample)
+      wf.nodes[0].config = config // assigned after the clone: structuredClone would refuse a function
+      let r: ReturnType<typeof exportWorkflowText> | undefined
+      expect(() => (r = exportWorkflowText(wf))).not.toThrow()
+      expect(r?.ok).toBe(false)
+      expect(r?.ok ? [] : r?.errors.map(({ code, path }) => ({ code, path }))).toEqual([{ code: 'value.not-json-data', path }])
+      if (r && !r.ok) expect(r.errors[0].message).toBe('The workflow contains a value that is not JSON data.')
+      // the low-level writer is documented to throw
+      expect(() => serializeWorkflow(wf)).toThrow(/Cannot write JSON/)
+    })
+
+    test('a bigint in the metadata is reported at its own pointer', () => {
+      const wf = { ...sample, metadata: { big: BigInt(1) } }
+      expect(toPairs(exportWorkflowText(wf))).toEqual([{ code: 'value.not-json-data', path: '/metadata/big' }])
+    })
+
+    test('a malformed in-memory workflow gives the code with the whole document as the path, not a throw', () => {
+      const broken = { ...sample, nodes: undefined } as unknown as Workflow
+      expect(toPairs(exportWorkflowText(broken))).toEqual([{ code: 'value.not-json-data', path: '' }])
+    })
+  })
+})
+
+describe('export writes only the Workflow fields (projection)', () => {
+  const dirty = (): Workflow => {
+    const wf = structuredClone(sample) as Workflow & Record<string, unknown>
+    wf.extra = 'top-level extra'
+    wf.selected = false
+    const n = wf.nodes[0] as unknown as Record<string, unknown>
+    n.selected = true
+    n.measured = { width: 1, height: 2 }
+    ;(n.position as Record<string, unknown>).z = 3
+    const e = wf.edges[0] as unknown as Record<string, unknown>
+    e.sourceHandle = 'data'
+    ;(e.source as Record<string, unknown>).extra = 1
+    return wf
+  }
+
+  test('extra fields on in-memory objects never reach the text', () => {
+    const r = exportWorkflowText(dirty())
+    expect(r.ok && r.text).toBe(serializeWorkflow(sample))
+    const text = serializeWorkflow(dirty())
+    expect(text).toBe(serializeWorkflow(sample))
+    for (const word of ['extra', 'selected', 'measured', 'sourceHandle', '"z"', 'width']) expect(text.includes(word), word).toBe(false)
+  })
+
+  test('an extra field with a bad value does not block the export either', () => {
+    const wf = dirty() as Workflow & Record<string, unknown>
+    wf.extra = NaN
+    wf.undefinedExtra = undefined
+    expect(exportWorkflowText(wf)).toEqual({ ok: true, text: serializeWorkflow(sample) })
+  })
+
+  test('export -> import -> export stays byte-identical', () => {
+    const first = serializeWorkflow(dirty())
+    const imported = imp(first)
+    expect(imported.ok).toBe(true)
+    if (imported.ok) expect(serializeWorkflow(imported.workflow)).toBe(first)
+  })
+
+  test('config and metadata are written as they are (arbitrary JSON)', () => {
+    const wf = { ...sample, metadata: { zeta: { selected: true }, alpha: [1] } }
+    const parsed = JSON.parse(serializeWorkflow(wf)) as { metadata: unknown }
+    expect(parsed.metadata).toEqual({ zeta: { selected: true }, alpha: [1] })
   })
 })
 
@@ -388,6 +469,11 @@ describe('parseConfigInput', () => {
     expect(parseConfigInput(payload, '{"a":1}')).toEqual({ ok: true, value: { a: 1 } })
     expect(parseConfigInput(payload, '{a')).toEqual({ ok: false, error: 'must be valid JSON' })
     expect(parseConfigInput(payload, '[1]')).toEqual({ ok: false, error: 'must be a JSON object' })
+  })
+
+  test('an internal parser failure shows the internal message, not the typo message', () => {
+    // A non-string raw value makes strictParse throw inside itself; the panel must not say "must be valid JSON".
+    expect(parseConfigInput(payload, undefined as unknown as string)).toEqual({ ok: false, error: INTERNAL_PARSER_ERROR })
   })
 
   test('a duplicate key typed into a JSON setting is flagged and not committed', () => {

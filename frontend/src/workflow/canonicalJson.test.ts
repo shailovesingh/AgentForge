@@ -360,7 +360,25 @@ function referenceString(s: string): string {
 describe('property test over seeded random JSON-like values', () => {
   test('canonicalCompact matches the reference writer, round-trips through the strict parser and is stable', () => {
     const r = rng(20261104)
-    let withIntegerLikeKeys = 0
+    // Measured on the generated VALUES (not on the output text): objects that mix integer-like keys
+    // ("0", "9", "10": JavaScript lists these first) with other keys, the nesting levels they occur at,
+    // and how many of them are in an order different from the sorted order (the case a naive writer gets wrong).
+    const isIntegerLike = (k: string) => /^(0|[1-9]\d*)$/.test(k)
+    const mixedAtDepth = new Map<number, number>()
+    const reorderedAtDepth = new Map<number, number>()
+    const bump = (m: Map<number, number>, depth: number) => m.set(depth, (m.get(depth) ?? 0) + 1)
+    const survey = (v: unknown, depth: number) => {
+      if (Array.isArray(v)) return v.forEach((item) => survey(item, depth + 1))
+      if (typeof v !== 'object' || v === null) return
+      const keys = Object.keys(v)
+      const ints = keys.filter(isIntegerLike).length
+      if (ints > 0 && ints < keys.length) {
+        bump(mixedAtDepth, depth)
+        const sorted = [...keys].sort()
+        if (keys.some((k, i) => k !== sorted[i])) bump(reorderedAtDepth, depth)
+      }
+      for (const k of keys) survey((v as Record<string, unknown>)[k], depth + 1)
+    }
     for (let i = 0; i < 1500; i++) {
       const v = randomValue(r, 0)
       const compact = canonicalCompact(v)
@@ -368,9 +386,16 @@ describe('property test over seeded random JSON-like values', () => {
       const parsed = parse(compact)
       expect(parsed, `case ${i}`).toEqual(v)
       expect(canonicalCompact(parsed), `case ${i}: not stable`).toBe(compact)
-      if (/\{"\d/.test(compact)) withIntegerLikeKeys++
+      survey(v, 0)
     }
-    expect(withIntegerLikeKeys, 'the generator must produce integer-like keys').toBeGreaterThan(20)
+    const levels = [...mixedAtDepth.keys()]
+    const mixedTotal = [...mixedAtDepth.values()].reduce((a, b) => a + b, 0)
+    expect(levels.length, `integer-like keys mixed with other keys occur at levels ${levels.join(',')}`).toBeGreaterThanOrEqual(3)
+    expect(mixedTotal, 'objects mixing integer-like and other keys').toBeGreaterThan(20)
+    const reorderedLevels = [...reorderedAtDepth.keys()]
+    const reorderedTotal = [...reorderedAtDepth.values()].reduce((a, b) => a + b, 0)
+    expect(reorderedLevels.length, `objects whose JavaScript key order differs from the sorted order occur at levels ${reorderedLevels.join(',')}`).toBeGreaterThanOrEqual(3)
+    expect(reorderedTotal, 'objects whose JavaScript key order differs from the sorted order').toBeGreaterThan(5)
   })
 
   test('exportPretty round-trips, is idempotent and has the same canonical form', () => {

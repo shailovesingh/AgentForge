@@ -32,14 +32,15 @@ The source of every rule is stated so that an AgentForge policy is never mistake
 | 5 | Object member names must be unique. | I-JSON (RFC 7493), which JCS requires of its input. AgentForge enforces it **at parse time** (`doc.duplicate-key`). |
 | 6 | Strings and keys must be valid Unicode: no unpaired surrogate. | I-JSON / JCS. Code `value.invalid-unicode`. |
 | 7 | Numbers must be finite. | I-JSON. Code `value.not-finite`. |
-| 8 | **The magnitude of every number must be at most 2^53 - 1** (9007199254740991). | **AgentForge policy**, not an RFC 8785 rule: it keeps TypeScript and Python in exact agreement and avoids silent precision loss. Code `value.unsafe-integer`. |
+| 8 | **The magnitude of every number must be at most 2^53 - 1** (9007199254740991). | **AgentForge policy**, not an RFC 8785 rule: it is meant to keep TypeScript and Python in exact agreement (planned for Phase 2; not yet verified) and avoids silent precision loss. Code `value.unsafe-integer`. |
 | 9 | **Strings and keys must not contain U+0000.** | **AgentForge / PostgreSQL `jsonb` compatibility rule.** It is **not** an RFC 8785 rule: PostgreSQL cannot store the NUL character. Code `value.nul-character`. |
 | 10 | Nesting depth is at most **64**, with the root value at depth 1. | AgentForge policy (stack safety; Python and JavaScript recursion limits differ). Code `doc.too-deep`. |
 | 11 | A document is at most **5,000,000 UTF-8 bytes**. | AgentForge policy. Code `doc.too-large`. |
-| 12 | **No Unicode normalization.** Strings and keys are preserved exactly, so e-acute and `e` followed by U+0301 are different. | AgentForge policy. |
+| 12 | **A UTF-8 byte order mark is tolerated and stripped on input and never written.** Invalid UTF-8 is rejected. | AgentForge policy. Code `doc.invalid-encoding`. |
+| 13 | **No Unicode normalization.** Strings and keys are preserved exactly, so e-acute and `e` followed by U+0301 are different. | AgentForge policy. |
 
-Rules 5 to 11 are about which values are accepted. The writers enforce the value rules
-themselves (6 to 10) and **throw** an `Error` that names the problem and the JSON Pointer when given
+Rules 5 to 11 are about which values are accepted. The low-level writers (`canonicalCompact` and
+`exportPretty`) enforce the value rules themselves (6 to 10) and **throw** an `Error` that names the problem and the JSON Pointer when given
 a value that breaks them. They also refuse anything that is not JSON data: `undefined`, a function, a
 symbol, a bigint, a non-plain object (Map, Set, Date, class instance), and a circular structure.
 Only own enumerable string keys are written, and a key named `__proto__` is an ordinary key.
@@ -104,6 +105,16 @@ workflow name and every node label) against rules 6 to 10, and the UTF-8 length 
 text against rule 11. A violation is shown as an error with its code and JSON Pointer, and **no file
 is created**. This is what makes the promise hold that a workflow the editor lets you export can
 always be imported again.
+
+The guard never throws. A value that is not JSON data at all (`undefined`, an array hole, a Date or
+other non-plain object, a function, a bigint, a symbol) is reported as the one **export-only** code
+`value.not-json-data` with the JSON Pointer of the value; an imported file can never produce it.
+
+Before it checks or writes anything, the workflow writer copies only the known Workflow fields
+(`schemaVersion, id, name, description, nodes, edges, metadata`; for a node `id, type, typeVersion,
+label, config, position {x, y}`; for an edge `id, source {nodeId, port}, target {nodeId, port}`), so an
+extra field on an in-memory object (for example a React Flow `selected`) can never reach a file.
+`config` and `metadata` are arbitrary JSON and are written as they are.
 
 ## PostgreSQL `jsonb` (documentation only; not verified in this repository)
 

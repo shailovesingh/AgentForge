@@ -29,7 +29,13 @@ const FAMILY_FIELDS: Record<Family, readonly string[]> = {
 
 const isBase64 = (b: unknown): boolean => typeof b === 'string' && b.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(b)
 
-const KNOWN_CODES: readonly string[] = ERROR_CODES
+// EXPLICIT EXEMPTION LIST: codes that only the export guard produces (an imported file can never give
+// them), so no fixture may expect them and no workflow/invalid fixture is required for them. They are
+// tested in errors.test.ts and serialize.test.ts. Every other code stays strictly covered.
+export const EXPORT_ONLY_CODES: readonly string[] = ['value.not-json-data']
+
+// What a fixture may expect: every code except the export-only ones.
+const KNOWN_CODES: readonly string[] = ERROR_CODES.filter((c) => !EXPORT_ONLY_CODES.includes(c))
 
 // A workflow case gives exactly one of these.
 const INPUT_FIELDS = ['input', 'inputText', 'inputRepeat', 'inputBytesBase64']
@@ -365,7 +371,18 @@ describe('fixture corpus', () => {
 
   test('every error code is expected by at least one workflow/invalid fixture', () => {
     const covered = new Set(corpus.invalid.flatMap((c) => c.expect.errors ?? []).map((e) => e.code))
-    expect(ERROR_CODES.filter((code) => !covered.has(code)), 'codes with no workflow/invalid fixture').toEqual([])
+    expect(
+      ERROR_CODES.filter((code) => !EXPORT_ONLY_CODES.includes(code) && !covered.has(code)),
+      'codes with no workflow/invalid fixture',
+    ).toEqual([])
+  })
+
+  test('the export-only exemption list names only real codes, and no fixture expects them', () => {
+    for (const code of EXPORT_ONLY_CODES) expect(KNOWN_CODES, code).not.toContain(code)
+    expect(ERROR_CODES.filter((c) => EXPORT_ONLY_CODES.includes(c)).length).toBe(EXPORT_ONLY_CODES.length)
+    // a fixture that expects an export-only code is a shape problem
+    const bad = { name: 'a', description: 'd', input: [], expect: { valid: false, errors: [{ code: EXPORT_ONLY_CODES[0], path: '' }] } }
+    expect(checkShape('workflow/invalid/a.json', bad).join('|')).toContain('not a known error code')
   })
 
   test('the serialization family covers its rejection codes and has valid cases', () => {
@@ -464,6 +481,25 @@ describe('serialization fixtures (exact text, both profiles)', () => {
         if (parsed.ok) return
         expect(asMultiset([parsed.error]), `${c.file}: error ({code, path})`).toEqual(asMultiset(c.expect.errors))
       }
+    })
+  }
+})
+
+// The whole-workflow path (import, then the workflow writer) for every ser-workflow-* serialization fixture.
+const WORKFLOW_SERIALIZATION = corpus.serialization.filter((c) => c.name.startsWith('ser-workflow-'))
+
+describe('serialization fixtures: whole-workflow import and export', () => {
+  test('the ser-workflow-* fixtures are present (so the loop below is not empty)', () => {
+    expect(WORKFLOW_SERIALIZATION.length).toBeGreaterThanOrEqual(12)
+  })
+  for (const c of WORKFLOW_SERIALIZATION) {
+    test(c.name, () => {
+      expect(c.expect.valid, `${c.file}: a workflow serialization case must be a valid one`).toBe(true)
+      if (!c.expect.valid) return
+      const imported = importWorkflow(serializationText(c), nodeDefinitions)
+      expect(imported.ok, `${c.file}: expected the input to import, got ${JSON.stringify(imported.ok ? null : imported.errors)}`).toBe(true)
+      if (!imported.ok) return
+      expect(serializeWorkflow(imported.workflow), `${c.file}: serializeWorkflow(import(input)) differs from expect.export`).toBe(c.expect.export)
     })
   }
 })

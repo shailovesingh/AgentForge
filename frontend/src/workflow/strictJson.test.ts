@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { ERROR_CODES } from './errors'
-import { classifyNumber, strictParse } from './strictJson'
+import { INTERNAL_PARSER_ERROR, classifyNumber, strictParse } from './strictJson'
 
 const parse = (text: string) => strictParse(text)
 const value = (text: string): unknown => {
@@ -427,5 +427,15 @@ describe('never throws', () => {
       const r = parse(text)
       if (!r.ok) expect(KNOWN.has(r.error.code), text).toBe(true)
     }
+  })
+
+  test('an internal exception is reported as an internal parser error, not as a typo in the text', () => {
+    // A non-string argument makes the parser itself throw a TypeError (no production code is changed).
+    const r = parse(undefined as unknown as string)
+    expect(r).toEqual({ ok: false, error: { code: 'doc.not-json', path: '', message: INTERNAL_PARSER_ERROR } })
+    expect(INTERNAL_PARSER_ERROR).toBe('Not valid JSON: internal parser error (please report this)')
+    // a real grammar error keeps its position and is NOT the internal message
+    const typo = parse('{nope')
+    expect(typo.ok ? '' : typo.error.message).toMatch(/at position \d+$/)
   })
 })

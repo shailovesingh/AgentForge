@@ -38,7 +38,10 @@ contracts/
 - Exactly the other fields listed for its family below. **Unknown fields are an error.**
 - Files are UTF-8 JSON (no byte order mark). LF or CRLF line endings are both fine.
 - Error `code` values come from the stable code list in `frontend/src/workflow/errors.ts`
-  (`ERROR_CODES`).
+  (`ERROR_CODES`), **except the export-only codes** (today only `value.not-json-data`, produced by the
+  editor's export guard for a value that is not JSON data). An imported file can never produce them, so
+  no fixture may expect one; the runner keeps an explicit exemption list for them and checks every
+  other code strictly.
 - `path` values are **RFC 6901 JSON Pointers** (`""` is the whole document, `/nodes/2/config/provider`
   is a nested location, `~` and `/` inside a key are written `~0` and `~1`).
 
@@ -163,7 +166,9 @@ does not involve workflows or the catalog: it pins key order, number text, strin
   each make a fixture fail.
 
 Besides this family the runner has property tests over the `workflow/valid` cases: importing, exporting, importing
-and exporting again is byte-identical, and `canonicalCompact(parse(export)) === canonicalCompact(workflow)`.
+and exporting again is byte-identical, and `canonicalCompact(parse(export)) === canonicalCompact(workflow)`. For every
+`ser-workflow-*` case the runner also imports `inputText` as a whole workflow and requires the workflow writer's
+output to equal `expect.export`.
 
 ### `connection/*.json`
 
@@ -237,9 +242,9 @@ the independent statement of what the code must do.
 3. Run `npm test` in `frontend/`. The runner names the file if it is malformed or fails.
 4. Raise `MIN_COUNTS` in the runner to the new totals. The floors make deleting fixtures fail the run and
    are never lowered.
-5. Every error code must stay covered by at least one `workflow/invalid` case, every `connection.*` code by at
-   least one `connection` case, and the `serialization` family must keep covering its own rejection codes; the
-   runner enforces all three.
+5. Every error code (except the export-only exemption list in the runner) must stay covered by at least one
+   `workflow/invalid` case, every `connection.*` code by at least one `connection` case, and the `serialization`
+   family must keep covering its own rejection codes; the runner enforces all three.
 
 ## Never edit expected values just to make a test pass
 

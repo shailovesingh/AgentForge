@@ -3,7 +3,7 @@ import { nodeDefinitions } from '../catalog'
 import { CONNECTION_ERROR_MESSAGES } from './connections'
 import { ERROR_CODES, jsonPointer } from './errors'
 import type { ErrorCode } from './errors'
-import { MAX_IMPORT_BYTES, importWorkflow } from './serialize'
+import { MAX_IMPORT_BYTES, exportWorkflowText, importWorkflow } from './serialize'
 import type { Workflow } from './types'
 
 const node = (id: string, type: string, config: Record<string, unknown> = {}) => ({
@@ -48,8 +48,15 @@ const withPosition = (raw: string): string => JSON.stringify(base()).replace('"x
 /** The base workflow as text, with the raw text of "metadata" replaced (for duplicate keys, depth, numbers). */
 const withMetadata = (raw: string): string => JSON.stringify(base()).replace('"metadata":{}', `"metadata":${raw}`)
 
-// One real input per code. Record<ErrorCode, ...> makes the compiler reject a missing entry too.
-const CASES: Record<ErrorCode, { path: string; input: () => string | Uint8Array }> = {
+// EXPLICIT EXEMPTION LIST: codes an imported file can never produce (parsed JSON is always data), so no
+// import case exists for them. They are produced by the export guard and tested through it below.
+// Every other code must keep an import case; do not add a code here to dodge that.
+const EXPORT_ONLY_CODES = ['value.not-json-data'] as const
+type ExportOnlyCode = (typeof EXPORT_ONLY_CODES)[number]
+const IMPORT_CODES = ERROR_CODES.filter((c): c is Exclude<ErrorCode, ExportOnlyCode> => !(EXPORT_ONLY_CODES as readonly string[]).includes(c))
+
+// One real input per import code. Record<..., ...> makes the compiler reject a missing entry too.
+const CASES: Record<Exclude<ErrorCode, ExportOnlyCode>, { path: string; input: () => string | Uint8Array }> = {
   'doc.not-json': { path: '', input: () => '{nope' },
   'doc.not-object': { path: '', input: () => '[]' },
   'doc.too-large': { path: '', input: () => ' '.repeat(MAX_IMPORT_BYTES + 1) },
@@ -128,7 +135,7 @@ describe('error codes', () => {
     expect(importWorkflow(JSON.stringify(base()), nodeDefinitions).ok).toBe(true)
   })
 
-  test.each(ERROR_CODES.map((code) => [code] as const))('%s is produced with its JSON Pointer path', (code) => {
+  test.each(IMPORT_CODES.map((code) => [code] as const))('%s is produced with its JSON Pointer path', (code) => {
     const result = importWorkflow(CASES[code].input(), nodeDefinitions)
     expect(result.ok).toBe(false)
     if (result.ok) return
@@ -136,9 +143,19 @@ describe('error codes', () => {
     expect(result.errors[0].message).not.toBe('')
   })
 
-  test('every code in ERROR_CODES has a test case, and every case is a real code', () => {
-    expect(Object.keys(CASES).sort()).toEqual([...ERROR_CODES].sort())
+  test('every code in ERROR_CODES has an import case, except the explicit export-only list; every case is a real code', () => {
+    expect(Object.keys(CASES).sort()).toEqual([...IMPORT_CODES].sort())
+    expect([...IMPORT_CODES, ...EXPORT_ONLY_CODES].sort()).toEqual([...ERROR_CODES].sort())
     expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
+  })
+
+  test('each export-only code is produced by the export guard', () => {
+    const wf = base()
+    wf.nodes[0].config = { payload: { a: undefined } }
+    const exported = exportWorkflowText(wf)
+    expect(exported.ok).toBe(false)
+    if (!exported.ok) expect(exported.errors).toEqual([{ code: 'value.not-json-data', path: '/nodes/0/config/payload/a', message: expect.any(String) }])
+    expect(EXPORT_ONLY_CODES).toEqual(['value.not-json-data']) // one entry, one case above: extend both together
   })
 
   test('every ConnectionError has a connection.<code> entry', () => {

@@ -13,7 +13,10 @@ import type { ErrorCode, ValidationError } from './errors'
 import { MAX_DEPTH, MAX_SAFE_MAGNITUDE, POLICY_MESSAGES, stringProblem } from './valuePolicy'
 import type { PolicyCode } from './valuePolicy'
 
-export type StrictParseResult = { ok: true; value: unknown } | { ok: false; error: ValidationError }
+/** The `doc.not-json` message for an unexpected exception inside the parser (never for bad text). */
+export const INTERNAL_PARSER_ERROR = 'Not valid JSON: internal parser error (please report this)'
+
+export type StrictParseResult ={ ok: true; value: unknown } | { ok: false; error: ValidationError }
 
 // 2^53. Written as text because the whole point is to compare number TOKENS as text.
 const TWO_POW_53 = '9007199254740992'
@@ -257,7 +260,7 @@ export function strictParse(text: string): StrictParseResult {
     return { ok: true, value }
   } catch (e) {
     if (e instanceof Stop) return { ok: false, error: e.problem }
-    const reason = e instanceof Error ? e.message : String(e)
-    return { ok: false, error: { code: 'doc.not-json', path: '', message: `Not valid JSON: ${reason} at position ${pos}` } }
+    // A bug in this parser, not a typo in the text: say so (the exception text is not echoed).
+    return { ok: false, error: { code: 'doc.not-json', path: '', message: INTERNAL_PARSER_ERROR } }
   }
 }

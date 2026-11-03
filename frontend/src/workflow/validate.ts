@@ -15,8 +15,9 @@ const MAX_ERRORS = 20
 
 /**
  * Validates a (migrated) parsed document: shape, node types and configs, and every edge
- * against the same connection rules the editor enforces. Returns a canonical Workflow
- * (fixed key order, unknown extra keys dropped) so export -> import -> export is stable.
+ * against the same connection rules the editor enforces. Returns a Workflow holding only the known
+ * fields (unknown extra keys dropped). Key order is not decided here: the export writer sorts keys,
+ * which is what keeps export -> import -> export stable.
  */
 export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefinition[]): ValidateResult {
   const errors: ValidationError[] = []
