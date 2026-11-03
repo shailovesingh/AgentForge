@@ -1,8 +1,10 @@
 import { validateConfig } from './configSchema'
 import { CONNECTION_ERROR_MESSAGES, checkConnection } from './connections'
+import { jsonPointer } from './errors'
+import type { ErrorCode, ValidationError } from './errors'
 import type { NodeDefinition, Workflow, WorkflowEdge, WorkflowNode } from './types'
 
-export type ValidateResult = { ok: true; workflow: Workflow } | { ok: false; errors: string[] }
+export type ValidateResult = { ok: true; workflow: Workflow } | { ok: false; errors: ValidationError[] }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -17,17 +19,17 @@ const MAX_ERRORS = 20
  * (fixed key order, unknown extra keys dropped) so export -> import -> export is stable.
  */
 export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefinition[]): ValidateResult {
-  const errors: string[] = []
-  const err = (message: string) => {
-    if (errors.length < MAX_ERRORS) errors.push(message)
+  const errors: ValidationError[] = []
+  const err = (code: ErrorCode, path: string, message: string) => {
+    if (errors.length < MAX_ERRORS) errors.push({ code, path, message })
   }
 
   for (const key of ['id', 'name', 'description'] as const) {
-    if (!isString(doc[key])) err(`"${key}" must be a string.`)
+    if (!isString(doc[key])) err('doc.invalid-field', jsonPointer(key), `"${key}" must be a string.`)
   }
-  if (!isRecord(doc.metadata)) err('"metadata" must be an object.')
-  if (!Array.isArray(doc.nodes)) err('"nodes" must be an array.')
-  if (!Array.isArray(doc.edges)) err('"edges" must be an array.')
+  if (!isRecord(doc.metadata)) err('doc.invalid-field', jsonPointer('metadata'), '"metadata" must be an object.')
+  if (!Array.isArray(doc.nodes)) err('doc.invalid-field', jsonPointer('nodes'), '"nodes" must be an array.')
+  if (!Array.isArray(doc.edges)) err('doc.invalid-field', jsonPointer('edges'), '"edges" must be an array.')
   if (errors.length > 0) return { ok: false, errors }
 
   // --- nodes ---
@@ -35,7 +37,8 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
   const nodeIds = new Set<string>()
   ;(doc.nodes as unknown[]).forEach((raw, i) => {
     const at = `nodes[${i}]`
-    if (!isRecord(raw)) return err(`${at} must be an object.`)
+    const ptr = jsonPointer('nodes', i)
+    if (!isRecord(raw)) return err('node.malformed', ptr, `${at} must be an object.`)
     const pos = raw.position
     if (
       !isString(raw.id) ||
@@ -47,15 +50,23 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
       !isNumber(pos.x) ||
       !isNumber(pos.y)
     ) {
-      return err(`${at} is malformed (needs id, type, typeVersion, label, config, position {x,y}).`)
+      return err('node.malformed', ptr, `${at} is malformed (needs id, type, typeVersion, label, config, position {x,y}).`)
     }
-    if (nodeIds.has(raw.id)) return err(`${at}: duplicate node id "${raw.id}".`)
+    if (nodeIds.has(raw.id)) {
+      return err('node.duplicate-id', jsonPointer('nodes', i, 'id'), `${at}: duplicate node id "${raw.id}".`)
+    }
     nodeIds.add(raw.id)
 
     const def = catalog.find((d) => d.type === raw.type && d.version === raw.typeVersion)
-    if (!def) return err(`${at} ("${raw.id}"): unknown node type ${raw.type}@${String(raw.typeVersion)}.`)
-    for (const [key, message] of Object.entries(validateConfig(def.configSchema, raw.config))) {
-      err(`${at} ("${raw.id}"): config "${key}" ${message}.`)
+    if (!def) {
+      return err(
+        'node.unknown-type',
+        jsonPointer('nodes', i, 'type'),
+        `${at} ("${raw.id}"): unknown node type ${raw.type}@${String(raw.typeVersion)}.`,
+      )
+    }
+    for (const { key, code, message } of validateConfig(def.configSchema, raw.config)) {
+      err(code, jsonPointer('nodes', i, 'config', key), `${at} ("${raw.id}"): config "${key}" ${message}.`)
     }
     nodes.push({
       id: raw.id,
@@ -74,8 +85,10 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
   const edgeIds = new Set<string>()
   ;(doc.edges as unknown[]).forEach((raw, i) => {
     const at = `edges[${i}]`
+    const ptr = jsonPointer('edges', i)
+    const malformed = `${at} is malformed (needs id, source {nodeId,port}, target {nodeId,port}).`
     if (!isRecord(raw) || !isRecord(raw.source) || !isRecord(raw.target)) {
-      return err(`${at} is malformed (needs id, source {nodeId,port}, target {nodeId,port}).`)
+      return err('edge.malformed', ptr, malformed)
     }
     const { source, target } = raw
     if (
@@ -85,9 +98,11 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
       !isString(target.nodeId) ||
       !isString(target.port)
     ) {
-      return err(`${at} is malformed (needs id, source {nodeId,port}, target {nodeId,port}).`)
+      return err('edge.malformed', ptr, malformed)
     }
-    if (edgeIds.has(raw.id)) return err(`${at}: duplicate edge id "${raw.id}".`)
+    if (edgeIds.has(raw.id)) {
+      return err('edge.duplicate-id', jsonPointer('edges', i, 'id'), `${at}: duplicate edge id "${raw.id}".`)
+    }
     edgeIds.add(raw.id)
 
     const edge: WorkflowEdge = {
@@ -97,7 +112,10 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
     }
     const partial = { ...(doc as object), nodes, edges } as Workflow
     const problem = checkConnection(partial, catalog, edge.source, edge.target)
-    if (problem) return err(`${at} ("${raw.id}") ${CONNECTION_ERROR_MESSAGES[problem]}.`)
+    if (problem) {
+      // `as const` makes this a template-literal type, so a ConnectionError without a code fails to compile.
+      return err(`connection.${problem}` as const, ptr, `${at} ("${raw.id}") ${CONNECTION_ERROR_MESSAGES[problem]}.`)
+    }
     edges.push(edge)
   })
 

@@ -68,6 +68,14 @@
   padding-left: 18px;
 }
 
+.errors code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg);
+  font-size: 12px;
+  cursor: help;
+}
+
 .errorsHeader {
   display: flex;
   justify-content: space-between;

@@ -4,6 +4,7 @@ import { useId, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { nodeDefinitions } from '../catalog'
 import { useEditorStore } from '../store/editorStore'
+import type { ValidationError } from '../workflow/errors'
 import { importWorkflow, serializeWorkflow } from '../workflow/serialize'
 import styles from './Toolbar.module.css'
 
@@ -15,7 +16,7 @@ function downloadName(name: string): string {
 export function Toolbar() {
   const name = useEditorStore((s) => s.workflow.name)
   const setWorkflowName = useEditorStore((s) => s.setWorkflowName)
-  const [importErrors, setImportErrors] = useState<string[]>([])
+  const [importErrors, setImportErrors] = useState<ValidationError[]>([])
   const fileInput = useRef<HTMLInputElement>(null)
   const nameId = useId()
   const { fitView } = useReactFlow()
@@ -88,8 +89,10 @@ export function Toolbar() {
             </button>
           </div>
           <ul>
-            {importErrors.map((message, i) => (
-              <li key={i}>{message}</li>
+            {importErrors.map((error, i) => (
+              <li key={i}>
+                <code title={error.path === '' ? '(whole document)' : error.path}>{error.code}</code> {error.message}
+              </li>
             ))}
           </ul>
         </div>

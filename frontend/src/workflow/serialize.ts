@@ -35,13 +35,14 @@ export function serializeWorkflow(workflow: Workflow): string {
 /** Parses, migrates and validates imported text. Never throws; returns readable errors. */
 export function importWorkflow(text: string, catalog: NodeDefinition[]): ValidateResult {
   if (text.length > MAX_IMPORT_CHARS) {
-    return { ok: false, errors: ['File is too large to import.'] }
+    return { ok: false, errors: [{ code: 'doc.too-large', path: '', message: 'File is too large to import.' }] }
   }
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
   } catch (e) {
-    return { ok: false, errors: [`Not valid JSON: ${e instanceof Error ? e.message : String(e)}`] }
+    const message = `Not valid JSON: ${e instanceof Error ? e.message : String(e)}`
+    return { ok: false, errors: [{ code: 'doc.not-json', path: '', message }] }
   }
   const migrated = migrate(parsed)
   if (!migrated.ok) return migrated

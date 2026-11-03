@@ -1,0 +1,43 @@
+// Structured validation errors for the import path. Codes are stable and namespaced; the
+// message is the human-readable text shown to the user. See docs/PHASE1_1_PLAN.md section 3.2.
+// Only codes that are actually produced belong here; later tasks add their own.
+
+export const ERROR_CODES = [
+  'doc.not-json',
+  'doc.not-object',
+  'doc.too-large',
+  'doc.unsupported-version',
+  'doc.invalid-field',
+  'node.malformed',
+  'node.duplicate-id',
+  'node.unknown-type',
+  'edge.malformed',
+  'edge.duplicate-id',
+  'connection.unknown-node',
+  'connection.unknown-port',
+  'connection.self-loop',
+  'connection.duplicate',
+  'connection.input-occupied',
+  'connection.type-mismatch',
+  'connection.cycle',
+  'schema.type',
+  'schema.enum',
+  'schema.required',
+  'schema.additionalProperties',
+  'schema.minimum',
+  'schema.maximum',
+] as const
+
+export type ErrorCode = (typeof ERROR_CODES)[number]
+
+/** `path` is an RFC 6901 JSON Pointer into the imported document ("" is the whole document). */
+export interface ValidationError {
+  code: ErrorCode
+  path: string
+  message: string
+}
+
+/** Builds an RFC 6901 JSON Pointer: each segment is escaped (`~` -> `~0`, `/` -> `~1`) and prefixed with `/`. */
+export function jsonPointer(...segments: (string | number)[]): string {
+  return segments.map((s) => '/' + String(s).replace(/~/g, '~0').replace(/\//g, '~1')).join('')
+}

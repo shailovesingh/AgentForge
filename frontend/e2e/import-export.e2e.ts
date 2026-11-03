@@ -57,7 +57,9 @@ test.describe('import', () => {
     await editor.buildPipeline()
 
     await editor.importText('{ not json')
-    await expect(editor.toolbar.getByRole('alert').getByText(/Not valid JSON/)).toBeVisible()
+    const alert = editor.toolbar.getByRole('alert')
+    await expect(alert.getByText(/Not valid JSON/)).toBeVisible()
+    await expect(alert.getByText('doc.not-json', { exact: true })).toBeVisible()
     await expect(editor.nodes).toHaveCount(3)
   })
 
@@ -67,7 +69,9 @@ test.describe('import', () => {
     workflow.nodes[0].type = 'mystery.node'
 
     await editor.importText(JSON.stringify(workflow))
-    await expect(editor.toolbar.getByRole('alert').getByText(/unknown node type mystery\.node@1/)).toBeVisible()
+    const alert = editor.toolbar.getByRole('alert')
+    await expect(alert.getByText(/unknown node type mystery\.node@1/)).toBeVisible()
+    await expect(alert.getByText('node.unknown-type', { exact: true })).toBeVisible()
     await expect(editor.nodes).toHaveCount(3)
     await expect(editor.edges).toHaveCount(2)
   })

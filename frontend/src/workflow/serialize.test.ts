@@ -61,44 +61,67 @@ describe('export / import round trip', () => {
   })
 })
 
-describe('import rejects bad files with specific messages', () => {
+describe('import rejects bad files with specific codes, paths and messages', () => {
   test('not JSON / not an object', () => {
-    expect(errorsOf('{nope')[0]).toMatch(/Not valid JSON/)
-    expect(errorsOf('[]')[0]).toMatch(/JSON object/)
+    const notJson = errorsOf('{nope')[0]
+    expect(notJson).toMatchObject({ code: 'doc.not-json', path: '' })
+    expect(notJson.message).toMatch(/Not valid JSON/)
+    expect(errorsOf('[]')[0]).toEqual({
+      code: 'doc.not-object',
+      path: '',
+      message: 'Workflow file must contain a JSON object.',
+    })
   })
 
   test('unsupported schemaVersion', () => {
-    expect(errorsOf(withEdit((w) => (w.schemaVersion = '9.9')))[0]).toMatch(/Unsupported schemaVersion "9.9"/)
+    const e = errorsOf(withEdit((w) => (w.schemaVersion = '9.9')))[0]
+    expect(e).toMatchObject({ code: 'doc.unsupported-version', path: '/schemaVersion' })
+    expect(e.message).toMatch(/Unsupported schemaVersion "9.9"/)
   })
 
   test('missing top-level fields', () => {
-    expect(errorsOf(JSON.stringify({ schemaVersion: '1.0' }))).toEqual(
-      expect.arrayContaining(['"id" must be a string.', '"nodes" must be an array.']),
+    const errors = errorsOf(JSON.stringify({ schemaVersion: '1.0' }))
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        { code: 'doc.invalid-field', path: '/id', message: '"id" must be a string.' },
+        { code: 'doc.invalid-field', path: '/nodes', message: '"nodes" must be an array.' },
+      ]),
     )
   })
 
   test('unknown node type and bad config', () => {
-    expect(errorsOf(withEdit((w) => (w.nodes[1].type = 'mystery.node')))[0]).toMatch(
-      /unknown node type mystery.node@1/,
-    )
-    expect(errorsOf(withEdit((w) => (w.nodes[1].config.provider = 'nope')))[0]).toMatch(
-      /config "provider" must be one of/,
-    )
+    const type = errorsOf(withEdit((w) => (w.nodes[1].type = 'mystery.node')))[0]
+    expect(type).toMatchObject({ code: 'node.unknown-type', path: '/nodes/1/type' })
+    expect(type.message).toMatch(/unknown node type mystery.node@1/)
+    const config = errorsOf(withEdit((w) => (w.nodes[1].config.provider = 'nope')))[0]
+    expect(config).toMatchObject({ code: 'schema.enum', path: '/nodes/1/config/provider' })
+    expect(config.message).toMatch(/config "provider" must be one of/)
   })
 
   test('duplicate node ids', () => {
-    expect(errorsOf(withEdit((w) => (w.nodes[2].id = 't')))[0]).toMatch(/duplicate node id "t"/)
+    expect(errorsOf(withEdit((w) => (w.nodes[2].id = 't')))[0]).toEqual({
+      code: 'node.duplicate-id',
+      path: '/nodes/2/id',
+      message: 'nodes[2]: duplicate node id "t".',
+    })
   })
 
   test('edges: unknown node, bad port, type mismatch, cycle', () => {
-    expect(errorsOf(withEdit((w) => (w.edges[0].target.nodeId = 'ghost')))[0]).toMatch(/does not exist/)
-    expect(errorsOf(withEdit((w) => (w.edges[0].source.port = 'nope')))[0]).toMatch(/port that the node does not have/)
+    const ghost = errorsOf(withEdit((w) => (w.edges[0].target.nodeId = 'ghost')))[0]
+    expect(ghost).toMatchObject({ code: 'connection.unknown-node', path: '/edges/0' })
+    expect(ghost.message).toMatch(/does not exist/)
+    const port = errorsOf(withEdit((w) => (w.edges[0].source.port = 'nope')))[0]
+    expect(port).toMatchObject({ code: 'connection.unknown-port', path: '/edges/0' })
+    expect(port.message).toMatch(/port that the node does not have/)
     // http.status (number) -> agent.input (text)
     const mismatch = withEdit((w) => {
       w.nodes.push(node('h', 'http.request', { method: 'GET', url: '' }), node('a', 'agent.autonomous', { provider: 'ollama' }))
       w.edges.push({ id: 'e3', source: { nodeId: 'h', port: 'status' }, target: { nodeId: 'a', port: 'input' } })
     })
-    expect(errorsOf(mismatch)[0]).toMatch(/incompatible data types/)
+    const typeMismatch = errorsOf(mismatch)[0]
+    expect(typeMismatch).toMatchObject({ code: 'connection.type-mismatch', path: '/edges/2' })
+    expect(typeMismatch.message).toMatch(/incompatible data types/)
+    // e4 targets l.input, which e1 already feeds, so the single-input rule fires before the cycle rule.
     const cycle = withEdit((w) => {
       w.nodes.push(node('h', 'http.request', { method: 'GET', url: '' }))
       w.edges.push(
@@ -106,11 +129,15 @@ describe('import rejects bad files with specific messages', () => {
         { id: 'e4', source: { nodeId: 'h', port: 'body' }, target: { nodeId: 'l', port: 'input' } },
       )
     })
-    expect(errorsOf(cycle).join('\n')).toMatch(/e4.*(cycle|already has a connection)/)
+    const occupied = errorsOf(cycle)[0]
+    expect(occupied).toMatchObject({ code: 'connection.input-occupied', path: '/edges/3' })
+    expect(occupied.message).toMatch(/e4.*(cycle|already has a connection)/)
   })
 
   test('oversized input', () => {
-    expect(errorsOf(' '.repeat(5 * 1024 * 1024 + 1))[0]).toMatch(/too large/)
+    const e = errorsOf(' '.repeat(5 * 1024 * 1024 + 1))[0]
+    expect(e).toMatchObject({ code: 'doc.too-large', path: '' })
+    expect(e.message).toMatch(/too large/)
   })
 })
 
@@ -131,6 +158,7 @@ describe('migrate', () => {
   test('a step that does not advance the version cannot loop forever', () => {
     const r = migrate({ schemaVersion: '0.8' }, { '0.8': (d) => d })
     expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors[0]).toMatchObject({ code: 'doc.unsupported-version', path: '/schemaVersion' })
   })
 
   test('there are no registered migrations yet (only 1.0 exists)', () => {

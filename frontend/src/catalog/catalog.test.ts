@@ -19,7 +19,7 @@ describe('node catalog', () => {
       expect(def.outputs.every((p) => p.multiple === undefined)).toBe(true)
 
       // Defaults satisfy the config schema, including required properties.
-      expect(validateConfig(def.configSchema, def.defaults)).toEqual({})
+      expect(validateConfig(def.configSchema, def.defaults)).toEqual([])
 
       // Every required property must have a default so new nodes start valid-shaped.
       for (const key of def.configSchema.required ?? []) {
@@ -41,15 +41,15 @@ describe('validateConfig', () => {
   test('flags wrong types, bad enums, out-of-range numbers, unknown and missing keys', () => {
     expect(
       validateConfig(schema, { provider: 'nope', temperature: 5, extra: 1, prompt: 3 }),
-    ).toEqual({
-      provider: 'must be one of: ollama, openai, anthropic',
-      temperature: 'must be at most 2',
-      extra: 'is not a known setting',
-      prompt: 'must be text',
-    })
-    expect(validateConfig(schema, {})).toEqual({
-      provider: 'is required',
-      prompt: 'is required',
-    })
+    ).toEqual([
+      { key: 'provider', code: 'schema.enum', message: 'must be one of: ollama, openai, anthropic' },
+      { key: 'temperature', code: 'schema.maximum', message: 'must be at most 2' },
+      { key: 'extra', code: 'schema.additionalProperties', message: 'is not a known setting' },
+      { key: 'prompt', code: 'schema.type', message: 'must be text' },
+    ])
+    expect(validateConfig(schema, {})).toEqual([
+      { key: 'provider', code: 'schema.required', message: 'is required' },
+      { key: 'prompt', code: 'schema.required', message: 'is required' },
+    ])
   })
 })
