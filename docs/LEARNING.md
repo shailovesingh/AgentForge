@@ -24,9 +24,9 @@
 
 | # | Module | Built in AgentForge | Learning status | Lessons taught |
 |---|---|---|---|---|
-| 1 | System Architecture | Partly (frontend, contracts, docs) | Not Started | none (primer available) |
+| 1 | System Architecture | Partly (frontend, contracts, docs) | **In Progress** | L3 touches contract-first design (Phase 1.1 T3: shared fixtures); L2 touches stable codes as a contract; primer available |
 | 2 | Frontend and React Flow | Yes (Phase 1) | Not Started | none (primer available) |
-| 3 | Workflow JSON and State Management | Yes (Phase 1); being hardened in Phase 1.1 | **In Progress** | L2 (Phase 1.1 T2: structured validation errors) |
+| 3 | Workflow JSON and State Management | Yes (Phase 1); being hardened in Phase 1.1 | **In Progress** | L2 (Phase 1.1 T2: structured validation errors); L3 (Phase 1.1 T3: shared fixtures and their rules) |
 | 4 | Backend and FastAPI | No (Phase 2) | Not Started | none |
 | 5 | Workflow Execution Engine | No (Phase 3) | Not Started | none |
 | 6 | Graph Theory and DAG Execution | Partly (cycle rule, Phase 1) | Not Started | none |
@@ -35,7 +35,7 @@
 | 9 | LangGraph and Autonomous Agents | No (Phase 4) | Not Started | none |
 | 10 | MCP Integration | No (Phase 6) | Not Started | none |
 | 11 | Natural-Language Workflow Generation | No (Phase 5) | Not Started | none |
-| 12 | Security, Testing and Deployment | Partly (tests, CI) | **In Progress** | L1 (Phase 1.1 T1: testing and CI); L2 touches table-driven and guard tests |
+| 12 | Security, Testing and Deployment | Partly (tests, CI) | **In Progress** | L1 (Phase 1.1 T1: testing and CI); L2 touches table-driven and guard tests; L3 (Phase 1.1 T3: data-driven tests, coverage guards, mutation checks) |
 
 **Suggested order.** Modules 1, 2 and 3 now (they describe code that exists). Module 12's testing part alongside. Module 6 once the connection rules are understood. Modules 4, 5 and 7 as Phases 2 and 3 are built; then 8 to 11.
 
@@ -43,11 +43,12 @@
 
 ## Module 1: System Architecture
 
-- **Status:** Not Started
+- **Status:** **In Progress** (Lessons L2 and L3 touch contract-first design; no answers recorded yet)
+- **Lessons taught:** L3 (Phase 1.1 T3): a shared contract between two implementations, language-neutral fixtures as the executable form of the contract, and the honest limit that Python parity is planned for Phase 2 and not claimed. L2 (Phase 1.1 T2): stable error codes as a contract. The primer in `docs/LEARNING_GUIDE.md` Part 1 still covers the rest of the module as reference only.
 - **Concepts to learn:** client and server; separation of concerns; contract-first design (a shared data format that everyone agrees on); monorepo; layered architecture; where state lives; architecture decision records (ADRs); API versus internal boundaries; versioning for backward compatibility.
 - **Why it is needed:** AgentForge has an editor, a server, an engine, AI components and a database. Without clear boundaries and one shared contract they would tangle. This is the module that lets you explain *why the system is shaped this way*.
-- **Where it appears:** the browser editor never runs workflows; the Workflow JSON document is the contract between editor, backend, engine and AI; the engine is kept independent of LangGraph; every significant choice is recorded in `docs/DECISIONS.md`.
-- **Related files:** `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` (D-002, D-003, D-004, D-006), `.claude/rules/architecture.md`, the top-level folder layout (`frontend/`, `docs/`, planned `backend/`, `contracts/`).
+- **Where it appears:** the browser editor never runs workflows; the Workflow JSON document is the contract between editor, backend, engine and AI; the engine is kept independent of LangGraph; every significant choice is recorded in `docs/DECISIONS.md`; the top-level `contracts/` folder holds language-neutral fixtures that the TypeScript runner executes today and a future Python runner will execute too (planned, Phase 2).
+- **Related files:** `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` (D-002, D-003, D-004, D-006), `.claude/rules/architecture.md`, the top-level folder layout (`frontend/`, `docs/`, `contracts/`, planned `backend/`), `contracts/README.md`, `contracts/fixtures/`, `frontend/src/contracts/fixtures.test.ts`, `docs/PHASE1_1_PLAN.md` section 3.2.
 - **Interview questions:**
   1. Why is the workflow stored as a JSON document instead of in the format of the drawing library?
   2. Why keep the execution engine separate from the AI agent framework?
@@ -71,12 +72,12 @@
 
 ## Module 3: Workflow JSON and State Management
 
-- **Status:** **In Progress** (Lesson L2 taught: structured validation errors; no answers recorded yet)
-- **Lessons taught:** L2 (Phase 1.1 T2): machine-readable versus human-readable errors, stable namespaced error codes, JSON Pointer, string-literal union types, validating untrusted input at the boundary, table-driven and guard tests. The primer in `docs/LEARNING_GUIDE.md` Part 1 still covers the rest of the module as reference only.
+- **Status:** **In Progress** (Lessons L2 and L3 taught: structured validation errors and the shared fixtures; no answers recorded yet)
+- **Lessons taught:** L2 (Phase 1.1 T2): machine-readable versus human-readable errors, stable namespaced error codes, JSON Pointer, string-literal union types, validating untrusted input at the boundary, table-driven and guard tests. L3 (Phase 1.1 T3): shared language-neutral fixtures, `{code, path}` compared as multisets and never the message, rule order in `checkConnection` as part of the contract, the import semantics a second implementation must follow (cascades, stop-early, the 20-error cap), `inputRepeat`, and the prototype-named-key fixtures. The primer in `docs/LEARNING_GUIDE.md` Part 1 still covers the rest of the module as reference only.
 - **Concepts to learn:** JSON documents and schemas; JSON Schema basics; `schemaVersion` versus `typeVersion`; immutable state updates; a store (Zustand) and selectors; validation versus warnings; serialization; import as untrusted input; migrations; canonical (repeatable) JSON; shared test fixtures.
 - **Why it is needed:** the workflow document is the heart of the system. Everything else reads or writes it, so getting its shape, versioning and validation right is the most valuable thing to understand.
 - **Where it appears:** the store holds the document being edited; export writes it; import parses, upgrades, validates and loads it, and a rejected file produces a list of `{code, path, message}` errors shown in the toolbar panel (L2); the catalog describes node types; config schemas describe settings.
-- **Related files:** `frontend/src/workflow/types.ts`, `validate.ts`, `serialize.ts`, `migrate.ts`, `configSchema.ts`, `connections.ts`, `errors.ts` (error codes, `ValidationError`, `jsonPointer`) and `errors.test.ts`; `frontend/src/app/Toolbar.tsx` (import error panel); `frontend/e2e/import-export.e2e.ts`; `frontend/src/store/editorStore.ts`; `frontend/src/catalog/nodes.ts`; `docs/PHASE1_1_PLAN.md` section 3.2; `docs/DECISIONS.md` D-018, D-022. Planned in Phase 1.1: `strictJson.ts`, `canonicalJson.ts`, `nodeMigrations.ts`, `lint.ts`, and `contracts/fixtures/`.
+- **Related files:** `frontend/src/workflow/types.ts`, `validate.ts`, `serialize.ts`, `migrate.ts`, `configSchema.ts`, `connections.ts`, `errors.ts` (error codes, `ValidationError`, `jsonPointer`) and `errors.test.ts`; `frontend/src/app/Toolbar.tsx` (import error panel); `frontend/e2e/import-export.e2e.ts`; `frontend/src/store/editorStore.ts`; `frontend/src/catalog/nodes.ts`; `contracts/README.md` and `contracts/fixtures/` (shared fixtures, L3); `frontend/src/contracts/fixtures.test.ts` (the runner); `docs/PHASE1_1_PLAN.md` section 3.2; `docs/DECISIONS.md` D-018, D-022. Planned in Phase 1.1: `strictJson.ts`, `canonicalJson.ts`, `nodeMigrations.ts`, `lint.ts`, and more fixture families under `contracts/fixtures/` (T4 onward).
 - **Interview questions:**
   1. Why are `schemaVersion` and `typeVersion` two separate numbers?
   2. What is the difference between a validation error and a warning in AgentForge, and why keep them apart?
@@ -198,11 +199,12 @@
 
 ## Module 12: Security, Testing and Deployment
 
-- **Status:** **In Progress** (Lesson L1 taught: testing and CI; Lesson L2 also touches table-driven and guard tests; no answers recorded yet)
+- **Status:** **In Progress** (Lesson L1 taught: testing and CI; Lessons L2 and L3 also touch table-driven tests, guard tests and fixtures; no answers recorded yet)
+- **Lessons taught:** L1 (Phase 1.1 T1): end-to-end versus unit tests, auto-waiting, flaky tests, vacuous tests and fault injection, CI, supply-chain pinning. L2 (Phase 1.1 T2): table-driven and guard tests. L3 (Phase 1.1 T3): data-driven tests with data kept apart from code, a conformance suite, circular tests, coverage guards and minimum-count floors, a drift test with fail-on-purpose regeneration, and mutation checks applied to the fixtures.
 - **Concepts to learn:** secrets and credential references; secret detection; SSRF; authorization and owner scoping; sandboxing; limits and timeouts; unit, integration and end-to-end tests; shared fixtures; fault injection (mutation) and vacuous tests; CI with GitHub Actions; supply-chain pinning by commit SHA; Docker and Compose.
 - **Why it is needed:** a platform that runs user-defined workflows with AI and external tools is a security problem first. Tests and CI are what let us change the system without fear.
-- **Where it appears:** unit tests and Playwright tests exist; a CI workflow exists; secret detection is planned (Phase 1.1 T9); backend security and Docker are planned (Phase 2 onward).
-- **Related files:** `frontend/e2e/`, `frontend/playwright.config.ts`, `.github/workflows/ci.yml`, `frontend/src/**/*.test.ts`, `.claude/rules/architecture.md`, `docs/ARCHITECTURE.md` section 11 and 12, `docs/DECISIONS.md` D-016, D-019, D-023.
+- **Where it appears:** unit tests and Playwright tests exist; the shared fixtures and their TypeScript runner exist (Python runner planned, Phase 2); a CI workflow exists; secret detection is planned (Phase 1.1 T9); backend security and Docker are planned (Phase 2 onward).
+- **Related files:** `frontend/e2e/`, `frontend/playwright.config.ts`, `.github/workflows/ci.yml`, `frontend/src/**/*.test.ts`, `frontend/src/contracts/fixtures.test.ts`, `contracts/README.md`, `contracts/fixtures/`, `.claude/rules/architecture.md`, `docs/ARCHITECTURE.md` section 11 and 12, `docs/DECISIONS.md` D-016, D-019, D-023.
 - **Interview questions:**
   1. Why pin GitHub Actions to a commit SHA instead of a version tag?
   2. What can an end-to-end test catch that a unit test cannot, and the reverse?

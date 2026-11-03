@@ -147,9 +147,10 @@ Status legend: **Implemented** = code exists. **Tested** = verified as stated in
 
 Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, auto-layout, NL generation, authentication, repo-based E2E tests.
 
-### Phase 1.1 — Contract hardening, warnings, Playwright (APPROVED; T1 and T2 done; T3 next; T4 to T10 not started; PO reviews at MS-A after T3, MS-B after T6, MS-C after T10)
+### Phase 1.1 — Contract hardening, warnings, Playwright (APPROVED; T1, T2, T3 done; **milestone MS-A reached, PO review due**; T4 to T10 not started; next milestones MS-B after T6, MS-C after T10)
 - [x] T1 Playwright harness, 49 of 52 ad hoc checks ported (26 tests), `npm run verify`, GitHub Actions CI workflow with SHA-pinned actions — **done**: independently reviewed (Opus: PASS WITH FINDINGS), review fixes in `f4cc801`, and the **PO reported the GitHub Actions run green** (48 unit, 26 e2e; PO-reported, not verified by Claude, commit not specified)
 - [x] T2 Structured validation errors `{code, path, message}` (23 `ERROR_CODES`, RFC 6901 JSON Pointer paths), shown in the import-error panel — **done**: Sonnet-implemented (`29b8aeb`), Opus-reviewed twice (both PASS WITH FINDINGS, no blockers), fixes `b9d136a`, `60b1609`, `6e97207`; accepted by the Principal Architect; `npm run verify` exit 0 (83 unit, 27 e2e). Two real bugs of one class (untrusted keys reaching inherited object members) were found and fixed on the way: config keys and `schemaVersion` on the import path, and node ids in the canvas.
+- [x] T3 Shared JSON fixtures in `contracts/` (74 case files in four families plus the catalog export) and the TypeScript runner (strict shape checker, multiset comparison, coverage guards, minimum-count floors, catalog drift test) — **done**: Sonnet-implemented (`e28483d`), Opus-reviewed (PASS WITH FINDINGS, no blockers; the reviewer verified the expectations against the spec, not the code), fixes `b299782`, accepted by the Principal Architect; `npm run verify` exit 0 (184 unit, 27 e2e). **Tested in TypeScript only; no Python parity is claimed** (a Python runner is a Phase 2 task).
 - [ ] T2 Structured validation errors `{code, path, message}`
 - [ ] T3 Shared JSON fixtures in `contracts/` with a Vitest runner (H2, approved)
 - [ ] T4 Strict parsing (duplicate keys rejected), canonical JSON (compact, hashing) and export JSON (pretty), 120+ fixtures (H5, P7 revised)
@@ -206,8 +207,8 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 and T2 done; T3 next.** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones (MS-A after T3). Phase 2 is **proposed only** and unauthorized.
-- **Last completed task:** Session 8: T2 (structured validation errors) implemented, reviewed twice by Opus, fixed and accepted; Lesson L2 written. T1 (Session 6): `382d6a4`, accepted on the PO-reported green CI. Documentation commits `b7e5cbc`, `db451da`, `cf738b5` were made and pushed by others.
+- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1, T2, T3 done; milestone MS-A reached and awaiting the PO's review; T4 starts after that review.** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones. Phase 2 is **proposed only** and unauthorized.
+- **Last completed task:** Session 9: T3 (shared fixtures and the TypeScript runner) implemented, reviewed by Opus, fixed and accepted; Lesson L3 written; milestone MS-A reached. Earlier: T2 (Session 8), T1 (Session 6). Documentation commits `b7e5cbc`, `db451da`, `cf738b5` were made and pushed by others.
 - **Last code commit:** `35fe3bc`.
 
 ### Verification results (actual, run 2026-11-03)
@@ -226,6 +227,15 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 **The browser script is not in the repository.** It ran from a scratch directory with `playwright-core` and the locally installed Chrome. It is therefore not reproducible from the repo, and repo-based E2E remains deferred (open question 2).
 
+### Verification results, Session 9 (Phase 1.1 T3; actual, 2026-11-03)
+
+| Check | Result |
+|---|---|
+| `npm run verify` at `b299782` (run by the Principal Architect) | **exit 0**: oxlint clean; **9 files, 184 unit tests passed** (83 before T3; 166 after `e28483d`; 184 after `b299782`); build ok; **27 e2e tests passed** (unchanged) |
+| Fixtures | 74 case files: workflow/valid 7, workflow/invalid 30, connection 22, config 15; plus `format.json` and the catalog export; largest fixture file now 9 KB |
+| Type-check separation | `npm exec --no -- tsc -p tsconfig.app.json --listFilesOnly` lists 0 `@types/node` files (the browser app does not see Node types) |
+| Opus review of `e28483d` | PASS WITH FINDINGS (no blockers, no majors); the reviewer ran `npm run verify` itself: green |
+| Mutation checks (by the implementer; not repeated by Claude) | four deliberate breaks of `connections.ts` each fail exactly the intended fixture; swapping `input-occupied` and `type-mismatch` is caught only by a new fixture |
 ### Verification results, Session 8 (Phase 1.1 T2; actual, 2026-11-03)
 
 | Check | Result |
@@ -289,6 +299,10 @@ Small implementation choices made in Session 2 without a decision entry (flagged
 20. **Screen-reader behaviour of the import-error list is untested** with real assistive technology (the path is plain visible text, which should be fine).
 21. **The final T2 fix (`6e97207`) and Lesson L2 had no independent Opus re-review**, only the Principal Architect's verification (the tutor's external-world facts are unverified general knowledge).
 22. **Carry-overs** for T3, T5, T6 and T7 from the T2 reviews are listed in `docs/PHASE1_1_PLAN.md`.
+23. **Fixtures are tested in TypeScript only.** The Python runner is a Phase 2 task; **no parity between TypeScript and Python is claimed or verified.** The fixtures were written as language-neutral data so it can be proven later.
+24. **The `b299782` fix and Lesson L3 had no second Opus review**, only the Principal Architect's verification (same limitation as T2's last fix). The tutor's real-world parallels (conformance suites, golden files) are general knowledge and unverified in the repository.
+25. **Fixture files are read with `JSON.parse`**, so a duplicate key inside a fixture file is not detected until the strict parser exists (T4). The fixture runner needs Node 20.12 or newer (`package.json` has no `engines` field; CI and local use Node 24).
+26. **A 5 MB fixture blob is in the history of `e28483d`** (about 23 KB compressed). History is never rewritten, so it stays; the working tree no longer contains it.
 
 ## 10. Open Questions
 
@@ -304,18 +318,18 @@ The six original questions are all decided (see `docs/PHASE1_REVIEW.md` §4 and 
 **Blocked:** T2 onward waits for T1 review. Phase 2 step 2 onward waits for Phase 1.1 and D-013. Phase 2 step 6 onward waits for Docker Desktop (PO will install).
 ## 11. Last Session Handoff
 
-- **Date:** 2026-11-03 (Session 8)
-- **Last task:** T2 (structured validation errors): Sonnet implementer, two Opus reviews, three fix commits, accepted. Lesson L2 (Sonnet tutor) written. Decisions D-029 (cadence and learning-check protocol) and D-030 (local-only working mode).
-- **Implemented changes:** see `docs/DEVELOPMENT_LOG.md` Session 8. Code under `frontend/` only.
-- **Tests:** `npm run verify` exit 0 at `6e97207` (83 unit, 27 e2e), run by the Principal Architect after each fix and by both reviewers.
-- **Git:** local commits only (D-030). Whether the PO has pushed them is unknown to Claude.
-- **Learning:** Lessons L1 and L2 delivered, each ending in a Knowledge Check; nothing marked Understood; evaluation happens at the end of the project.
-- **Next task:** T3 (shared fixtures), then milestone MS-A.
+- **Date:** 2026-11-03 (Session 9)
+- **Last task:** T3 (shared fixtures and the TypeScript runner): Sonnet implementer, Opus review (PASS WITH FINDINGS, no blockers), one fix commit, accepted. Lesson L3 (Sonnet tutor). **Milestone MS-A (T1 to T3) reached.**
+- **Implemented changes:** `contracts/` (README, format, 74 fixtures, catalog export), `frontend/src/contracts/fixtures.test.ts`, `frontend/tsconfig.contracts.json` and the tsconfig reference changes. No application source changed.
+- **Tests:** `npm run verify` exit 0 at `b299782` (184 unit, 27 e2e), run by the Principal Architect and by the reviewer.
+- **Git:** local commits only (D-030); the last `git status` showed `main` ahead of `origin/main` by 10 commits. Whether the PO has pushed since is unknown to Claude.
+- **Learning:** Lessons L1, L2 and L3 delivered, each ending in a Knowledge Check; nothing marked Understood; evaluation at the end of the project.
+- **Next task:** the PO's MS-A review, then T4.
 
 ## 12. Next Recommended Action
 
-1. **Principal Architect:** T3 (shared JSON fixtures in `contracts/` and the TypeScript runner), then the Opus review, then the **MS-A report** for the PO.
-2. **PO:** at MS-A, review T1 to T3; push to GitHub if you want a CI run (Linux) and a backup; report any CI failure.
+1. **PO: review milestone MS-A (T1 to T3).** What to look at: the `contracts/` folder and its `README.md`; `docs/DEVELOPMENT_LOG.md` Sessions 6 to 9; the two Opus reviews and their triage; `npm run verify` (or the GitHub Actions run if you push). Decide: continue to T4 (strict parsing, canonical JSON), or change course.
+2. **PO (optional):** push to GitHub for a Linux CI run and a backup; report any CI failure to Claude (D-030).
 3. **PO (housekeeping):** move `Downloads\CLAUDE.md` out of the AgentForge parent path; install Docker Desktop before Phase 2 step 6.
 4. **No Phase 2 or backend work.**
 ## 13. Update Rules
@@ -336,12 +350,13 @@ Do not invent implementation status, test results, commit IDs, or decisions.
 
 > Tracked **separately from implementation progress** (D-028). The curriculum is `docs/LEARNING.md`; the evidence is in `docs/LEARNING_GUIDE.md`. A topic is Understood only with evidence from the Product Owner's answers.
 
-- **Current learning module:** Module 3, Workflow JSON and State Management (structured validation errors), via **Lesson L2**; Module 12 (testing and CI part) via **Lesson L1**. Recommended next: Modules 1, 2 and the rest of Module 3 (they describe code that already exists).
+- **Current learning module:** Module 3, Workflow JSON and State Management (structured validation errors, shared fixtures), via **Lessons L2 and L3**; Module 1 (contract-first design) via **Lesson L3**; Module 12 (testing and CI, data-driven tests) via **Lessons L1 and L3**. Recommended next: Modules 1, 2 and the rest of Module 3 (they describe code that already exists).
 - **Concepts explained:**
   - **L1 (taught 2026-11-03):** end-to-end versus unit tests, fixtures and helpers, auto-waiting assertions, flaky tests and retries, vacuous tests and fault injection, continuous integration, supply-chain pinning by commit SHA.
   - **L2 (taught 2026-11-03, after Phase 1.1 T2):** machine-readable versus human-readable errors, stable namespaced error codes, JSON Pointer (RFC 6901), string-literal union types and compile-time exhaustiveness, validating untrusted input at a boundary (own-property lookups), table-driven and guard tests, errors versus warnings (D-018).
+  - **L3 (taught 2026-11-03, after Phase 1.1 T3):** contract-first design with a shared contract between two implementations (language-neutral fixtures in `contracts/`; the Python runner is planned for Phase 2 and no parity is claimed), data-driven tests with data kept apart from code, comparing `{code, path}` as multisets and never the message, rule order in `checkConnection` as part of the contract, the import semantics a second implementation must follow, coverage guards and minimum-count floors, the catalog drift test with fail-on-purpose regeneration, `inputRepeat` (a generator spec instead of a 5 MB file), circular tests and expectations written from the specification, and mutation checks.
   - **Primer (reference only, no lesson, no evidence):** workflow, node, port, edge, catalog, config schema, `schemaVersion` versus `typeVersion`, validation versus warnings, DAG, credentials.
 - **Topics understood:** **none yet.** By design (D-029) answers are collected in one dedicated learning session at the end of the project; no per-lesson questions are asked in conversation.
 - **Topics requiring revision:** none recorded.
-- **Next learning objective:** keep building; each completed task gets a lesson ending in a Knowledge Check (next: Lesson L3 after T3, the shared fixtures). The evaluation session happens at the end of the project.
-- **Module status summary:** Modules 3 and 12 In Progress; Modules 1, 2 and 4 to 11 Not Started.
+- **Next learning objective:** keep building; each completed task gets a lesson ending in a Knowledge Check (next: Lesson L4 after T4, strict parsing and canonical JSON). The evaluation session happens at the end of the project.
+- **Module status summary:** Modules 1, 3 and 12 In Progress; Modules 2 and 4 to 11 Not Started.

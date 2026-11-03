@@ -512,3 +512,48 @@ T2 **accepted** by the Principal Architect. Next: T3 (shared fixtures and the Ty
 
 **Next Task:**
 T3.
+
+---
+
+### Session: 9 / 2026-11-03
+
+**Phase:**
+Phase 1.1: T3 (shared fixtures) implemented, reviewed, fixed and accepted; **milestone MS-A reached**
+
+**T3: shared JSON fixtures and the TypeScript runner (commits in order):**
+
+| Commit | What |
+|---|---|
+| `e28483d` | Sonnet implementer: `contracts/` at the repository root (README, `format.json`, catalog export, 64 case files in four families) and `frontend/src/contracts/fixtures.test.ts` (loader, strict shape checker, per-family runners, coverage guards, catalog drift test). 83 to 166 unit tests; 27 e2e unchanged. |
+| `b299782` | Sonnet implementer, review fixes (below). 74 case files, 184 unit tests, 27 e2e. |
+
+**Independent review (Opus 5.5, read-only) of `e28483d`: PASS WITH FINDINGS, no blockers, no majors.** The reviewer sampled all 64 cases and derived each expectation from the **spec** (plan section 3.2, `errors.ts`, the rule order in `connections.ts`, RFC 6901, the catalog), not from the code, to test the "circular fixtures" risk: every sampled expectation followed from the spec except three that encode behaviour due to change or had a false description. It confirmed the runner cannot pass vacuously (renamed directories, unknown files and shape failures all fail) and that the multiset comparison counts duplicates and ignores order. Findings and the Principal Architect's triage (all accepted and fixed in `b299782`):
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | The test file pulled `@types/node` into the browser app's type-check | New `tsconfig.contracts.json`; `src/contracts` excluded from `tsconfig.app.json`; verified: the app program lists 0 `@types/node` files |
+| 2 | `UPDATE_FIXTURES` left set in a PowerShell session would make the drift check pass silently | When set, the catalog test rewrites the file and then **fails on purpose** ("unset UPDATE_FIXTURES and run again"); README ends the example with `Remove-Item Env:UPDATE_FIXTURES` |
+| 3 | No minimum-count guard | Floors: total 74, valid 7, invalid 30, connection 22, config 15 |
+| 4 | Rule order only partly pinned | Added `conn-unknown-port-before-self-loop`, `conn-type-mismatch-before-cycle`, `conn-input-occupied-before-cycle` |
+| 5 | Wrong-direction fixture weak (both sides wrong) | Split into source-only, target-only and missing-target-port cases |
+| 6 | Three expectations/descriptions encode changing or false behaviour | `wf-invalid-schema-required` now labelled "current behaviour; T5 changes it per D-025"; the "all six types" fixture gained the `condition.true -> agent.tools` edge so its claim is true; the too-large fixture rewritten (item 7) |
+| 7 | README under-specifies import semantics a second runner needs | Documented (edges in array order against accepted edges; rejected items not added so errors cascade; second duplicate id blamed; document-level errors stop early; 20-error cap) and pinned by new fixtures: multi-error, cascade, error cap (20), stop-before-nodes |
+| 8 | No RFC 6901 escaping case | `wf-invalid-schema-pointer-escaping` (`a/b~c` becomes `/nodes/0/config/a~1b~0c`) |
+| 9 | Connection format depended on catalog `defaults` (T5 removes it) | Runner builds nodes with `config: {}` |
+| nit | A 5 MB fixture (5,242,881 spaces) | Replaced by a generator field `inputRepeat {prefix?, unit, times, suffix?}` with a cap of 10,000,000 on `times`; the 5 MB blob stays in the history of `e28483d` (compressed about 23 KB; history is never rewritten) |
+
+**Mutation checks (by the implementer; not repeated by Claude):** four deliberate breaks of `connections.ts` (move `cycle` before `type-mismatch`; before `input-occupied`; `self-loop` before `unknown-port`; ignore direction on the target side) each made exactly the intended fixture fail; swapping `input-occupied` and `type-mismatch` was caught **only** by a new fixture, no existing unit test noticed. `UPDATE_FIXTURES=1 npm test` failed with the regenerate message and left the catalog file byte-identical.
+
+**Verification by the Principal Architect (commands actually run):** `npm run verify` in `frontend/` at `b299782`: **exit 0; 9 files, 184 unit tests passed; 27 e2e tests passed.** Also: `git show --stat`, fixture counts per family (7 + 30 + 22 + 15 = 74), largest fixture file now 9 KB, `git diff 6e97207 HEAD -- frontend/src` shows only the new test file, and `npm exec --no -- tsc -p tsconfig.app.json --listFilesOnly` lists no `@types/node`.
+
+**Carry-overs recorded for later tasks (also in `docs/PHASE1_1_PLAN.md`):** T4: change the size-limit fixture to 5,000,000 UTF-8 bytes and add the boundary pair; fixture files are read with `JSON.parse`, so a duplicate key inside a fixture file is not detected until the strict parser exists; the reviewer's note that `package.json` has no `engines` field (the runner needs Node 20.12 or newer; CI and local use Node 24). T5: `wf-invalid-schema-required` changes with D-025; `schema.required` coverage guard needs an exemption mechanism. T6: no fixture yet for a known type with an unknown `typeVersion` (deliberately, to avoid freezing behaviour that T6 revisits).
+
+**Not claimed:** **Python parity.** The fixtures are language-neutral and are run in TypeScript only; the Python runner is a Phase 2 task.
+
+**Process disclosures:** the `b299782` fix commit and Lesson L3 had no second independent Opus review, only the Principal Architect's verification (the same limitation as T2's last fix). No remote git operation by Claude. The T3 commits are unpushed as of the last `git status` (ahead 10).
+
+**Status:**
+T3 **accepted** by the Principal Architect. **Milestone MS-A (T1 to T3) is reached; the Product Owner's review is due.**
+
+**Next Task:**
+T4 (strict parsing, canonical JSON and export JSON), only after the MS-A review and the PO's go-ahead (a milestone review pauses the chain).
