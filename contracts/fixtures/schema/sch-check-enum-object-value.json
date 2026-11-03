@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-enum-object-value",
+  "description": "An enum value that is an object is reported at its index.",
+  "schema": {
+    "type": "string",
+    "enum": [
+      "a",
+      {
+        "a": 1
+      }
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum/1"
+    }
+  ]
+}

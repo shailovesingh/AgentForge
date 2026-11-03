@@ -1,0 +1,29 @@
+{
+  "name": "sch-defaults-falsy-kept",
+  "description": "Defaults 0, false and the empty string are kept (only undefined means no default).",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "n": {
+        "type": "number",
+        "default": 0
+      },
+      "f": {
+        "type": "boolean",
+        "default": false
+      },
+      "s": {
+        "type": "string",
+        "default": ""
+      }
+    }
+  },
+  "applyDefaults": true,
+  "expect": {
+    "value": {
+      "n": 0,
+      "f": false,
+      "s": ""
+    }
+  }
+}

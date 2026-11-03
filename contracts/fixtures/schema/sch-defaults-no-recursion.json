@@ -1,0 +1,22 @@
+{
+  "name": "sch-defaults-no-recursion",
+  "description": "A nested default is not applied unless its parent has an explicit default.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "o": {
+        "type": "object",
+        "properties": {
+          "inner": {
+            "type": "string",
+            "default": "x"
+          }
+        }
+      }
+    }
+  },
+  "applyDefaults": true,
+  "expect": {
+    "value": {}
+  }
+}

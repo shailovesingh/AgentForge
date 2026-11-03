@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-properties-on-string",
+  "description": "properties on a string schema is reported.",
+  "schema": {
+    "type": "string",
+    "properties": {}
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties"
+    }
+  ]
+}

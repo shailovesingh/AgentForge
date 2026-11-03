@@ -1,0 +1,15 @@
+{
+  "name": "sch-check-default-out-of-range",
+  "description": "A default that breaks minimum is reported.",
+  "schema": {
+    "type": "number",
+    "minimum": 1,
+    "default": 0
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/default"
+    }
+  ]
+}

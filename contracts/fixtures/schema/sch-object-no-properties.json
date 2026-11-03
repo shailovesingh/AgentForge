@@ -1,0 +1,14 @@
+{
+  "name": "sch-object-no-properties",
+  "description": "An object schema without properties accepts any keys (additionalProperties absent).",
+  "schema": {
+    "type": "object"
+  },
+  "value": {
+    "x": 1
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

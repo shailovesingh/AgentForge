@@ -1,0 +1,13 @@
+{
+  "name": "sch-number-maximum-boundary",
+  "description": "A number equal to maximum is valid.",
+  "schema": {
+    "type": "number",
+    "maximum": 2
+  },
+  "value": 2,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

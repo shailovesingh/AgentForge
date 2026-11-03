@@ -1,0 +1,22 @@
+{
+  "name": "sch-type-error-skips-number-keywords",
+  "description": "A wrong type reports only schema.type; enum and minimum are skipped.",
+  "schema": {
+    "type": "number",
+    "enum": [
+      1,
+      2
+    ],
+    "minimum": 5
+  },
+  "value": "x",
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

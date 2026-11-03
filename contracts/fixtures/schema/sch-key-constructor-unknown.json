@@ -1,0 +1,25 @@
+{
+  "name": "sch-key-constructor-unknown",
+  "description": "The key constructor is an unknown key, not an inherited property.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "value": {
+    "constructor": 1
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.additionalProperties",
+      "path": "/constructor"
+    }
+  ]
+}

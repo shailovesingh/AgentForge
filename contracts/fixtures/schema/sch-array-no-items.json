@@ -1,0 +1,17 @@
+{
+  "name": "sch-array-no-items",
+  "description": "Without items the elements are not validated.",
+  "schema": {
+    "type": "array"
+  },
+  "value": [
+    1,
+    "a",
+    null,
+    {}
+  ],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

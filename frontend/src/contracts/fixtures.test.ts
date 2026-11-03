@@ -9,6 +9,8 @@ import { canonicalCompact, exportPretty } from '../workflow/canonicalJson'
 import { validateConfig } from '../workflow/configSchema'
 import { checkConnection } from '../workflow/connections'
 import { ERROR_CODES, jsonPointer } from '../workflow/errors'
+import { applyDefaults, checkSchemaSubset, validateAgainstSchema } from '../workflow/jsonSchema'
+import type { JsonSchema, ObjectSchema } from '../workflow/jsonSchema'
 import { importWorkflow, serializeWorkflow } from '../workflow/serialize'
 import { strictParse } from '../workflow/strictJson'
 import type { Workflow } from '../workflow/types'
@@ -17,7 +19,7 @@ import type { Workflow } from '../workflow/types'
 // Shape checker (pure; unit-tested below with deliberately bad examples)
 // ---------------------------------------------------------------------------
 
-type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config' | 'serialization'
+type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config' | 'serialization' | 'schema'
 
 const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   'workflow/valid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
@@ -25,6 +27,7 @@ const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   connection: ['nodes', 'edges', 'source', 'target', 'expect'],
   config: ['nodeType', 'config', 'configText', 'expect'],
   serialization: ['inputText', 'inputBytesBase64', 'expect'],
+  schema: ['schema', 'value', 'options', 'applyDefaults', 'checkSchema', 'expect'],
 }
 
 const isBase64 = (b: unknown): boolean => typeof b === 'string' && b.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(b)
@@ -33,6 +36,12 @@ const isBase64 = (b: unknown): boolean => typeof b === 'string' && b.length % 4 
 // them), so no fixture may expect them and no workflow/invalid fixture is required for them. They are
 // tested in errors.test.ts and serialize.test.ts. Every other code stays strictly covered.
 export const EXPORT_ONLY_CODES: readonly string[] = ['value.not-json-data']
+
+// SECOND EXPLICIT EXEMPTION LIST (temporary, T5a): codes of JSON Schema subset keywords that no catalog
+// schema uses yet, so no workflow/invalid fixture can produce them. They are covered by the `schema` family
+// instead (guard below). T5b converts the catalog: remove an entry from here as soon as a workflow/invalid
+// fixture covers it, and delete the list when it is empty.
+export const SCHEMA_ONLY_CODES: readonly string[] = ['schema.minLength', 'schema.maxLength', 'schema.minItems', 'schema.maxItems']
 
 // What a fixture may expect: every code except the export-only ones.
 const KNOWN_CODES: readonly string[] = ERROR_CODES.filter((c) => !EXPORT_ONLY_CODES.includes(c))
@@ -159,6 +168,41 @@ export function checkShape(file: string, value: unknown): string[] {
       } else bad('expect must be { "valid": true, "compact", "export" } or { "valid": false, "errors": [...] }')
       break
     }
+    case 'schema': {
+      // Three case kinds: validation (default), defaults (`applyDefaults: true`), schema check (`checkSchema: true`).
+      const kinds = ['applyDefaults', 'checkSchema'].filter((k) => Object.hasOwn(value, k))
+      if (kinds.length > 1) {
+        bad('has both applyDefaults and checkSchema; use at most one')
+        break
+      }
+      const kind = kinds[0] ?? 'validation'
+      if (!Object.hasOwn(value, 'schema')) bad('needs schema')
+      else if (kind !== 'checkSchema' && !isObject(value.schema)) bad('schema must be a JSON object')
+      const forbid = (...fields: string[]) => {
+        for (const f of fields) if (Object.hasOwn(value, f)) bad(`${f} is not allowed in a ${kind} case`)
+      }
+      if (kind === 'validation') {
+        if (!Object.hasOwn(value, 'value')) bad('needs value')
+        if (!isObject(value.options) || !hasExactKeys(value.options, ['checkRequired']) || typeof value.options.checkRequired !== 'boolean') {
+          bad('options must be exactly { "checkRequired": true|false }')
+        }
+        expectationList(expected, true)
+        if (Array.isArray(expected)) {
+          for (const e of expected) if (isObject(e) && typeof e.code === 'string' && !e.code.startsWith('schema.')) bad(`expect code "${e.code}" must be a schema.* code`)
+        }
+      } else if (kind === 'applyDefaults') {
+        forbid('value', 'options')
+        if (value.applyDefaults !== true) bad('applyDefaults must be true')
+        if (!isObject(expected) || !hasExactKeys(expected, ['value']) || !isObject(expected.value)) bad('expect must be exactly { "value": { ... } }')
+      } else {
+        forbid('value', 'options')
+        if (value.checkSchema !== true) bad('checkSchema must be true')
+        if (!Array.isArray(expected) || !expected.every((e) => isObject(e) && hasExactKeys(e, ['path']) && isPointer(e.path))) {
+          bad('expect must be an array of exactly { path } (a JSON Pointer into the schema)')
+        }
+      }
+      break
+    }
     case 'config':
       if (!isNonEmptyString(value.nodeType)) bad('nodeType must be a non-empty string')
       oneOf('config', isObject, 'a JSON object')
@@ -249,6 +293,16 @@ interface SerializationCase extends CaseBase {
   expect: { valid: true; compact: string; export: string } | { valid: false; errors: Expected[] }
 }
 
+/** Three kinds, told apart by `applyDefaults` / `checkSchema` (see contracts/README.md). */
+interface SchemaCase extends CaseBase {
+  schema: unknown
+  value?: unknown
+  options?: { checkRequired: boolean }
+  applyDefaults?: true
+  checkSchema?: true
+  expect: Expected[] | { value: Record<string, unknown> } | { path: string }[]
+}
+
 interface Corpus {
   problems: string[]
   valid: WorkflowCase[]
@@ -256,10 +310,11 @@ interface Corpus {
   connection: ConnectionCase[]
   config: ConfigCase[]
   serialization: SerializationCase[]
+  schema: SchemaCase[]
 }
 
 function loadCorpus(): Corpus {
-  const corpus: Corpus = { problems: [], valid: [], invalid: [], connection: [], config: [], serialization: [] }
+  const corpus: Corpus = { problems: [], valid: [], invalid: [], connection: [], config: [], serialization: [], schema: [] }
   if (!existsSync(FIXTURES_DIR)) {
     corpus.problems.push('contracts/fixtures does not exist')
     return corpus
@@ -294,6 +349,7 @@ function loadCorpus(): Corpus {
     else if (family === 'workflow/invalid') corpus.invalid.push(withFile as WorkflowCase)
     else if (family === 'connection') corpus.connection.push(withFile as ConnectionCase)
     else if (family === 'serialization') corpus.serialization.push(withFile as SerializationCase)
+    else if (family === 'schema') corpus.schema.push(withFile as SchemaCase)
     else corpus.config.push(withFile as ConfigCase)
   }
   corpus.problems.push(...checkUniqueNames(names))
@@ -353,7 +409,14 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
   }
 }
 
-const MIN_COUNTS = { total: 262, valid: 19, invalid: 97, connection: 22, config: 15, serialization: 109, serializationInvalid: 9 }
+const MIN_COUNTS = {
+  total: 387, valid: 19, invalid: 97, connection: 22, config: 15, serialization: 109, serializationInvalid: 9,
+  schema: 125, schemaValidation: 66, schemaDefaults: 8, schemaCheck: 51,
+}
+
+// Which kind a schema case is (the three shapes are told apart by `applyDefaults` / `checkSchema`).
+const schemaKind = (c: SchemaCase): 'defaults' | 'check' | 'validation' => (c.applyDefaults ? 'defaults' : c.checkSchema ? 'check' : 'validation')
+const schemaValidation = corpus.schema.filter((c) => schemaKind(c) === 'validation')
 
 // What the serialization family must keep covering: the rejection codes an exporter or a hasher could meet.
 const SERIALIZATION_REJECTIONS = ['value.unsafe-integer', 'value.not-finite', 'doc.not-json', 'doc.duplicate-key', 'value.invalid-unicode', 'value.nul-character']
@@ -372,9 +435,27 @@ describe('fixture corpus', () => {
   test('every error code is expected by at least one workflow/invalid fixture', () => {
     const covered = new Set(corpus.invalid.flatMap((c) => c.expect.errors ?? []).map((e) => e.code))
     expect(
-      ERROR_CODES.filter((code) => !EXPORT_ONLY_CODES.includes(code) && !covered.has(code)),
+      ERROR_CODES.filter((code) => !EXPORT_ONLY_CODES.includes(code) && !SCHEMA_ONLY_CODES.includes(code) && !covered.has(code)),
       'codes with no workflow/invalid fixture',
     ).toEqual([])
+  })
+
+  test('every schema.* code is expected by a schema or a config fixture; the schema-only exemption list is honest', () => {
+    const covered = new Set([
+      ...schemaValidation.flatMap((c) => c.expect as Expected[]).map((e) => e.code),
+      ...corpus.config.flatMap((c) => c.expect).map((e) => e.code),
+    ])
+    expect(
+      ERROR_CODES.filter((code) => code.startsWith('schema.') && !covered.has(code)),
+      'schema.* codes with no schema or config fixture',
+    ).toEqual([])
+    // every exempted code is a real schema.* code and is NOT covered by workflow/invalid (otherwise remove it from the list)
+    const viaWorkflow = new Set(corpus.invalid.flatMap((c) => c.expect.errors ?? []).map((e) => e.code))
+    for (const code of SCHEMA_ONLY_CODES) {
+      expect(ERROR_CODES as readonly string[], code).toContain(code)
+      expect(code.startsWith('schema.'), code).toBe(true)
+      expect(viaWorkflow.has(code), `${code} is now covered by a workflow/invalid fixture: remove it from SCHEMA_ONLY_CODES`).toBe(false)
+    }
   })
 
   test('the export-only exemption list names only real codes, and no fixture expects them', () => {
@@ -401,15 +482,19 @@ describe('fixture corpus', () => {
   // Floors: deleting fixtures must fail the run. Raise them when you add cases; never lower them.
   test('no fixtures have been deleted (minimum counts)', () => {
     const counts = {
-      total: corpus.valid.length + corpus.invalid.length + corpus.connection.length + corpus.config.length + corpus.serialization.length,
+      total: corpus.valid.length + corpus.invalid.length + corpus.connection.length + corpus.config.length + corpus.serialization.length + corpus.schema.length,
       valid: corpus.valid.length,
       invalid: corpus.invalid.length,
       connection: corpus.connection.length,
       config: corpus.config.length,
       serialization: corpus.serialization.length,
+      schema: corpus.schema.length,
+      schemaValidation: schemaValidation.length,
+      schemaDefaults: corpus.schema.filter((c) => schemaKind(c) === 'defaults').length,
+      schemaCheck: corpus.schema.filter((c) => schemaKind(c) === 'check').length,
     }
     expect(counts.total, 'total cases').toBeGreaterThanOrEqual(MIN_COUNTS.total)
-    for (const family of ['valid', 'invalid', 'connection', 'config', 'serialization'] as const) {
+    for (const family of ['valid', 'invalid', 'connection', 'config', 'serialization', 'schema', 'schemaValidation', 'schemaDefaults', 'schemaCheck'] as const) {
       expect(counts[family], `${family} cases`).toBeGreaterThanOrEqual(MIN_COUNTS[family])
     }
   })
@@ -553,6 +638,45 @@ describe('config fixtures', () => {
   }
 })
 
+describe('jsonSchema.ts is not used by production code yet (T5b switches the code over)', () => {
+  test('only test files import it', () => {
+    const src = resolve(import.meta.dirname, '..')
+    const offenders = readdirSync(src, { recursive: true, withFileTypes: true })
+      .filter((d) => d.isFile() && /\.(ts|tsx)$/.test(d.name) && !d.name.endsWith('.test.ts') && d.name !== 'jsonSchema.ts')
+      .map((d) => relative(src, join(d.parentPath, d.name)).split(sep).join('/'))
+      .filter((file) => /from\s+['"][^'"]*jsonSchema['"]/.test(readFileSync(join(src, file), 'utf8')))
+    expect(offenders).toEqual([])
+  })
+})
+
+describe('schema fixtures (JSON Schema subset validator, explicit applyDefaults, schema check)', () => {
+  for (const c of corpus.schema) {
+    test(c.name, () => {
+      switch (schemaKind(c)) {
+        case 'defaults': {
+          const actual = applyDefaults(c.schema as ObjectSchema)
+          // compared as text so the order of the keys counts too
+          expect(JSON.stringify(actual), `${c.file}: applyDefaults result (key order counts)`).toBe(JSON.stringify((c.expect as { value: unknown }).value))
+          return
+        }
+        case 'check': {
+          const actual = checkSchemaSubset(c.schema).map((p) => p.path)
+          expect([...actual].sort(), `${c.file}: schema problem paths (order-insensitive)`).toEqual(
+            (c.expect as { path: string }[]).map((e) => e.path).sort(),
+          )
+          return
+        }
+        case 'validation': {
+          // a fixture schema must itself be inside the subset, or its expectation would prove nothing
+          expect(checkSchemaSubset(c.schema), `${c.file}: the fixture's own schema is outside the subset`).toEqual([])
+          const actual = validateAgainstSchema(c.schema as JsonSchema, c.value, c.options as { checkRequired: boolean }).map(({ code, path }) => ({ code, path }))
+          expect(asMultiset(actual), `${c.file}: schema errors ({code, path}, order-insensitive)`).toEqual(asMultiset(c.expect as Expected[]))
+        }
+      }
+    })
+  }
+})
+
 // ---------------------------------------------------------------------------
 // The shape checker itself, with deliberately bad examples
 // ---------------------------------------------------------------------------
@@ -577,6 +701,14 @@ describe('checkShape', () => {
     },
     config: { name: 'a', description: 'd', nodeType: 'llm.prompt', config: {}, expect: [{ code: 'schema.required', path: '/provider' }] },
     serialization: { name: 'a', description: 'd', inputText: '{"b":1,"a":[]}', expect: { valid: true, compact: '{"a":[],"b":1}', export: '{\n  "a": [],\n  "b": 1\n}\n' } },
+    schema: {
+      name: 'a',
+      description: 'd',
+      schema: { type: 'string', minLength: 1 },
+      value: '',
+      options: { checkRequired: false },
+      expect: [{ code: 'schema.minLength', path: '' }],
+    },
   }
   const files = {
     invalid: 'workflow/invalid/a.json',
@@ -584,6 +716,7 @@ describe('checkShape', () => {
     connection: 'connection/a.json',
     config: 'config/a.json',
     serialization: 'serialization/a.json',
+    schema: 'schema/a.json',
   }
 
   test.each(Object.keys(good) as (keyof typeof good)[])('a well-formed %s fixture has no problems', (family) => {
@@ -706,6 +839,56 @@ describe('checkShape', () => {
     test('an expectation that is neither valid nor invalid', () => {
       some(checkShape(file, withExpect(null)), 'expect must be { "valid": true')
       some(checkShape(file, withExpect({ valid: 'yes' })), 'expect must be { "valid": true')
+    })
+  })
+
+  describe('schema', () => {
+    const file = files.schema
+    const defaults = { name: 'a', description: 'd', schema: { type: 'object', properties: {} }, applyDefaults: true, expect: { value: {} } }
+    const check = { name: 'a', description: 'd', schema: 5, checkSchema: true, expect: [{ path: '' }] }
+
+    test('a null value, a defaults case and a check case have no problems', () => {
+      expect(checkShape(file, { ...good.schema, value: null, expect: [] })).toEqual([])
+      expect(checkShape(file, defaults)).toEqual([])
+      expect(checkShape(file, check)).toEqual([])
+      expect(checkShape(file, { ...check, expect: [] })).toEqual([])
+    })
+    test('a validation case needs schema, value and exactly { checkRequired }', () => {
+      const { value: _value, ...noValue } = good.schema
+      const { schema: _schema, ...noSchema } = good.schema
+      some(checkShape(file, noValue), 'needs value')
+      some(checkShape(file, noSchema), 'needs schema')
+      some(checkShape(file, { ...good.schema, schema: 5 }), 'schema must be a JSON object')
+      some(checkShape(file, { ...good.schema, options: {} }), 'options must be exactly')
+      some(checkShape(file, { ...good.schema, options: { checkRequired: 1 } }), 'options must be exactly')
+      some(checkShape(file, { ...good.schema, options: { checkRequired: true, extra: 1 } }), 'options must be exactly')
+    })
+    test('a validation case expects schema.* codes only, as { code, path }', () => {
+      some(checkShape(file, { ...good.schema, expect: [{ code: 'doc.not-json', path: '' }] }), 'must be a schema.* code')
+      some(checkShape(file, { ...good.schema, expect: [{ code: 'nope', path: '' }] }), 'not a known error code')
+      some(checkShape(file, { ...good.schema, expect: [{ code: 'schema.type', path: 'x' }] }), 'JSON Pointer')
+      some(checkShape(file, { ...good.schema, expect: [{ code: 'schema.type', path: '', message: 'm' }] }), 'exactly { code, path }')
+      some(checkShape(file, { ...good.schema, expect: {} }), 'array of { code, path }')
+    })
+    test('a defaults case expects exactly { value: {...} } and takes no value or options', () => {
+      some(checkShape(file, { ...defaults, expect: [] }), 'expect must be exactly { "value"')
+      some(checkShape(file, { ...defaults, expect: { value: [] } }), 'expect must be exactly { "value"')
+      some(checkShape(file, { ...defaults, expect: { value: {}, extra: 1 } }), 'expect must be exactly { "value"')
+      some(checkShape(file, { ...defaults, value: {} }), 'value is not allowed in a applyDefaults case')
+      some(checkShape(file, { ...defaults, options: { checkRequired: true } }), 'options is not allowed')
+      some(checkShape(file, { ...defaults, applyDefaults: false }), 'applyDefaults must be true')
+    })
+    test('a check case expects an array of exactly { path } and takes no value or options', () => {
+      some(checkShape(file, { ...check, expect: [{ path: 'x' }] }), 'array of exactly { path }')
+      some(checkShape(file, { ...check, expect: [{ path: '', code: 'schema.type' }] }), 'array of exactly { path }')
+      some(checkShape(file, { ...check, expect: { path: '' } }), 'array of exactly { path }')
+      some(checkShape(file, { ...check, value: 1 }), 'value is not allowed in a checkSchema case')
+      some(checkShape(file, { ...check, checkSchema: false }), 'checkSchema must be true')
+    })
+    test('applyDefaults and checkSchema together; an unknown field; a family field of another family', () => {
+      some(checkShape(file, { ...check, applyDefaults: true }), 'use at most one')
+      some(checkShape(file, { ...good.schema, extra: 1 }), 'unknown field "extra"')
+      some(checkShape(file, { ...good.schema, nodeType: 'x' }), 'unknown field "nodeType"')
     })
   })
 

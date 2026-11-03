@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-minlength-negative",
+  "description": "minLength must be a non-negative integer.",
+  "schema": {
+    "type": "string",
+    "minLength": -1
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/minLength"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "sch-check-missing-type",
+  "description": "A schema without type is reported at /type.",
+  "schema": {},
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/type"
+    }
+  ]
+}

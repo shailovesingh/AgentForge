@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-nongoal-ref",
+  "description": "The deliberate non-goal keyword $ref is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "$ref": "#/x"
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/$ref"
+    }
+  ]
+}

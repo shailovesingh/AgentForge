@@ -1,0 +1,21 @@
+{
+  "name": "sch-enum-string-invalid",
+  "description": "A string outside the enum is rejected.",
+  "schema": {
+    "type": "string",
+    "enum": [
+      "a",
+      "b"
+    ]
+  },
+  "value": "c",
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.enum",
+      "path": ""
+    }
+  ]
+}

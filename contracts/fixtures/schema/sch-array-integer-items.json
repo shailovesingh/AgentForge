@@ -1,0 +1,29 @@
+{
+  "name": "sch-array-integer-items",
+  "description": "Each item is checked against items.",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "integer"
+    }
+  },
+  "value": [
+    1,
+    2.5,
+    3,
+    "x"
+  ],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": "/1"
+    },
+    {
+      "code": "schema.type",
+      "path": "/3"
+    }
+  ]
+}

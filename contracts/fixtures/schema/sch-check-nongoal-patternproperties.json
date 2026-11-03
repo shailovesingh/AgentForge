@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-nongoal-patternproperties",
+  "description": "The deliberate non-goal keyword patternProperties is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "patternProperties": {}
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/patternProperties"
+    }
+  ]
+}

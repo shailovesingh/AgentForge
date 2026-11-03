@@ -1,0 +1,16 @@
+{
+  "name": "sch-check-property-not-schema",
+  "description": "A property whose schema is not an object is reported there.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": "string"
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a"
+    }
+  ]
+}

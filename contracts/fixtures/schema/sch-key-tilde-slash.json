@@ -1,0 +1,21 @@
+{
+  "name": "sch-key-tilde-slash",
+  "description": "An unknown key with ~ and / is escaped in the path (~0 and ~1).",
+  "schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "value": {
+    "a/b~c": 1
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.additionalProperties",
+      "path": "/a~1b~0c"
+    }
+  ]
+}

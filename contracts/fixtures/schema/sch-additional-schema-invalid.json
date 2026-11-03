@@ -1,0 +1,24 @@
+{
+  "name": "sch-additional-schema-invalid",
+  "description": "An unknown key that fails the additionalProperties schema is reported at its key.",
+  "schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": {
+      "type": "number"
+    }
+  },
+  "value": {
+    "x": 1,
+    "y": "s"
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": "/y"
+    }
+  ]
+}

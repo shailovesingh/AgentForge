@@ -1,0 +1,13 @@
+{
+  "name": "sch-check-null-type",
+  "description": "null is not a supported type.",
+  "schema": {
+    "type": "null"
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/type"
+    }
+  ]
+}

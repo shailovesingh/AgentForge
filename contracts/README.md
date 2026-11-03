@@ -3,7 +3,7 @@
 Language-neutral test fixtures that describe the **expected outcome** of AgentForge's validation rules
 (workflow import, connection rules, node config validation, the node catalog, and the exact JSON text
 written by the two serialization profiles). They are plain JSON data with no code in them.
-The serialization profiles are specified in `CANONICAL_JSON.md`.
+The serialization profiles are specified in `CANONICAL_JSON.md`; the config schema subset in `CONFIG_SCHEMA.md`.
 
 ## Status: tested in TypeScript only
 
@@ -28,6 +28,7 @@ contracts/
     connection/*.json               one proposed connection and the rule it should hit (or null)
     config/*.json                   one node config and the schema errors it should produce
     serialization/*.json            arbitrary JSON text in, exact compact and export text out
+    schema/*.json                   the JSON Schema subset: validation, applyDefaults and schema-check cases
 ```
 
 ## Common rules for every case file
@@ -207,6 +208,20 @@ example in the `__proto__` fixture: a JSON parser always creates an **own** `__p
 object literal in JavaScript or Python would not, so `configText` makes that intent visible. Give exactly
 one of `config` / `configText`.
 
+### `schema/*.json`
+
+Cases for the JSON Schema subset validator (`frontend/src/workflow/jsonSchema.ts`). The subset, its non-goals,
+`checkRequired` and the explicit-defaults rule are specified in `CONFIG_SCHEMA.md`. **TypeScript only: no Python
+parity is claimed; the Python runner is planned for Phase 2.** Every case has `name`, `description` and `schema`, and
+is one of three kinds, told apart by which field it has:
+
+- **validation** (no `applyDefaults`, no `checkSchema`): `value`, `options: { "checkRequired": true|false }`, and
+  `expect`: a list of `{ code, path }` (empty = valid), with `schema.*` codes only. `path` is relative to `value`.
+  `value` may be any JSON value; an own `__proto__` key written in the file is an own key after parsing.
+- **defaults**: `"applyDefaults": true` and `expect: { "value": { ... } }`, compared as JSON text so key order counts.
+- **schema check**: `"checkSchema": true` and `expect`: a list of `{ path }` (paths into the schema; message text is
+  not compared).
+
 ## Comparing errors: multisets, no messages
 
 Lists of `{ code, path }` are compared as **multisets**: order does not matter, duplicates count, and
@@ -244,7 +259,9 @@ the independent statement of what the code must do.
    are never lowered.
 5. Every error code (except the export-only exemption list in the runner) must stay covered by at least one
    `workflow/invalid` case, every `connection.*` code by at least one `connection` case, and the `serialization`
-   family must keep covering its own rejection codes; the runner enforces all three.
+   family must keep covering its own rejection codes; the runner enforces all three. Every `schema.*` code must also
+   appear in a `schema` or `config` case (the four length and item codes are exempt from the `workflow/invalid`
+   requirement through an explicit, temporary list in the runner until the catalog uses those keywords).
 
 ## Never edit expected values just to make a test pass
 

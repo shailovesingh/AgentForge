@@ -1,0 +1,29 @@
+{
+  "name": "sch-defaults-object-default-copied",
+  "description": "An explicit object default is copied whole.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "o": {
+        "type": "object",
+        "default": {
+          "k": [
+            1,
+            2
+          ]
+        }
+      }
+    }
+  },
+  "applyDefaults": true,
+  "expect": {
+    "value": {
+      "o": {
+        "k": [
+          1,
+          2
+        ]
+      }
+    }
+  }
+}

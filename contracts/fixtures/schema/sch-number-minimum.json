@@ -1,0 +1,18 @@
+{
+  "name": "sch-number-minimum",
+  "description": "A number below minimum is rejected.",
+  "schema": {
+    "type": "number",
+    "minimum": 0
+  },
+  "value": -1,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.minimum",
+      "path": ""
+    }
+  ]
+}

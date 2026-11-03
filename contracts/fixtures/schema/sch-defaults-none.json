@@ -1,0 +1,16 @@
+{
+  "name": "sch-defaults-none",
+  "description": "No defaults gives an empty object.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    }
+  },
+  "applyDefaults": true,
+  "expect": {
+    "value": {}
+  }
+}

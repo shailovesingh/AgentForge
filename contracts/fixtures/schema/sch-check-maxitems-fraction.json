@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-maxitems-fraction",
+  "description": "maxItems must be an integer.",
+  "schema": {
+    "type": "array",
+    "maxItems": 1.5
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/maxItems"
+    }
+  ]
+}

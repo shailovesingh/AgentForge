@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-default-wrong-type",
+  "description": "A default that fails its own schema is reported.",
+  "schema": {
+    "type": "string",
+    "default": 5
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/default"
+    }
+  ]
+}

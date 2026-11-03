@@ -1,0 +1,27 @@
+{
+  "name": "sch-key-proto-own",
+  "description": "An own __proto__ key (a JSON parser always makes it an own key) is an unknown key, not a prototype assignment.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "value": {
+    "__proto__": {
+      "a": "x"
+    }
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.additionalProperties",
+      "path": "/__proto__"
+    }
+  ]
+}

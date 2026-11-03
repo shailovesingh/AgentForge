@@ -1,0 +1,18 @@
+{
+  "name": "sch-array-valid",
+  "description": "A list of valid items is valid.",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "string"
+    }
+  },
+  "value": [
+    "a",
+    "b"
+  ],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

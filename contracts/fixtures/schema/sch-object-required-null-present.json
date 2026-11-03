@@ -1,0 +1,27 @@
+{
+  "name": "sch-object-required-null-present",
+  "description": "A null value is present (not absent) but has the wrong type.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "a"
+    ]
+  },
+  "value": {
+    "a": null
+  },
+  "options": {
+    "checkRequired": true
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": "/a"
+    }
+  ]
+}

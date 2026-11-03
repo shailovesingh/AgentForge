@@ -1,0 +1,18 @@
+{
+  "name": "sch-check-default-object-incomplete",
+  "description": "A default is validated without checkRequired, so an incomplete object default is fine.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "a"
+    ],
+    "default": {}
+  },
+  "checkSchema": true,
+  "expect": []
+}

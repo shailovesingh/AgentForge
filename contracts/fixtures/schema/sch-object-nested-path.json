@@ -1,0 +1,38 @@
+{
+  "name": "sch-object-nested-path",
+  "description": "Nested object errors have a nested JSON Pointer path.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "object",
+        "properties": {
+          "b": {
+            "type": "object",
+            "properties": {
+              "c": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "value": {
+    "a": {
+      "b": {
+        "c": "x"
+      }
+    }
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": "/a/b/c"
+    }
+  ]
+}

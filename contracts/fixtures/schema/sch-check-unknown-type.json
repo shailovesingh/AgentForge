@@ -1,0 +1,13 @@
+{
+  "name": "sch-check-unknown-type",
+  "description": "An unknown type is reported.",
+  "schema": {
+    "type": "date"
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/type"
+    }
+  ]
+}

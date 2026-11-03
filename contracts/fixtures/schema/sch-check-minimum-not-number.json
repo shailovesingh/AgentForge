@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-minimum-not-number",
+  "description": "minimum must be a number.",
+  "schema": {
+    "type": "number",
+    "minimum": "1"
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/minimum"
+    }
+  ]
+}

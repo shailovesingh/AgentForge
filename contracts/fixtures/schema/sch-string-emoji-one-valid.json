@@ -1,0 +1,13 @@
+{
+  "name": "sch-string-emoji-one-valid",
+  "description": "One emoji (one code point, two UTF-16 units) fits maxLength 1.",
+  "schema": {
+    "type": "string",
+    "maxLength": 1
+  },
+  "value": "😀",
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

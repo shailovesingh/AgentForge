@@ -1,0 +1,70 @@
+{
+  "name": "sch-check-valid",
+  "description": "A well-formed schema using every keyword has no problems.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "s": {
+        "type": "string",
+        "title": "S",
+        "description": "d",
+        "default": "x",
+        "minLength": 1,
+        "maxLength": 5,
+        "enum": [
+          "x",
+          "y"
+        ]
+      },
+      "n": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 10,
+        "default": 1.5
+      },
+      "i": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 2
+      },
+      "b": {
+        "type": "boolean",
+        "default": true
+      },
+      "l": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 3,
+        "default": []
+      },
+      "o": {
+        "type": "object",
+        "properties": {
+          "k": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "k"
+        ],
+        "additionalProperties": false,
+        "default": {}
+      },
+      "p": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "number"
+        }
+      }
+    },
+    "required": [
+      "s"
+    ],
+    "additionalProperties": false
+  },
+  "checkSchema": true,
+  "expect": []
+}

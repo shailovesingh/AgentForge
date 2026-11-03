@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-minlength-on-number",
+  "description": "minLength on a number schema is reported.",
+  "schema": {
+    "type": "number",
+    "minLength": 1
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/minLength"
+    }
+  ]
+}

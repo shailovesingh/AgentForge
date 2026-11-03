@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-nongoal-allof",
+  "description": "The deliberate non-goal keyword allOf is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "allOf": []
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/allOf"
+    }
+  ]
+}

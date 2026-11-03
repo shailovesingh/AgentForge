@@ -3,6 +3,8 @@ import { nodeDefinitions } from '../catalog'
 import { CONNECTION_ERROR_MESSAGES } from './connections'
 import { ERROR_CODES, jsonPointer } from './errors'
 import type { ErrorCode } from './errors'
+import { validateAgainstSchema } from './jsonSchema'
+import type { SchemaError } from './jsonSchema'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importWorkflow } from './serialize'
 import type { Workflow } from './types'
 
@@ -53,10 +55,17 @@ const withMetadata = (raw: string): string => JSON.stringify(base()).replace('"m
 // Every other code must keep an import case; do not add a code here to dodge that.
 const EXPORT_ONLY_CODES = ['value.not-json-data'] as const
 type ExportOnlyCode = (typeof EXPORT_ONLY_CODES)[number]
-const IMPORT_CODES = ERROR_CODES.filter((c): c is Exclude<ErrorCode, ExportOnlyCode> => !(EXPORT_ONLY_CODES as readonly string[]).includes(c))
+// SECOND EXPLICIT EXEMPTION LIST (temporary): codes of keywords the JSON Schema subset validator supports
+// but no catalog schema uses yet, so no workflow import can produce them. They are tested through
+// validateAgainstSchema below. T5b converts the catalog; delete this list then if a catalog schema uses them.
+const SCHEMA_ONLY_CODES = ['schema.minLength', 'schema.maxLength', 'schema.minItems', 'schema.maxItems'] as const
+type SchemaOnlyCode = (typeof SCHEMA_ONLY_CODES)[number]
+type NotImportable = ExportOnlyCode | SchemaOnlyCode
+const NOT_IMPORTABLE: readonly string[] = [...EXPORT_ONLY_CODES, ...SCHEMA_ONLY_CODES]
+const IMPORT_CODES = ERROR_CODES.filter((c): c is Exclude<ErrorCode, NotImportable> => !NOT_IMPORTABLE.includes(c))
 
 // One real input per import code. Record<..., ...> makes the compiler reject a missing entry too.
-const CASES: Record<Exclude<ErrorCode, ExportOnlyCode>, { path: string; input: () => string | Uint8Array }> = {
+const CASES: Record<Exclude<ErrorCode, NotImportable>, { path: string; input: () => string | Uint8Array }> = {
   'doc.not-json': { path: '', input: () => '{nope' },
   'doc.not-object': { path: '', input: () => '[]' },
   'doc.too-large': { path: '', input: () => ' '.repeat(MAX_IMPORT_BYTES + 1) },
@@ -145,8 +154,21 @@ describe('error codes', () => {
 
   test('every code in ERROR_CODES has an import case, except the explicit export-only list; every case is a real code', () => {
     expect(Object.keys(CASES).sort()).toEqual([...IMPORT_CODES].sort())
-    expect([...IMPORT_CODES, ...EXPORT_ONLY_CODES].sort()).toEqual([...ERROR_CODES].sort())
+    expect([...IMPORT_CODES, ...EXPORT_ONLY_CODES, ...SCHEMA_ONLY_CODES].sort()).toEqual([...ERROR_CODES].sort())
     expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
+  })
+
+  test('each schema-only code is produced by validateAgainstSchema with its JSON Pointer path', () => {
+    const produced: Record<SchemaOnlyCode, SchemaError[]> = {
+      'schema.minLength': validateAgainstSchema({ type: 'object', properties: { s: { type: 'string', minLength: 2 } } }, { s: 'a' }, { checkRequired: false }),
+      'schema.maxLength': validateAgainstSchema({ type: 'object', properties: { s: { type: 'string', maxLength: 1 } } }, { s: 'ab' }, { checkRequired: false }),
+      'schema.minItems': validateAgainstSchema({ type: 'object', properties: { l: { type: 'array', minItems: 1 } } }, { l: [] }, { checkRequired: false }),
+      'schema.maxItems': validateAgainstSchema({ type: 'object', properties: { l: { type: 'array', maxItems: 1 } } }, { l: [1, 2] }, { checkRequired: false }),
+    }
+    expect(Object.keys(produced).sort()).toEqual([...SCHEMA_ONLY_CODES].sort())
+    for (const code of SCHEMA_ONLY_CODES) {
+      expect(produced[code], code).toEqual([{ code, path: code.endsWith('Length') ? '/s' : '/l', message: expect.any(String) }])
+    }
   })
 
   test('each export-only code is produced by the export guard', () => {

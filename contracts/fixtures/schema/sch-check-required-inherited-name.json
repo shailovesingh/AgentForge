@@ -1,0 +1,21 @@
+{
+  "name": "sch-check-required-inherited-name",
+  "description": "required names are matched as own keys: toString is not a property here.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "toString"
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/required/0"
+    }
+  ]
+}

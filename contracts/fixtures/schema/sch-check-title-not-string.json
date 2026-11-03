@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-title-not-string",
+  "description": "title must be a string.",
+  "schema": {
+    "type": "string",
+    "title": 1
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/title"
+    }
+  ]
+}

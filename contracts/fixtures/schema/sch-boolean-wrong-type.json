@@ -1,0 +1,17 @@
+{
+  "name": "sch-boolean-wrong-type",
+  "description": "The text \"true\" is not a boolean.",
+  "schema": {
+    "type": "boolean"
+  },
+  "value": "true",
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

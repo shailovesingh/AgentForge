@@ -1,0 +1,21 @@
+{
+  "name": "sch-array-maxitems",
+  "description": "A list longer than maxItems is rejected.",
+  "schema": {
+    "type": "array",
+    "maxItems": 1
+  },
+  "value": [
+    1,
+    2
+  ],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.maxItems",
+      "path": ""
+    }
+  ]
+}

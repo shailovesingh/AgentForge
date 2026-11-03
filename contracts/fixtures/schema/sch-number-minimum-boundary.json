@@ -1,0 +1,13 @@
+{
+  "name": "sch-number-minimum-boundary",
+  "description": "A number equal to minimum is valid.",
+  "schema": {
+    "type": "number",
+    "minimum": 0
+  },
+  "value": 0,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

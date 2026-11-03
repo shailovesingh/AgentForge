@@ -1,0 +1,27 @@
+{
+  "name": "sch-object-required-nested-unchecked",
+  "description": "checkRequired false also applies to nested objects.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "b": {
+        "type": "object",
+        "properties": {
+          "c": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "c"
+        ]
+      }
+    }
+  },
+  "value": {
+    "b": {}
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

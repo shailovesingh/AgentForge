@@ -1,0 +1,23 @@
+{
+  "name": "sch-additional-true",
+  "description": "additionalProperties true accepts an unknown key unvalidated.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": true
+  },
+  "value": {
+    "b": [
+      1,
+      {}
+    ]
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

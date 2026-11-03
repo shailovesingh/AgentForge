@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-nongoal-anyof",
+  "description": "The deliberate non-goal keyword anyOf is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "anyOf": []
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/anyOf"
+    }
+  ]
+}

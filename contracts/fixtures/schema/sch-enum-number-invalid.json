@@ -1,0 +1,21 @@
+{
+  "name": "sch-enum-number-invalid",
+  "description": "A number outside a number enum is rejected.",
+  "schema": {
+    "type": "number",
+    "enum": [
+      1,
+      2
+    ]
+  },
+  "value": 3,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.enum",
+      "path": ""
+    }
+  ]
+}

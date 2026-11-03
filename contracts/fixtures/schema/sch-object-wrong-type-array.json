@@ -1,0 +1,18 @@
+{
+  "name": "sch-object-wrong-type-array",
+  "description": "A list is not an object.",
+  "schema": {
+    "type": "object",
+    "properties": {}
+  },
+  "value": [],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "sch-number-valid",
+  "description": "A fractional number is valid for number.",
+  "schema": {
+    "type": "number"
+  },
+  "value": 1.5,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

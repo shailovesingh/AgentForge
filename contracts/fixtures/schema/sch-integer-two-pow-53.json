@@ -1,0 +1,17 @@
+{
+  "name": "sch-integer-two-pow-53",
+  "description": "2^53 is not a safe integer, so it is not a valid integer.",
+  "schema": {
+    "type": "integer"
+  },
+  "value": 9007199254740992,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

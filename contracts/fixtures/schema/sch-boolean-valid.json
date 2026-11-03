@@ -1,0 +1,12 @@
+{
+  "name": "sch-boolean-valid",
+  "description": "A boolean is valid for boolean.",
+  "schema": {
+    "type": "boolean"
+  },
+  "value": false,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

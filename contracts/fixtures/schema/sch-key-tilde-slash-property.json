@@ -1,0 +1,24 @@
+{
+  "name": "sch-key-tilde-slash-property",
+  "description": "A known key with / is escaped in the path of its error.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a/b": {
+        "type": "string"
+      }
+    }
+  },
+  "value": {
+    "a/b": 1
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": "/a~1b"
+    }
+  ]
+}

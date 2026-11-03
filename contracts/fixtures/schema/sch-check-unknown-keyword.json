@@ -1,0 +1,16 @@
+{
+  "name": "sch-check-unknown-keyword",
+  "description": "A keyword that is neither supported nor a listed non-goal is reported.",
+  "schema": {
+    "type": "string",
+    "examples": [
+      "a"
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/examples"
+    }
+  ]
+}

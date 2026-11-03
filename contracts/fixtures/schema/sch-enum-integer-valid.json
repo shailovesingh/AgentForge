@@ -1,0 +1,16 @@
+{
+  "name": "sch-enum-integer-valid",
+  "description": "An integer in an integer enum is valid.",
+  "schema": {
+    "type": "integer",
+    "enum": [
+      1,
+      2
+    ]
+  },
+  "value": 2,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

@@ -1,0 +1,25 @@
+{
+  "name": "sch-key-required-constructor",
+  "description": "required constructor is absent unless it is an own key.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "constructor": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "constructor"
+    ]
+  },
+  "value": {},
+  "options": {
+    "checkRequired": true
+  },
+  "expect": [
+    {
+      "code": "schema.required",
+      "path": "/constructor"
+    }
+  ]
+}

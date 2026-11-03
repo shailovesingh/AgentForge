@@ -1,0 +1,21 @@
+{
+  "name": "sch-check-default-object-nested",
+  "description": "A default object with a wrong nested value is reported at that nested path.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "default": {
+      "a": 1
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/default/a"
+    }
+  ]
+}

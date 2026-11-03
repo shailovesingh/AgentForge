@@ -1,0 +1,33 @@
+{
+  "name": "sch-object-required-order",
+  "description": "Several absent required keys are all reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      },
+      "b": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "b",
+      "a"
+    ]
+  },
+  "value": {},
+  "options": {
+    "checkRequired": true
+  },
+  "expect": [
+    {
+      "code": "schema.required",
+      "path": "/a"
+    },
+    {
+      "code": "schema.required",
+      "path": "/b"
+    }
+  ]
+}

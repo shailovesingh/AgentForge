@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-nongoal-then",
+  "description": "The deliberate non-goal keyword then is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "then": {}
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/then"
+    }
+  ]
+}

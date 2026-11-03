@@ -29,6 +29,12 @@ export const ERROR_CODES = [
   'schema.additionalProperties',
   'schema.minimum',
   'schema.maximum',
+  // The next four exist in the JSON Schema subset validator (jsonSchema.ts) but no catalog schema uses
+  // those keywords yet, so no workflow import can produce them until T5b converts the catalog.
+  'schema.minLength',
+  'schema.maxLength',
+  'schema.minItems',
+  'schema.maxItems',
   'value.not-finite',
   'value.unsafe-integer',
   'value.invalid-unicode',

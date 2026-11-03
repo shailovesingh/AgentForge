@@ -1,0 +1,15 @@
+{
+  "name": "sch-check-additional-not-schema",
+  "description": "additionalProperties must be a boolean or a schema.",
+  "schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": "no"
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/additionalProperties"
+    }
+  ]
+}

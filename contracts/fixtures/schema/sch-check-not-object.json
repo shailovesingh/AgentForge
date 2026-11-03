@@ -1,0 +1,11 @@
+{
+  "name": "sch-check-not-object",
+  "description": "A schema that is not an object is reported at the root.",
+  "schema": 5,
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": ""
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "sch-string-length-boundary",
+  "description": "A string whose length equals both limits is valid.",
+  "schema": {
+    "type": "string",
+    "minLength": 2,
+    "maxLength": 2
+  },
+  "value": "ab",
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

@@ -1,0 +1,12 @@
+{
+  "name": "sch-integer-one-point-zero",
+  "description": "The spelling 1.0 is an integer.",
+  "schema": {
+    "type": "integer"
+  },
+  "value": 1.0,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

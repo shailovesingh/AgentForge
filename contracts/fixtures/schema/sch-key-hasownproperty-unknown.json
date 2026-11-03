@@ -1,0 +1,25 @@
+{
+  "name": "sch-key-hasownproperty-unknown",
+  "description": "The key hasOwnProperty is an unknown key.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "value": {
+    "hasOwnProperty": 1
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.additionalProperties",
+      "path": "/hasOwnProperty"
+    }
+  ]
+}

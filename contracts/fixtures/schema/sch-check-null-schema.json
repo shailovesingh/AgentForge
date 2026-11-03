@@ -1,0 +1,11 @@
+{
+  "name": "sch-check-null-schema",
+  "description": "null is not a schema.",
+  "schema": null,
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": ""
+    }
+  ]
+}

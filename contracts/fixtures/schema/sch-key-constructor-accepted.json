@@ -1,0 +1,19 @@
+{
+  "name": "sch-key-constructor-accepted",
+  "description": "Without additionalProperties false, an own constructor key is accepted and not validated by an inherited schema.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    }
+  },
+  "value": {
+    "constructor": "x"
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

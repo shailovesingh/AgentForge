@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-nongoal-if",
+  "description": "The deliberate non-goal keyword if is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "if": {}
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/if"
+    }
+  ]
+}

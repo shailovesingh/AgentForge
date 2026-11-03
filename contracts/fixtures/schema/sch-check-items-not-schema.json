@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-items-not-schema",
+  "description": "items must be a schema.",
+  "schema": {
+    "type": "array",
+    "items": 5
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/items"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "sch-type-error-skips-string-keywords",
+  "description": "A wrong type reports only schema.type; length and enum are skipped.",
+  "schema": {
+    "type": "string",
+    "minLength": 3,
+    "enum": [
+      "abc"
+    ]
+  },
+  "value": 5,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-nongoal-format",
+  "description": "The deliberate non-goal keyword format is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "format": "date"
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/format"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "sch-enum-string-valid",
+  "description": "A string in the enum is valid.",
+  "schema": {
+    "type": "string",
+    "enum": [
+      "a",
+      "b"
+    ]
+  },
+  "value": "b",
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

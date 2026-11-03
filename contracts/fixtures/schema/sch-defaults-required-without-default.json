@@ -1,0 +1,25 @@
+{
+  "name": "sch-defaults-required-without-default",
+  "description": "A required property without a default stays absent.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      },
+      "b": {
+        "type": "number",
+        "default": 1
+      }
+    },
+    "required": [
+      "a"
+    ]
+  },
+  "applyDefaults": true,
+  "expect": {
+    "value": {
+      "b": 1
+    }
+  }
+}

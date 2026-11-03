@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-enum-on-array",
+  "description": "enum on an array schema is reported.",
+  "schema": {
+    "type": "array",
+    "enum": []
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "sch-check-type-list",
+  "description": "A list of types is not in the subset.",
+  "schema": {
+    "type": [
+      "string",
+      "null"
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/type"
+    }
+  ]
+}

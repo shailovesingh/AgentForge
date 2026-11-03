@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-required-not-list",
+  "description": "required must be a list.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "required": "a"
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/required"
+    }
+  ]
+}

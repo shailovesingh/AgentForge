@@ -1,0 +1,18 @@
+{
+  "name": "sch-number-maximum",
+  "description": "A number above maximum is rejected.",
+  "schema": {
+    "type": "number",
+    "maximum": 2
+  },
+  "value": 2.5,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.maximum",
+      "path": ""
+    }
+  ]
+}

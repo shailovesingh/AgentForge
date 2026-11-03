@@ -1,0 +1,29 @@
+{
+  "name": "sch-defaults-property-order",
+  "description": "The result lists keys in schema order.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "z": {
+        "type": "string",
+        "default": "z"
+      },
+      "a": {
+        "type": "string",
+        "default": "a"
+      },
+      "m": {
+        "type": "string",
+        "default": "m"
+      }
+    }
+  },
+  "applyDefaults": true,
+  "expect": {
+    "value": {
+      "z": "z",
+      "a": "a",
+      "m": "m"
+    }
+  }
+}

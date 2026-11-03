@@ -1,0 +1,16 @@
+{
+  "name": "sch-check-items-on-object",
+  "description": "items on an object schema is reported.",
+  "schema": {
+    "type": "object",
+    "items": {
+      "type": "string"
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/items"
+    }
+  ]
+}

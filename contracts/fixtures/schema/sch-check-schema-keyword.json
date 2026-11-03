@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-schema-keyword",
+  "description": "$schema is not part of the subset.",
+  "schema": {
+    "type": "string",
+    "$schema": "x"
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/$schema"
+    }
+  ]
+}

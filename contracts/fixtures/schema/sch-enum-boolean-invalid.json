@@ -1,0 +1,20 @@
+{
+  "name": "sch-enum-boolean-invalid",
+  "description": "A boolean outside a boolean enum is rejected.",
+  "schema": {
+    "type": "boolean",
+    "enum": [
+      true
+    ]
+  },
+  "value": false,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.enum",
+      "path": ""
+    }
+  ]
+}

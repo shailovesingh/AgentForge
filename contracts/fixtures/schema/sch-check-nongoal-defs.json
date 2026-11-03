@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-nongoal-defs",
+  "description": "The deliberate non-goal keyword $defs is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "$defs": {}
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/$defs"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "sch-defaults-basic",
+  "description": "Each property with a default gets it; one without is absent.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "default": "x"
+      },
+      "b": {
+        "type": "integer",
+        "default": 3
+      },
+      "c": {
+        "type": "string"
+      }
+    }
+  },
+  "applyDefaults": true,
+  "expect": {
+    "value": {
+      "a": "x",
+      "b": 3
+    }
+  }
+}

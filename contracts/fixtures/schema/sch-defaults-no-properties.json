@@ -1,0 +1,11 @@
+{
+  "name": "sch-defaults-no-properties",
+  "description": "A schema without properties gives an empty object.",
+  "schema": {
+    "type": "object"
+  },
+  "applyDefaults": true,
+  "expect": {
+    "value": {}
+  }
+}

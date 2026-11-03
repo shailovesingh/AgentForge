@@ -1,0 +1,17 @@
+{
+  "name": "sch-check-required-own-constructor",
+  "description": "A property literally named constructor can be required.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "constructor": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "constructor"
+    ]
+  },
+  "checkSchema": true,
+  "expect": []
+}

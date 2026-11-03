@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-nongoal-not",
+  "description": "The deliberate non-goal keyword not is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string",
+        "not": {}
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/not"
+    }
+  ]
+}

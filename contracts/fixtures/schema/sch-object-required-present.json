@@ -1,0 +1,22 @@
+{
+  "name": "sch-object-required-present",
+  "description": "A present required key satisfies checkRequired true.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "a"
+    ]
+  },
+  "value": {
+    "a": "x"
+  },
+  "options": {
+    "checkRequired": true
+  },
+  "expect": []
+}

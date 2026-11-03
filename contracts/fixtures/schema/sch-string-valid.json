@@ -1,0 +1,12 @@
+{
+  "name": "sch-string-valid",
+  "description": "A string value is valid for a string schema.",
+  "schema": {
+    "type": "string"
+  },
+  "value": "hello",
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

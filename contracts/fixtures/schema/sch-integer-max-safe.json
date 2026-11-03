@@ -1,0 +1,12 @@
+{
+  "name": "sch-integer-max-safe",
+  "description": "2^53 - 1 is the largest valid integer.",
+  "schema": {
+    "type": "integer"
+  },
+  "value": 9007199254740991,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

@@ -1,0 +1,16 @@
+{
+  "name": "sch-check-required-without-properties",
+  "description": "required without properties is reported.",
+  "schema": {
+    "type": "object",
+    "required": [
+      "a"
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/required/0"
+    }
+  ]
+}

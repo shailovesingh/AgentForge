@@ -1,0 +1,17 @@
+{
+  "name": "sch-integer-fraction",
+  "description": "A number with a fractional part is not an integer.",
+  "schema": {
+    "type": "integer"
+  },
+  "value": 1.5,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

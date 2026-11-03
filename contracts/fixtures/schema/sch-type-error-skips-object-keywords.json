@@ -1,0 +1,25 @@
+{
+  "name": "sch-type-error-skips-object-keywords",
+  "description": "A wrong type reports only schema.type; required is skipped even with checkRequired true.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "a"
+    ]
+  },
+  "value": [],
+  "options": {
+    "checkRequired": true
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

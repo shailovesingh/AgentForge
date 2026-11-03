@@ -1,0 +1,49 @@
+{
+  "name": "sch-multiple-errors",
+  "description": "Independent problems are all reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "integer"
+      },
+      "b": {
+        "type": "string",
+        "maxLength": 1
+      },
+      "c": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "c"
+    ],
+    "additionalProperties": false
+  },
+  "value": {
+    "a": 1.5,
+    "b": "xy",
+    "z": 1
+  },
+  "options": {
+    "checkRequired": true
+  },
+  "expect": [
+    {
+      "code": "schema.required",
+      "path": "/c"
+    },
+    {
+      "code": "schema.type",
+      "path": "/a"
+    },
+    {
+      "code": "schema.maxLength",
+      "path": "/b"
+    },
+    {
+      "code": "schema.additionalProperties",
+      "path": "/z"
+    }
+  ]
+}

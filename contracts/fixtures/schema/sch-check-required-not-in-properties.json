@@ -1,0 +1,22 @@
+{
+  "name": "sch-check-required-not-in-properties",
+  "description": "A required name that is not a property is reported at its index.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "a",
+      "b"
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/required/1"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "sch-object-required-checked",
+  "description": "With checkRequired true an absent required key is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "a"
+    ]
+  },
+  "value": {},
+  "options": {
+    "checkRequired": true
+  },
+  "expect": [
+    {
+      "code": "schema.required",
+      "path": "/a"
+    }
+  ]
+}

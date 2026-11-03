@@ -1,0 +1,19 @@
+{
+  "name": "sch-check-default-in-property",
+  "description": "A bad default inside a property is reported at that property.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "integer",
+        "default": 1.5
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/default"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "sch-additional-false",
+  "description": "additionalProperties false rejects an unknown key.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "value": {
+    "a": "x",
+    "b": 1
+  },
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.additionalProperties",
+      "path": "/b"
+    }
+  ]
+}

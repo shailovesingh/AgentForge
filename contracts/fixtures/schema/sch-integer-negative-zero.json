@@ -1,0 +1,12 @@
+{
+  "name": "sch-integer-negative-zero",
+  "description": "Negative zero is a valid integer.",
+  "schema": {
+    "type": "integer"
+  },
+  "value": -0,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

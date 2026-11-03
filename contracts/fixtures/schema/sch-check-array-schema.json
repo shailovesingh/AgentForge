@@ -1,0 +1,11 @@
+{
+  "name": "sch-check-array-schema",
+  "description": "A list is not a schema.",
+  "schema": [],
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": ""
+    }
+  ]
+}

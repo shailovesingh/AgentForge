@@ -1,0 +1,17 @@
+{
+  "name": "sch-string-wrong-type",
+  "description": "A number is not a string.",
+  "schema": {
+    "type": "string"
+  },
+  "value": 5,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

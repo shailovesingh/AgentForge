@@ -1,0 +1,61 @@
+{
+  "name": "sch-check-depth-17-too-deep",
+  "description": "A schema nested 17 levels deep is reported at the 17th level.",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "array",
+                                "items": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/items/items/items/items/items/items/items/items/items/items/items/items/items/items/items/items"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-enum-not-list",
+  "description": "enum must be a list.",
+  "schema": {
+    "type": "string",
+    "enum": "a"
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum"
+    }
+  ]
+}

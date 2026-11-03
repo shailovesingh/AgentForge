@@ -1,0 +1,17 @@
+{
+  "name": "sch-integer-wrong-type",
+  "description": "A string is not an integer.",
+  "schema": {
+    "type": "integer"
+  },
+  "value": "x",
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

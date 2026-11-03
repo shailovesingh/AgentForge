@@ -1,0 +1,23 @@
+{
+  "name": "sch-array-item-wrong-type",
+  "description": "A wrong item is reported at its index.",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "string"
+    }
+  },
+  "value": [
+    "a",
+    1
+  ],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": "/1"
+    }
+  ]
+}

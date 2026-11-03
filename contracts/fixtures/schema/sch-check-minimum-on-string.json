@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-minimum-on-string",
+  "description": "minimum on a string schema is reported.",
+  "schema": {
+    "type": "string",
+    "minimum": 1
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/minimum"
+    }
+  ]
+}

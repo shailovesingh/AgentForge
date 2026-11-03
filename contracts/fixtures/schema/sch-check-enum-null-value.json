@@ -1,0 +1,16 @@
+{
+  "name": "sch-check-enum-null-value",
+  "description": "An enum value null is reported.",
+  "schema": {
+    "type": "string",
+    "enum": [
+      null
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum/0"
+    }
+  ]
+}

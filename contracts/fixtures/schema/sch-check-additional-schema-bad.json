@@ -1,0 +1,17 @@
+{
+  "name": "sch-check-additional-schema-bad",
+  "description": "An additionalProperties schema is checked like any schema.",
+  "schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": {
+      "type": "nope"
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/additionalProperties/type"
+    }
+  ]
+}

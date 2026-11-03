@@ -1,0 +1,32 @@
+{
+  "name": "sch-array-nested-path",
+  "description": "The path of an error inside an object inside a list is /index/key.",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "properties": {
+        "a": {
+          "type": "number"
+        }
+      }
+    }
+  },
+  "value": [
+    {
+      "a": 1
+    },
+    {
+      "a": "x"
+    }
+  ],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": "/1/a"
+    }
+  ]
+}

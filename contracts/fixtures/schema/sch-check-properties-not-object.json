@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-properties-not-object",
+  "description": "properties must be an object.",
+  "schema": {
+    "type": "object",
+    "properties": []
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties"
+    }
+  ]
+}
