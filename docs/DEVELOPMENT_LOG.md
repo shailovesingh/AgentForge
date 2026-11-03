@@ -120,3 +120,70 @@ Completed (documentation scope). Architecture is awaiting approval.
 
 **Next Task:**
 Architecture review by the PO and Principal Architect. After approval: Phase 1 step 0 (git init + `.gitignore`), then step 1 (scaffold `frontend/`).
+
+---
+
+### Session: 2 / 2026-11-03
+
+**Phase:**
+Phase 1: Visual workflow builder (frontend only)
+
+**Task:**
+Phase 1 steps 0–10, following the approval of D-002 to D-011 and the PO's git and Phase 1 authorization.
+
+**Objective:**
+Deliver the visual builder: canvas, generic node component, node library with drag-and-drop, connection rules, config panel, and Workflow JSON export/import, without starting any backend work.
+
+**Implementation:**
+- Recorded the PO's approvals in `DECISIONS.md` (D-002 to D-011 Approved; D-006 PO clarification added).
+- Step 0: `git init` on `main`, `.gitignore`, `.gitattributes`; inspected staged files; secret-pattern scan found nothing; initial commit.
+- Step 1: scaffolded `frontend/` with Vite react-ts; added `@xyflow/react`, `lucide-react`, `zustand`, `vitest`; enabled `strict`; removed template demo content.
+- Steps 2–3: Workflow JSON v1 types, a static six-node catalog, a config-schema validator, and the Zustand store.
+- Steps 4–6: controlled React Flow canvas, a single generic `WorkflowNode`, a searchable node library with drag-and-drop and click/Enter add.
+- Step 7: one pure `checkConnection` rule set (unknown node/port, self-loop, duplicate, single-input, data types, cycles), shared by canvas, store and importer.
+- Step 8: config panel generated from `configSchema`; invalid input is flagged and never committed.
+- Step 9: `migrate` (versioned chain), `validate` (shape, types, configs, edges through the shared rules), canonical `serialize`, and toolbar Import/Export/New with an error panel.
+- Verified in a real browser with an ad hoc Playwright script.
+
+**Files Created:**
+- `.gitignore`, `.gitattributes`
+- `frontend/` (Vite scaffold files, `package.json`, `package-lock.json`, `tsconfig*.json`, `vite.config.ts`, `.oxlintrc.json`, `index.html`, `public/favicon.svg`)
+- `frontend/src/app/{App.tsx,App.module.css,Toolbar.tsx,Toolbar.module.css}`
+- `frontend/src/canvas/{Canvas.tsx,Canvas.module.css,flowMapping.ts}`
+- `frontend/src/nodes/{WorkflowNode.tsx,WorkflowNode.module.css,NodeIcon.tsx,icons.ts,icons.test.ts}`
+- `frontend/src/library/{Library.tsx,Library.module.css,search.ts,search.test.ts}`
+- `frontend/src/config-panel/{ConfigPanel.tsx,ConfigPanel.module.css}`
+- `frontend/src/catalog/{nodes.ts,index.ts,catalog.test.ts}`
+- `frontend/src/store/{editorStore.ts,editorStore.test.ts}`
+- `frontend/src/workflow/{types.ts,configSchema.ts,connections.ts,connections.test.ts,migrate.ts,validate.ts,serialize.ts,serialize.test.ts}`
+
+**Files Modified:**
+- `docs/DECISIONS.md`, `docs/PROJECT_BRAIN.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT_LOG.md`
+
+**Technical Decisions:**
+- All of D-001 to D-011 are now Approved (see DECISIONS.md).
+- Small choices, flagged for architect review: Vite template defaults (oxlint, TypeScript 7, Vite 8, Vitest 5); `strict: true`; no `credentialRef` config yet; `fitView` only after import (on mount it zoomed into the first node).
+- Connection rules are one function reused by the canvas, store and importer, so there is a single source of truth.
+- Importer canonicalizes key order and drops unknown extra keys, which makes export -> import -> export byte-identical.
+
+**Verification:**
+- Commands executed: `npx tsc -b`, `npm run lint`, `npm test`, `npm run build`, dev server probe (HTTP 200), Playwright script against the dev server in headless Chrome.
+- Tests passed: **48 unit tests in 6 files**; **44 of 44 browser checks**; `tsc`, `oxlint` and `vite build` exit 0 with no warnings.
+- Tests failed (during development, then fixed):
+  - First browser run: 4 of 18 checks failed or errored. Cause 1, app bug: `fitView` on an empty canvas fired when the first node was added and zoomed the viewport, shifting later nodes. Fixed by removing it from mount and fitting after import. Cause 2, test-script mistakes: an ambiguous label locator and a click that landed on the minimap.
+  - `tsc` flagged an overwritten `position` key in a test; two oxlint warnings (component created during render; non-component export). All fixed.
+  - Library icons rendered squashed in the screenshot; fixed with `flex-shrink: 0`.
+- Manual verification: screenshots of the editor and of the imported workflow were inspected.
+- Not verified: Firefox/Safari/Edge, dark mode appearance, screen readers, keyboard-only canvas use, large graphs, the red/green handle feedback colours while dragging, and cycle rejection in the browser (unit-tested only).
+
+**Incidents:**
+- Windows PowerShell 5.1 `Set-Content -Encoding utf8` wrote UTF-8 BOMs and double-encoded non-ASCII characters (e.g. `§` to `Â§`) in `docs/PROJECT_BRAIN.md` and `docs/DECISIONS.md`, and a BOM into the steps 2-3 commit message. That commit message was amended (local, unpushed; the commit is now `5af36e5`). Both docs were repaired and every doc was scanned for remaining mojibake. The damaged versions exist in the first commit; the repair is in the Session 2 documentation commit.
+
+**Known Issues:**
+- See PROJECT_BRAIN §9 (no persistence, no undo/redo, Chrome-only verification, placeholder provider list, importer does not enforce required inputs, newer-than-typical toolchain, the parent-directory `CLAUDE.md`).
+
+**Status:**
+Completed for Phase 1 scope. Awaiting PO and Principal Architect acceptance.
+
+**Next Task:**
+Review of Phase 1 and the open questions in PROJECT_BRAIN §10. If accepted, draft a Phase 2 plan for separate review. No backend work before that review.

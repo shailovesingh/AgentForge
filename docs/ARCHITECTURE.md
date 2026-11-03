@@ -1,8 +1,8 @@
 # ARCHITECTURE — AGENTFORGE
 
-> **Status: PROPOSED — awaiting approval from the Product Owner and Principal Architect.**
-> Nothing in this document is implemented yet. Decision IDs (D-xxx) refer to `docs/DECISIONS.md`.
-> Last updated: 2026-11-03 (Session 1).
+> **Status: APPROVED (Product Owner, 2026-11-03; decisions D-001 to D-011).**
+> **Implemented so far: the frontend portions of §2, §4 and §5 (Phase 1).** Everything else (§3, §6–§12 backend, engine, agents, generation, MCP, persistence, security services) is **planned, not implemented**.
+> Decision IDs (D-xxx) refer to `docs/DECISIONS.md`. Last updated: 2026-11-03 (Session 2).
 
 ---
 
@@ -63,6 +63,8 @@ frontend/src/
   catalog/        Static catalog (Phase 1) → API client (Phase 2)
   store/          Zustand editor store
 ```
+
+**As built in Phase 1:** `app/` (shell and toolbar), `canvas/` (including `flowMapping.ts`, the only Workflow-to-React-Flow mapping), `nodes/`, `library/`, `config-panel/`, `catalog/`, `store/`, and `workflow/` (`types`, `configSchema`, `connections`, `migrate`, `validate`, `serialize`). The store holds the canonical `Workflow` document plus selection. `connections.ts` is a single rule set shared by the canvas (live drag feedback), the store (last gate) and the importer (each imported edge is checked as if added). The Phase 1 validator covers shape, known node types, config values and connection rules; "required inputs connected" is deliberately left to run-time validation (Phase 3), because an editor must be able to hold incomplete graphs.
 
 **Principles**
 
@@ -197,7 +199,7 @@ class NodeExecutor(Protocol):
 
 ## 6. Workflow Execution Engine
 
-The engine is a general DAG executor with **no LangGraph dependency**.
+The engine is a general **dependency-based DAG executor** with **no LangGraph dependency** (D-006, as clarified by the PO: not a sequential node runner; it must support conditional branching, branch selection, skipped nodes and dependency-driven execution, and independent nodes must be architecturally capable of running concurrently even if concurrency is enabled later).
 
 1. **Load:** `migrate` the document, `validate` it, then resolve each node to its executor.
 2. **Plan:** a topological sort. **Cycles are rejected in v1 (D-006).** Iteration happens inside the Agent node, or later in an explicit Loop node that has its own bounded semantics.

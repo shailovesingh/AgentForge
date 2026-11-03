@@ -5,8 +5,8 @@
 
 | Phase | Name | Status | Prerequisites |
 |---|---|---|---|
-| 0 | Project bootstrap (docs, rules, architecture proposal) | **Done** (docs only; architecture awaiting approval) | — |
-| 1 | Visual workflow builder (frontend only) | **Planned**, blocked on architecture approval | Approval of D-002–D-005, D-011 |
+| 0 | Project bootstrap (docs, rules, architecture proposal) | **Done** (architecture approved 2026-11-03) | — |
+| 1 | Visual workflow builder (frontend only) | **Implemented and verified; awaiting PO acceptance** (Session 2) | — |
 | 2 | Backend: FastAPI, Pydantic schemas, workflow API, PostgreSQL | Not started | Docker installed; D-008, D-009 approved |
 | 3 | Execution engine (registry, validator, DAG scheduler, run logs, SSE) | Not started | Phase 2; D-006 |
 | 4 | AI runtime (LLM node, Agent node, LangGraph, tools, memory) | Not started | Phase 3 |
@@ -37,6 +37,24 @@ Note: credential encryption, `owner_id` scoping and execution limits are built *
 | 8 | Config panel: shows the selected node; label editor; form rendered from `configSchema` (string, text, number, boolean, enum, json); inline validation messages | 3, 5 | Edits persist in the store and show up in the export; invalid JSON or number input is flagged and not committed |
 | 9 | Export: serialize the store to Workflow JSON v1 and download `<name>.json`. Import: file picker, then parse, then `migrate`, then validate (schema shape, known types and versions, port references, rules from step 7), with readable error list | 2, 3, 7 | **Round-trip test:** export → import → export is byte-identical. Malformed or unknown-type files are rejected with specific messages and leave the current graph untouched |
 | 10 | Update PROJECT_BRAIN, DEVELOPMENT_LOG and ROADMAP; handoff report | all | Docs reflect the actual verified state |
+
+**Results (Session 2, 2026-11-03).** "Unit" = Vitest. "Chrome" = ad hoc Playwright run against the dev server (script kept outside the repo).
+
+| # | Status | Evidence |
+|---|---|---|
+| 0 | Done | `git init`, `.gitignore`, `.gitattributes`; staged files inspected; secret-pattern scan found nothing; commit `798ab84` |
+| 1 | Done | `build`, `lint`, `test` exit 0; dev server answered HTTP 200; commit `2466b26` |
+| 2 | Done | Unit: unique `type@version`, unique port names, defaults satisfy `configSchema`, config validator cases |
+| 3 | Done | Unit: every store action, including node removal cascading to edges (commit `5af36e5`) |
+| 4 | Done | Chrome: store renders; Delete/Backspace remove nodes and edges. Pan, zoom and MiniMap are React Flow defaults and were not separately exercised |
+| 5 | Done | Chrome: all six catalog nodes render labels, icons and handles; handle ids equal port names (edges connected through them) |
+| 6 | Done | Chrome: drop lands at the cursor (within 40 px); search filter and empty state; click and Enter add |
+| 7 | Done | Unit: every rule. Chrome: occupied input, duplicate and type mismatch create no edge. **Cycle rejection is unit-tested only.** The green/red handle styling during a drag was **not** visually verified |
+| 8 | Done | Unit: input parsing. Chrome: label edit, enum select, invalid number and invalid JSON flagged and not committed (confirmed via export) |
+| 9 | Done | Unit: round trip byte-identical, 8 rejection cases, migration chain. Chrome: export, fresh-page import, byte-identical re-export, failed imports leave the graph untouched (commit `35fe3bc`) |
+| 10 | Done | This documentation update |
+
+Totals: 48 unit tests passed; 44/44 Chrome checks passed; `tsc`, `oxlint` and `vite build` clean. Chrome-only; see PROJECT_BRAIN §7 "Not tested".
 
 **Explicitly out of scope for Phase 1:** backend and persistence, workflow execution, undo/redo, auto-layout, NL generation, authentication, Playwright E2E.
 
