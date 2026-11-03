@@ -15,12 +15,16 @@ test.describe('connection rules', () => {
   })
 
   test('a duplicate connection is rejected', async ({ editor }) => {
-    await editor.buildPipeline()
-    await editor.connect(
-      { node: editor.node('trigger.manual'), port: 'data' },
-      { node: editor.node('llm.prompt'), port: 'input' },
-    )
-    await expect(editor.edges).toHaveCount(2)
+    // A multiple-connection input, so only the `duplicate` rule (not `input-occupied`) can reject.
+    await editor.drop('Condition', 100, 200)
+    await editor.drop('Agent', 500, 200)
+    const from = { node: editor.node('logic.condition'), port: 'true' }
+    const to = { node: editor.node('agent.autonomous'), port: 'tools' }
+
+    await editor.connect(from, to)
+    await expect(editor.edges).toHaveCount(1)
+    await editor.connect(from, to)
+    await expect(editor.edges).toHaveCount(1)
   })
 
   test('incompatible data types are rejected', async ({ editor }) => {

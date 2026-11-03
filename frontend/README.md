@@ -7,10 +7,11 @@ React + TypeScript + Vite visual workflow editor. Architecture: `../docs/ARCHITE
 | Command | What it does |
 |---|---|
 | `npm run dev` | Dev server (Vite) |
+| `npm run typecheck` | Type-check every project (`tsc -b`: app, node tooling, e2e); run `npm ci` first, never bare `npx tsc` |
 | `npm run lint` | Oxlint |
 | `npm test` | Unit tests (Vitest) |
 | `npm run build` | Type-check every project (`tsc -b`: app, node tooling, e2e) and build |
-| `npm run test:e2e` | Browser tests (Playwright, Chromium); starts the dev server itself |
+| `npm run test:e2e` | Browser tests (Playwright, Chromium); starts its own dev server on port 5174 |
 | `npm run verify` | Everything above in order: lint, unit tests, build (includes type-check), e2e |
 
 ## Reproducible run from a clean checkout
@@ -22,7 +23,7 @@ npx playwright install chromium     # one time, about 120 MB; no system Chrome n
 npm run verify
 ```
 
-`npm run test:e2e` reuses a dev server already running on port 5173 and otherwise starts one. In CI (`CI=1`) it always starts its own, retries a failed test once, and keeps traces of retried tests.
+`npm run test:e2e` always starts its own dev server on port 5174 (`--strictPort`) and never reuses a running one, so it fails if that port is taken rather than testing another server. In CI (`CI=1`) it also retries a failed test once, fails the run if a test needed a retry (`failOnFlakyTests`), and keeps traces of retried tests.
 
 ## End-to-end tests (`e2e/`)
 

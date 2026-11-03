@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = 5173
+// Dedicated port (not Vite's default 5173) so a run never lands on a developer's own server.
+const PORT = 5174
 const isCI = Boolean(process.env.CI)
 
 // End-to-end tests (D-019). Chromium only, so results do not depend on whichever browser is
@@ -10,6 +11,7 @@ export default defineConfig({
   testMatch: '**/*.e2e.ts',
   fullyParallel: true,
   forbidOnly: isCI,
+  failOnFlakyTests: isCI,
   retries: isCI ? 1 : 0,
   workers: isCI ? 2 : undefined,
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
@@ -28,7 +30,7 @@ export default defineConfig({
   webServer: {
     command: `npm run dev -- --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !isCI,
+    reuseExistingServer: false, // always start our own, so tests never hit some other server
     timeout: 60_000,
   },
 })

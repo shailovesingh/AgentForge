@@ -16,10 +16,18 @@ test.describe('adding nodes', () => {
     await editor.drop('Output', 700, 200)
 
     await expect(editor.nodes).toHaveCount(3)
-    await expect(editor.node('llm.prompt').getByText('LLM Prompt')).toBeVisible()
 
-    const box = await editor.node('trigger.manual').boundingBox()
-    expect(Math.abs(box!.x - (paneBox!.x + 100))).toBeLessThan(40)
+    const dropped = [
+      { type: 'trigger.manual', label: 'Manual Trigger', x: 100 },
+      { type: 'llm.prompt', label: 'LLM Prompt', x: 400 },
+      { type: 'output.result', label: 'Output', x: 700 },
+    ]
+    for (const { type, label, x } of dropped) {
+      await expect(editor.node(type).getByText(label, { exact: true }).first()).toBeVisible()
+      const box = await editor.node(type).boundingBox()
+      expect(Math.abs(box!.x - (paneBox!.x + x))).toBeLessThan(40)
+      expect(Math.abs(box!.y - (paneBox!.y + 200))).toBeLessThan(40)
+    }
   })
 
   test('clicking or pressing Enter on a library item adds a node', async ({ editor }) => {

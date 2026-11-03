@@ -42,6 +42,7 @@ test.describe('import', () => {
     const first = (await editor.exportWorkflow()).text
 
     await editor.page.reload()
+    await expect(editor.libraryItems).toHaveCount(6) // the app has rendered again
     await expect(editor.nodes).toHaveCount(0) // a fresh load starts empty
 
     await editor.importText(first)

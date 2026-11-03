@@ -55,6 +55,9 @@ export function editor(page: Page) {
   async function connect(from: PortRef, to: PortRef) {
     const a = await startConnection(from)
     await moveTo(a, await centerOf(handle(to, 'target')))
+    // React Flow marks a hovered handle `connectingto` (valid or not): a drag that never
+    // reached the target must fail here, not pass vacuously.
+    await expect(handle(to, 'target')).toHaveClass(/\bconnectingto\b/)
     await page.mouse.up()
   }
 
