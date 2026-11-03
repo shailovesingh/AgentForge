@@ -73,7 +73,6 @@
   border-radius: 4px;
   background: var(--bg);
   font-size: 12px;
-  cursor: help;
 }
 
 .errorsHeader {

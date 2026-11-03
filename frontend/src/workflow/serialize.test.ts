@@ -106,7 +106,29 @@ describe('import rejects bad files with specific codes, paths and messages', () 
     })
   })
 
-  test('edges: unknown node, bad port, type mismatch, cycle', () => {
+  test('config keys that name inherited members are unknown settings, not skipped', () => {
+    const llm = sample.nodes[1].config
+    const pointers = ['constructor', 'toString', 'hasOwnProperty', 'valueOf'].map((key) => {
+      const errors = errorsOf(withEdit((w) => (w.nodes[1].config = { ...llm, [key]: 1 })))
+      expect(errors).toHaveLength(1)
+      expect(errors[0]).toMatchObject({ code: 'schema.additionalProperties' })
+      return errors[0].path
+    })
+    expect(pointers).toEqual(
+      ['constructor', 'toString', 'hasOwnProperty', 'valueOf'].map((k) => `/nodes/1/config/${k}`),
+    )
+    // Raw text, so JSON.parse creates an OWN "__proto__" key (an object literal would set the prototype).
+    const raw = JSON.stringify(sample).replace('"provider":"ollama"', '"__proto__":{},"provider":"ollama"')
+    expect(raw).toContain('"__proto__"')
+    const errors = errorsOf(raw)
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toMatchObject({
+      code: 'schema.additionalProperties',
+      path: '/nodes/1/config/__proto__',
+    })
+  })
+
+  test('edges: unknown node, bad port, type mismatch, input occupied', () => {
     const ghost = errorsOf(withEdit((w) => (w.edges[0].target.nodeId = 'ghost')))[0]
     expect(ghost).toMatchObject({ code: 'connection.unknown-node', path: '/edges/0' })
     expect(ghost.message).toMatch(/does not exist/)
@@ -131,7 +153,7 @@ describe('import rejects bad files with specific codes, paths and messages', () 
     })
     const occupied = errorsOf(cycle)[0]
     expect(occupied).toMatchObject({ code: 'connection.input-occupied', path: '/edges/3' })
-    expect(occupied.message).toMatch(/e4.*(cycle|already has a connection)/)
+    expect(occupied.message).toMatch(/already has a connection/)
   })
 
   test('oversized input', () => {
@@ -159,6 +181,13 @@ describe('migrate', () => {
     const r = migrate({ schemaVersion: '0.8' }, { '0.8': (d) => d })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.errors[0]).toMatchObject({ code: 'doc.unsupported-version', path: '/schemaVersion' })
+  })
+
+  test('a schemaVersion naming an inherited member is unsupported, not a migration step', () => {
+    for (const version of ['constructor', 'toString', '__proto__']) {
+      const e = errorsOf(withEdit((w) => (w.schemaVersion = version)))[0]
+      expect(e).toMatchObject({ code: 'doc.unsupported-version', path: '/schemaVersion' })
+    }
   })
 
   test('there are no registered migrations yet (only 1.0 exists)', () => {

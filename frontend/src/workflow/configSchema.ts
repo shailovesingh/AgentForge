@@ -65,14 +65,19 @@ export function parseConfigInput(
   return error ? { ok: false, error } : { ok: true, value }
 }
 
-/** Validates a node config against its schema: missing required keys first, then each config key in order. */
+/**
+ * Validates a node config against its schema: missing required keys first, then each config
+ * key in Object.entries order (integer-like keys sort first in JS objects).
+ * Config keys are untrusted, so schema lookups use own-property checks: a key such as
+ * "constructor" or "__proto__" must not resolve to an inherited member.
+ */
 export function validateConfig(schema: ConfigSchema, config: Record<string, unknown>): ConfigError[] {
   const errors: ConfigError[] = []
   for (const key of schema.required ?? []) {
     if (config[key] === undefined) errors.push({ key, code: 'schema.required', message: 'is required' })
   }
   for (const [key, value] of Object.entries(config)) {
-    const prop = schema.properties[key]
+    const prop = Object.hasOwn(schema.properties, key) ? schema.properties[key] : undefined
     if (!prop) {
       errors.push({ key, code: 'schema.additionalProperties', message: 'is not a known setting' })
       continue

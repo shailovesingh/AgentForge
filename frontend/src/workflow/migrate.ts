@@ -24,7 +24,8 @@ export function migrate(input: unknown, migrations: Record<string, Migration> = 
   const seen = new Set<string>()
   while (doc.schemaVersion !== SCHEMA_VERSION) {
     const version = doc.schemaVersion
-    const step = typeof version === 'string' ? migrations[version] : undefined
+    // schemaVersion is untrusted: only own keys are migration steps ("constructor" must not match).
+    const step =typeof version === 'string' && Object.hasOwn(migrations, version) ? migrations[version] : undefined
     if (typeof version !== 'string' || !step || seen.has(version)) {
       return {
         ok: false,

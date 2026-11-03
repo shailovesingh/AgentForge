@@ -37,7 +37,7 @@ const base = (): Workflow => ({
 
 /** Serializes the base workflow after an edit. */
 const edited = (edit: (wf: Workflow) => void): string => {
-  const wf = base() as Workflow
+  const wf = base()
   edit(wf)
   return JSON.stringify(wf)
 }

@@ -92,6 +92,7 @@ export function Toolbar() {
             {importErrors.map((error, i) => (
               <li key={i}>
                 <code title={error.path === '' ? '(whole document)' : error.path}>{error.code}</code> {error.message}
+                <span className={styles.srOnly}> {error.path === '' ? '(whole document)' : `at ${error.path}`}</span>
               </li>
             ))}
           </ul>
