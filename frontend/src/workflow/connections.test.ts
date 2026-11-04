@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest'
-import { nodeDefinitions } from '../catalog'
+import { getLatestNodeDefinition, nodeDefinitions } from '../catalog'
 import { checkConnection } from './connections'
 import type { Workflow, WorkflowEdge } from './types'
 
 const node = (id: string, type: string) => ({
   id,
   type,
-  typeVersion: 1,
+  typeVersion: getLatestNodeDefinition(type)!.version, // the catalog serves only the latest version of a type
   label: id,
   config: {},
   position: { x: 0, y: 0 },

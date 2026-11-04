@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { getLatestNodeDefinition, nodeDefinitions } from '../catalog'
 import { checkConnection } from '../workflow/connections'
 import { applyDefaults } from '../workflow/jsonSchema'
+import type { UpgradeReport } from '../workflow/nodeMigrations'
 import { SCHEMA_VERSION } from '../workflow/types'
 import type { PortRef, Position, Workflow, WorkflowEdge } from '../workflow/types'
 
@@ -12,6 +13,7 @@ export interface EditorState {
   workflow: Workflow
   selectedNodeIds: string[]
   selectedEdgeIds: string[]
+  upgrades: UpgradeReport[]
 
   /** Creates a node from the latest catalog definition and selects it. Returns its id. */
   addNode: (type: string, position: Position) => string
@@ -24,8 +26,10 @@ export interface EditorState {
   removeEdges: (edgeIds: string[]) => void
   setSelection: (nodeIds: string[], edgeIds: string[]) => void
   setWorkflowName: (name: string) => void
-  loadWorkflow: (workflow: Workflow) => void
+  /** Replaces the document. `upgrades` is what the import migrated in memory (shown by the banner); any later load or reset replaces it. */
+  loadWorkflow: (workflow: Workflow, upgrades?: UpgradeReport[]) => void
   reset: () => void
+  dismissUpgrades: () => void
 }
 
 // ponytail: short random ids; collisions are negligible for editor-sized graphs.
@@ -47,6 +51,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
   workflow: createEmptyWorkflow(),
   selectedNodeIds: [],
   selectedEdgeIds: [],
+  upgrades: [],
 
   addNode: (type, position) => {
     const def = getLatestNodeDefinition(type)
@@ -136,8 +141,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   setWorkflowName: (name) => set(({ workflow }) => ({ workflow: { ...workflow, name } })),
 
-  loadWorkflow: (workflow) => set({ workflow, selectedNodeIds: [], selectedEdgeIds: [] }),
+  loadWorkflow: (workflow, upgrades = []) => set({ workflow, selectedNodeIds: [], selectedEdgeIds: [], upgrades }),
 
   reset: () =>
-    set({ workflow: createEmptyWorkflow(), selectedNodeIds: [], selectedEdgeIds: [] }),
+    set({ workflow: createEmptyWorkflow(), selectedNodeIds: [], selectedEdgeIds: [], upgrades: [] }),
+
+  dismissUpgrades: () => set({ upgrades: [] }),
 }))

@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-agent-v1-max-iterations-fraction-below-range",
+  "description": "A version 1 agent with maxIterations 0.5 (below the version 1 range) is not rounded to 1 by the migration; it fails the version 2 integer type (schema.type, where version 1 itself would have said schema.minimum).",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "a", "config": { "provider": "ollama", "maxIterations": 0.5 }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "schema.type", "path": "/nodes/0/config/maxIterations" }] }
+}

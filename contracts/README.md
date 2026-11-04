@@ -4,6 +4,7 @@ Language-neutral test fixtures that describe the **expected outcome** of AgentFo
 (workflow import, connection rules, node config validation, the node catalog, and the exact JSON text
 written by the two serialization profiles). They are plain JSON data with no code in them.
 The serialization profiles are specified in `CANONICAL_JSON.md`; the config schema subset in `CONFIG_SCHEMA.md`.
+Node versions and migrations are specified in `MIGRATIONS.md`.
 
 ## Status: tested in TypeScript only
 
@@ -29,6 +30,7 @@ contracts/
     config/*.json                   one node config and the schema errors it should produce
     serialization/*.json            arbitrary JSON text in, exact compact and export text out
     schema/*.json                   the JSON Schema subset: validation, applyDefaults and schema-check cases
+    migration/*.json                node migrations: a version 1 document in, the upgrade reports and the migrated workflow out
 ```
 
 ## Common rules for every case file
@@ -77,7 +79,8 @@ text cannot express: invalid UTF-8 and a leading byte order mark. The runner dec
 bytes to the importer (so `doc.invalid-encoding` is reachable). An empty string is allowed (empty file).
 
 The import must succeed, and the resulting workflow must deep-equal the parsed input (valid cases are
-written in canonical shape, so importing changes nothing).
+written in canonical shape and at the latest node versions, so importing changes nothing) and `upgrades` must be
+empty. A document with an older node version belongs in the `migration` family instead.
 
 ### `workflow/invalid/*.json`
 
@@ -124,9 +127,9 @@ TypeScript runs these fixtures only; **no Python parity is claimed** until a Pyt
   `metadata`, `nodes`, `edges`) are wrong, those errors are returned and nodes and edges are not checked
   (see `wf-invalid-doc-error-stops-before-nodes`).
 - **Nodes** are checked in array order. Each node goes through these checks in this order: malformed
-  (`node.malformed`), duplicate id (`node.duplicate-id`), unknown type or version (`node.unknown-type`),
-  then its config. Exactly three cases are **not added**: a malformed node, a duplicate id (the **second**
-  occurrence is the one blamed and is dropped) and an unknown type. A node whose **only** problems are
+  (`node.malformed`), duplicate id (`node.duplicate-id`), unknown type (`node.unknown-type`, only for a node TYPE the catalog does not have), then its version (`node.version-newer` or
+  `node.no-migration-path`, normally already reported by the migration step before validation; see `MIGRATIONS.md`), then its config. Exactly four cases are **not added**: a malformed node, a duplicate id (the **second**
+  occurrence is the one blamed and is dropped), an unknown type and a version problem. A node whose **only** problems are
   config errors **is still added**: its config errors (`schema.*`, at `/nodes/<i>/config/<key>`) are
   reported and the node is kept, so edges that use it are checked normally (see
   `wf-invalid-config-error-node-still-connectable`).
@@ -135,10 +138,10 @@ TypeScript runs these fixtures only; **no Python parity is claimed** until a Pyt
   (`edge.duplicate-id`) is rejected first; then the connection rules run in the order given under
   `connection/*.json`. A cycle is therefore reported on the edge that closes it, and a rejected edge is
   not added.
-- Because a malformed, duplicate-id or unknown-type node is not added, such a node **cascades**: an edge
+- Because a malformed, duplicate-id, unknown-type or wrong-version node is not added, such a node **cascades**: an edge
   that uses it also fails with `connection.unknown-node` (see `wf-invalid-cascade-unknown-type-edge`). A
   node with config errors does **not** cascade.
-- **At most 20 errors** are reported (`MAX_ERRORS` in `frontend/src/workflow/validate.ts`); the first 20 in
+- **At most 20 errors** are reported (`MAX_ERRORS` in `frontend/src/workflow/errors.ts`); the first 20 in
   the order above are kept (see `wf-invalid-error-cap`, built with `inputRepeat`).
 
 ### `serialization/*.json`
@@ -183,7 +186,7 @@ output to equal `expect.export`.
 
 The workflow is described compactly: each node is `{ id, type }` and each edge is
 `{ source: [nodeId, port], target: [nodeId, port] }`. A runner builds a full workflow from it: every
-node gets `typeVersion` 1, its id as label, position `{0, 0}` and an **empty** `config` (`{}`; the
+node gets `typeVersion` equal to the LATEST catalog version of its type (the catalog serves only the latest), its id as label, position `{0, 0}` and an **empty** `config` (`{}`; the
 connection rules never read config, so this format does not depend on catalog defaults); edges get ids
 `e1`, `e2`, ... in order. It then asks whether `source` -> `target` may be added.
 `expect` is `null` when the connection is allowed, otherwise the first failing rule as a full code:
@@ -227,6 +230,32 @@ is one of three kinds, told apart by which field it has:
 - **schema check**: `"checkSchema": true` and `expect`: a list of `{ path }` (paths into the schema; message text is
   not compared).
 
+### `migration/*.json`
+
+Success cases for node migrations (`MIGRATIONS.md`): a document with an OLD node version goes in, and the upgrade
+reports and the full migrated workflow come out. **TypeScript only: no Python parity is claimed; the Python runner
+is planned for Phase 2.**
+
+```json
+{ "name": "...", "description": "...", "input": { ...a workflow document... },
+  "expect": { "upgrades": [ { "nodeId": "a", "type": "agent.autonomous", "from": 1, "to": 2,
+                              "notes": [ "maxIterations 2.5 was not a whole number and was rounded to 3" ] } ],
+              "workflow": { ...the full migrated workflow... } } }
+```
+
+- `input` is a JSON object (a workflow document). The runner imports `JSON.stringify(input)` through the importer and
+  requires the import to succeed, `upgrades` to equal `expect.upgrades` (same order; `notes` compared exactly) and the
+  imported workflow to deep-equal `expect.workflow`.
+- It then exports the workflow, imports that text again and requires `upgrades: []` and a byte-identical re-export (so
+  the upgraded document is stable).
+- A node that is already at the latest version is not reported. A node that IS migrated is always reported, with an
+  **empty** `notes` list when the migration changed nothing visible (for example a whole-number `maxIterations`).
+- Cases where the migrated document is still invalid, or where a version is rejected, are `workflow/invalid` cases
+  (for example `wf-invalid-agent-v1-max-iterations-fraction-above-range`), so the strict code-coverage guards apply to
+  `node.version-newer` and `node.no-migration-path` like to any other code.
+- The `.5` cases (1.5, 2.5, 3.5, 48.5, 49.5) are there because Python's built-in `round()` rounds half to even
+  (`round(2.5) == 2`, `round(48.5) == 48`); a Python port must round half up (`MIGRATIONS.md`).
+
 ## Comparing errors: multisets, no messages
 
 Lists of `{ code, path }` are compared as **multisets**: order does not matter, duplicates count, and
@@ -261,7 +290,7 @@ the independent statement of what the code must do.
    currently prints.
 3. Run `npm test` in `frontend/`. The runner names the file if it is malformed or fails.
 4. Raise `MIN_COUNTS` in the runner to the new totals. The floors make deleting fixtures fail the run and
-   are never lowered (the one exception so far: T5b moved the `schema.required` rejection from `workflow/invalid`
+   are never lowered (the `migration` family has its own floor, `migration` in `MIN_COUNTS`; the one exception so far: T5b moved the `schema.required` rejection from `workflow/invalid`
    to `workflow/valid`, because of decision C1, so the invalid floor went down by one and the valid floor up).
 5. Every error code (except the two exemption lists in `frontend/src/workflow/codeExemptions.ts`) must stay covered by at least one
    `workflow/invalid` case, every `connection.*` code by at least one `connection` case, and the `serialization`

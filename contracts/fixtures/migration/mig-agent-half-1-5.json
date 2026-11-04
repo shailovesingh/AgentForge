@@ -1,0 +1,29 @@
+{
+  "name": "mig-agent-half-1-5",
+  "description": "1.5 rounds half UP to 2 (half to even would also give 2; 2.5 is the case that separates the rules).",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 1.5 }, "position": { "x": 10, "y": 20 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": {
+    "upgrades": [{ "nodeId": "a", "type": "agent.autonomous", "from": 1, "to": 2, "notes": ["maxIterations 1.5 was not a whole number and was rounded to 2"] }],
+    "workflow": {
+      "schemaVersion": "1.0",
+      "id": "wf_1",
+      "name": "Sample",
+      "description": "",
+      "nodes": [
+        { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 2 }, "position": { "x": 10, "y": 20 } }
+      ],
+      "edges": [],
+      "metadata": {}
+    }
+  }
+}

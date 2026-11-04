@@ -1,0 +1,8 @@
+{
+  "name": "cfg-max-iterations-fraction-rejected",
+  "description": "maxIterations is an integer since agent.autonomous version 2, so 2.5 is schema.type (a version 1 document with 2.5 is upgraded by the node migration before it is validated).",
+  "nodeType": "agent.autonomous",
+  "config": { "provider": "ollama", "maxIterations": 2.5 },
+  "checkRequired": true,
+  "expect": [{ "code": "schema.type", "path": "/maxIterations" }]
+}

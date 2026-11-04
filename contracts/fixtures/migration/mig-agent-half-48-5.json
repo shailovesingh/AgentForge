@@ -1,0 +1,29 @@
+{
+  "name": "mig-agent-half-48-5",
+  "description": "48.5 rounds half UP to 49; round half to even (Python round) would give 48, so a port that uses it fails here.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 48.5 }, "position": { "x": 10, "y": 20 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": {
+    "upgrades": [{ "nodeId": "a", "type": "agent.autonomous", "from": 1, "to": 2, "notes": ["maxIterations 48.5 was not a whole number and was rounded to 49"] }],
+    "workflow": {
+      "schemaVersion": "1.0",
+      "id": "wf_1",
+      "name": "Sample",
+      "description": "",
+      "nodes": [
+        { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 49 }, "position": { "x": 10, "y": 20 } }
+      ],
+      "edges": [],
+      "metadata": {}
+    }
+  }
+}

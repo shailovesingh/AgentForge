@@ -56,7 +56,7 @@ export function Toolbar() {
     const result = importWorkflow(new Uint8Array(await file.arrayBuffer()), nodeDefinitions)
     if (result.ok) {
       // Only a fully valid file replaces the current graph.
-      useEditorStore.getState().loadWorkflow(result.workflow)
+      useEditorStore.getState().loadWorkflow(result.workflow, result.upgrades)
       setImportErrors([])
       // Fit after React Flow has rendered and measured the new nodes.
       setTimeout(() => void fitView({ padding: 0.2, maxZoom: 1 }), 50)

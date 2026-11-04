@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-agent-v1-max-iterations-integer-above-range",
+  "description": "A version 1 agent with the whole number 51 is left unchanged by the migration and fails schema.maximum, exactly as version 1 would have.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "a", "config": { "provider": "ollama", "maxIterations": 51 }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "schema.maximum", "path": "/nodes/0/config/maxIterations" }] }
+}

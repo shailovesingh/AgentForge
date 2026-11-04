@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-node-version-newer-llm-prompt",
+  "description": "An llm.prompt node at typeVersion 2 is newer than the catalog (version 1): node.version-newer at the node's typeVersion.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 2, "label": "l", "config": { "provider": "ollama", "prompt": "" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "node.version-newer", "path": "/nodes/0/typeVersion" }] }
+}

@@ -77,6 +77,8 @@ const CASES: Record<Exclude<ErrorCode, NotImportable>, { path: string; input: ()
   'node.malformed': { path: '/nodes/1', input: () => edited((w) => (w.nodes[1] = 5 as never)) },
   'node.duplicate-id': { path: '/nodes/2/id', input: () => edited((w) => (w.nodes[2].id = 't')) },
   'node.unknown-type': { path: '/nodes/1/type', input: () => edited((w) => (w.nodes[1].type = 'mystery.node')) },
+  'node.version-newer': { path: '/nodes/1/typeVersion', input: () => edited((w) => (w.nodes[1].typeVersion = 2)) },
+  'node.no-migration-path': { path: '/nodes/1/typeVersion', input: () => edited((w) => (w.nodes[1].typeVersion = 0)) },
   'edge.malformed': { path: '/edges/0', input: () => edited((w) => (w.edges[0] = 'x' as never)) },
   'edge.duplicate-id': { path: '/edges/1/id', input: () => edited((w) => (w.edges[1].id = 'e1')) },
   'connection.unknown-node': {

@@ -1,0 +1,17 @@
+{
+  "name": "wf-invalid-node-version-problems-all-reported",
+  "description": "Version problems are collected for every node before the file is rejected: a newer agent and an agent at version 0 give one error each, in document order.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 3, "label": "a", "config": { "provider": "ollama" }, "position": { "x": 0, "y": 0 } },
+      { "id": "b", "type": "agent.autonomous", "typeVersion": 0, "label": "b", "config": { "provider": "ollama" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "node.version-newer", "path": "/nodes/0/typeVersion" }, { "code": "node.no-migration-path", "path": "/nodes/1/typeVersion" }] }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "mig-agent-half-3-5",
+  "description": "3.5 rounds half UP to 4 (Python round() would give 4 here, but see 2.5 and 49.5: a port must be half up, not half to even).",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 3.5 }, "position": { "x": 10, "y": 20 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": {
+    "upgrades": [{ "nodeId": "a", "type": "agent.autonomous", "from": 1, "to": 2, "notes": ["maxIterations 3.5 was not a whole number and was rounded to 4"] }],
+    "workflow": {
+      "schemaVersion": "1.0",
+      "id": "wf_1",
+      "name": "Sample",
+      "description": "",
+      "nodes": [
+        { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 4 }, "position": { "x": 10, "y": 20 } }
+      ],
+      "edges": [],
+      "metadata": {}
+    }
+  }
+}

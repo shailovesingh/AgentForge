@@ -240,7 +240,7 @@
   },
   {
     "type": "agent.autonomous",
-    "version": 1,
+    "version": 2,
     "category": "AI",
     "label": "Agent",
     "description": "An autonomous AI agent that reasons in a loop and can call connected tools.",
@@ -296,7 +296,7 @@
           "default": ""
         },
         "maxIterations": {
-          "type": "number",
+          "type": "integer",
           "title": "Max iterations",
           "minimum": 1,
           "maximum": 50,

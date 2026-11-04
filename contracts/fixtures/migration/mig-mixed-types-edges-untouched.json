@@ -1,0 +1,45 @@
+{
+  "name": "mig-mixed-types-edges-untouched",
+  "description": "A file mixing a version 1 agent, an agent already at version 2 and other node types: only the version 1 agent is upgraded and reported, and nodes, edges and metadata that are not touched are identical.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "d",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": { "x": 1 } }, "position": { "x": 0, "y": 0 } },
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "Draft", "config": { "provider": "ollama", "prompt": "hi", "temperature": 0.5 }, "position": { "x": 200, "y": 0 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 3.5 }, "position": { "x": 400, "y": 0 } },
+      { "id": "b", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent B", "config": { "provider": "ollama", "maxIterations": 4 }, "position": { "x": 400, "y": 200 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Out", "config": { "format": "text" }, "position": { "x": 600, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "a", "port": "input" } },
+      { "id": "e3", "source": { "nodeId": "a", "port": "output" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": { "owner": "me" }
+  },
+  "expect": {
+    "upgrades": [{ "nodeId": "a", "type": "agent.autonomous", "from": 1, "to": 2, "notes": ["maxIterations 3.5 was not a whole number and was rounded to 4"] }],
+    "workflow": {
+      "schemaVersion": "1.0",
+      "id": "wf_1",
+      "name": "Sample",
+      "description": "d",
+      "nodes": [
+        { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": { "x": 1 } }, "position": { "x": 0, "y": 0 } },
+        { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "Draft", "config": { "provider": "ollama", "prompt": "hi", "temperature": 0.5 }, "position": { "x": 200, "y": 0 } },
+        { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 4 }, "position": { "x": 400, "y": 0 } },
+        { "id": "b", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent B", "config": { "provider": "ollama", "maxIterations": 4 }, "position": { "x": 400, "y": 200 } },
+        { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Out", "config": { "format": "text" }, "position": { "x": 600, "y": 0 } }
+      ],
+      "edges": [
+        { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l", "port": "input" } },
+        { "id": "e2", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "a", "port": "input" } },
+        { "id": "e3", "source": { "nodeId": "a", "port": "output" }, "target": { "nodeId": "o", "port": "input" } }
+      ],
+      "metadata": { "owner": "me" }
+    }
+  }
+}

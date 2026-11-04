@@ -11,7 +11,7 @@
       { "id": "h", "type": "http.request", "typeVersion": 1, "label": "h", "config": { "method": "GET", "url": "", "headers": {}, "body": "" }, "position": { "x": 200, "y": 0 } },
       { "id": "c", "type": "logic.condition", "typeVersion": 1, "label": "c", "config": { "field": "", "operator": "equals", "value": "" }, "position": { "x": 400, "y": 0 } },
       { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "provider": "ollama", "model": "", "systemPrompt": "", "prompt": "", "temperature": 0.7 }, "position": { "x": 600, "y": 0 } },
-      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "a", "config": { "provider": "ollama", "model": "", "instructions": "", "maxIterations": 10 }, "position": { "x": 800, "y": 0 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "a", "config": { "provider": "ollama", "model": "", "instructions": "", "maxIterations": 10 }, "position": { "x": 800, "y": 0 } },
       { "id": "o", "type": "output.result", "typeVersion": 1, "label": "o", "config": { "format": "text" }, "position": { "x": 1000, "y": 0 } }
     ],
     "edges": [

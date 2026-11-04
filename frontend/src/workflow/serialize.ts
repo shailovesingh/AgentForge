@@ -1,11 +1,16 @@
 import { exportPretty } from './canonicalJson'
 import type { ValidationError } from './errors'
 import { migrate } from './migrate'
+import { migrateNodes } from './nodeMigrations'
+import type { UpgradeReport } from './nodeMigrations'
 import { strictParse } from './strictJson'
 import type { NodeDefinition, Workflow } from './types'
 import { validateWorkflow } from './validate'
-import type { ValidateResult } from './validate'
 import { findPolicyViolations } from './valuePolicy'
+
+export type ImportResult =
+  | { ok: true; workflow: Workflow; upgrades: UpgradeReport[] }
+  | { ok: false; errors: ValidationError[] }
 
 // Imported files are untrusted input. AgentForge policy (decision C2): at most 5,000,000 UTF-8
 // BYTES (not characters), checked before parsing.
@@ -109,8 +114,10 @@ const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }) // ig
  * Parses, migrates and validates imported text or bytes. Never throws; returns readable errors.
  * The size limit counts UTF-8 bytes and is checked before anything is decoded or parsed. One
  * leading byte order mark is tolerated and dropped (it is never written).
+ * Pipeline: strictParse, migrate (document version), migrateNodes (node versions), validateWorkflow.
+ * `upgrades` lists every node that was upgraded in memory (empty when none); the input is only read.
  */
-export function importWorkflow(input: string | Uint8Array, catalog: NodeDefinition[]): ValidateResult {
+export function importWorkflow(input: string | Uint8Array, catalog: NodeDefinition[]): ImportResult {
   let text: string
   if (typeof input === 'string') {
     if (utf8Length(input, MAX_IMPORT_BYTES) > MAX_IMPORT_BYTES) return { ok: false, errors: [importTooLarge()] }
@@ -131,5 +138,8 @@ export function importWorkflow(input: string | Uint8Array, catalog: NodeDefiniti
   if (!parsed.ok) return { ok: false, errors: [parsed.error] }
   const migrated = migrate(parsed.value)
   if (!migrated.ok) return migrated
-  return validateWorkflow(migrated.doc, catalog)
+  const upgraded = migrateNodes(migrated.doc, catalog)
+  if (!upgraded.ok) return upgraded
+  const validated = validateWorkflow(upgraded.doc, catalog)
+  return validated.ok ? { ok: true, workflow: validated.workflow, upgrades: upgraded.upgrades } : validated
 }

@@ -1,0 +1,29 @@
+{
+  "name": "mig-agent-integer-no-note",
+  "description": "A version 1 agent whose maxIterations is already a whole number still upgrades to version 2: the upgrade is reported with an EMPTY notes list and the value is unchanged.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 10 }, "position": { "x": 10, "y": 20 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": {
+    "upgrades": [{ "nodeId": "a", "type": "agent.autonomous", "from": 1, "to": 2, "notes": [] }],
+    "workflow": {
+      "schemaVersion": "1.0",
+      "id": "wf_1",
+      "name": "Sample",
+      "description": "",
+      "nodes": [
+        { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 10 }, "position": { "x": 10, "y": 20 } }
+      ],
+      "edges": [],
+      "metadata": {}
+    }
+  }
+}

@@ -1,7 +1,8 @@
 import { CONNECTION_ERROR_MESSAGES, checkConnection } from './connections'
-import { jsonPointer } from './errors'
+import { MAX_ERRORS, jsonPointer } from './errors'
 import type { ErrorCode, ValidationError } from './errors'
 import { validateAgainstSchema } from './jsonSchema'
+import { nodeVersionProblem } from './nodeMigrations'
 import type { NodeDefinition, Workflow, WorkflowEdge, WorkflowNode } from './types'
 
 export type ValidateResult = { ok: true; workflow: Workflow } | { ok: false; errors: ValidationError[] }
@@ -10,8 +11,6 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
 const isString = (v: unknown): v is string => typeof v === 'string'
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
-
-const MAX_ERRORS = 20
 
 /**
  * Validates a (migrated) parsed document: shape, node types and configs, and every edge
@@ -60,6 +59,13 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
 
     const def = catalog.find((d) => d.type === raw.type && d.version === raw.typeVersion)
     if (!def) {
+      // A known type with a version the catalog lacks is a version problem (importWorkflow migrates first, so this
+      // is only reached when validateWorkflow is called on its own); node.unknown-type is for unknown TYPES only.
+      const versions = catalog.filter((d) => d.type === raw.type).map((d) => d.version)
+      if (versions.length > 0) {
+        const p = nodeVersionProblem(i, raw.id, raw.type, raw.typeVersion as number, Math.max(...versions))
+        return err(p.code, p.path, p.message)
+      }
       return err(
         'node.unknown-type',
         jsonPointer('nodes', i, 'type'),

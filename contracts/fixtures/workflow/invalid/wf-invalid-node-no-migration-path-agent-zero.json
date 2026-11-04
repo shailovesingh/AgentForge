@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-node-no-migration-path-agent-zero",
+  "description": "An agent.autonomous node at typeVersion 0 has no migration step (the first step starts at 1): node.no-migration-path at the node's typeVersion.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 0, "label": "a", "config": { "provider": "ollama" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "node.no-migration-path", "path": "/nodes/0/typeVersion" }] }
+}

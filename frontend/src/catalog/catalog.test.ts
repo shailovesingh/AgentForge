@@ -143,3 +143,23 @@ describe('initial values of a new node', () => {
     expect(getLatestNodeDefinition('trigger.manual')!.configSchema.properties!.payload.default).toEqual({})
   })
 })
+
+describe('agent.autonomous version 2 (T6)', () => {
+  beforeEach(() => useEditorStore.getState().reset())
+
+  test('a NEW agent node is created at typeVersion 2 with maxIterations 10 (literal values, not read from the catalog)', () => {
+    const id = useEditorStore.getState().addNode('agent.autonomous', { x: 0, y: 0 })
+    const node = useEditorStore.getState().workflow.nodes.find((n) => n.id === id)!
+    expect(node.typeVersion).toBe(2)
+    expect(node.config.maxIterations).toBe(10)
+  })
+
+  test('maxIterations is an integer from 1 to 50 in the catalog', () => {
+    const prop = getLatestNodeDefinition('agent.autonomous')!.configSchema.properties!.maxIterations
+    expect(prop).toMatchObject({ type: 'integer', minimum: 1, maximum: 50, default: 10 })
+  })
+
+  test('every other node type is still at version 1', () => {
+    expect(nodeDefinitions.filter((d) => d.type !== 'agent.autonomous').map((d) => d.version)).toEqual([1, 1, 1, 1, 1])
+  })
+})

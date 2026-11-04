@@ -112,7 +112,7 @@ export const nodeDefinitions: NodeDefinition[] = [
   },
   {
     type: 'agent.autonomous',
-    version: 1,
+    version: 2,
     category: 'AI',
     label: 'Agent',
     description: 'An autonomous AI agent that reasons in a loop and can call connected tools.',
@@ -131,8 +131,8 @@ export const nodeDefinitions: NodeDefinition[] = [
         provider: { type: 'string', title: 'Provider', enum: PROVIDERS, default: 'ollama' },
         model: { type: 'string', title: 'Model', default: '' },
         instructions: { type: 'string', title: 'Instructions', default: '' },
-        // ponytail: stays `number` until T6's node migration makes it an integer.
-        maxIterations: { type: 'number', title: 'Max iterations', minimum: 1, maximum: 50, default: 10 },
+        // Version 2: an integer. Version 1 documents (a plain number) are upgraded by the node migration in workflow/nodeMigrations.ts.
+        maxIterations: { type: 'integer', title: 'Max iterations', minimum: 1, maximum: 50, default: 10 },
       },
       required: ['provider'],
       additionalProperties: false,

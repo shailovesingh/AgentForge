@@ -11,6 +11,7 @@ import { EXPORT_ONLY_CODES, SCHEMA_ONLY_CODES } from '../workflow/codeExemptions
 import { ERROR_CODES } from '../workflow/errors'
 import { applyDefaults, checkSchemaSubset, validateAgainstSchema } from '../workflow/jsonSchema'
 import type { JsonSchema, ObjectSchema } from '../workflow/jsonSchema'
+import type { UpgradeReport } from '../workflow/nodeMigrations'
 import { importWorkflow, serializeWorkflow } from '../workflow/serialize'
 import { strictParse } from '../workflow/strictJson'
 import type { Workflow } from '../workflow/types'
@@ -19,7 +20,7 @@ import type { Workflow } from '../workflow/types'
 // Shape checker (pure; unit-tested below with deliberately bad examples)
 // ---------------------------------------------------------------------------
 
-type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config' | 'serialization' | 'schema'
+type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config' | 'serialization' | 'schema' | 'migration'
 
 const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   'workflow/valid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
@@ -28,6 +29,7 @@ const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   config: ['nodeType', 'config', 'configText', 'checkRequired', 'expect'],
   serialization: ['inputText', 'inputBytesBase64', 'expect'],
   schema: ['schema', 'value', 'options', 'applyDefaults', 'checkSchema', 'expect'],
+  migration: ['input', 'expect'],
 }
 
 const isBase64 = (b: unknown): boolean => typeof b === 'string' && b.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(b)
@@ -198,6 +200,32 @@ export function checkShape(file: string, value: unknown): string[] {
       }
       break
     }
+    case 'migration': {
+      // A version 1 document in, the upgrade reports and the full migrated workflow out.
+      if (!isObject(value.input)) bad('input must be a JSON object (a workflow document)')
+      if (!isObject(expected) || !hasExactKeys(expected, ['upgrades', 'workflow'])) {
+        bad('expect must be exactly { "upgrades": [...], "workflow": { ... } }')
+        break
+      }
+      if (!isObject(expected.workflow)) bad('expect.workflow must be a JSON object')
+      if (!Array.isArray(expected.upgrades)) bad('expect.upgrades must be an array')
+      else {
+        expected.upgrades.forEach((u, i) => {
+          const ok =
+            isObject(u) &&
+            hasExactKeys(u, ['nodeId', 'type', 'from', 'to', 'notes']) &&
+            typeof u.nodeId === 'string' &&
+            isNonEmptyString(u.type) &&
+            Number.isInteger(u.from) &&
+            Number.isInteger(u.to) &&
+            (u.from as number) < (u.to as number) &&
+            Array.isArray(u.notes) &&
+            u.notes.every((n) => typeof n === 'string')
+          if (!ok) bad(`expect.upgrades[${i}] must be exactly { nodeId, type, from, to, notes } (from < to, notes a list of strings)`)
+        })
+      }
+      break
+    }
     case 'config':
       if (!isNonEmptyString(value.nodeType)) bad('nodeType must be a non-empty string')
       oneOf('config', isObject, 'a JSON object')
@@ -301,8 +329,14 @@ interface SchemaCase extends CaseBase {
   expect: Expected[] | { value: Record<string, unknown> } | { path: string }[]
 }
 
+interface MigrationCase extends CaseBase {
+  input: unknown
+  expect: { upgrades: UpgradeReport[]; workflow: unknown }
+}
+
 interface Corpus {
   problems: string[]
+  migration: MigrationCase[]
   valid: WorkflowCase[]
   invalid: WorkflowCase[]
   connection: ConnectionCase[]
@@ -312,7 +346,7 @@ interface Corpus {
 }
 
 function loadCorpus(): Corpus {
-  const corpus: Corpus = { problems: [], valid: [], invalid: [], connection: [], config: [], serialization: [], schema: [] }
+  const corpus: Corpus = { problems: [], migration: [], valid: [], invalid: [], connection: [], config: [], serialization: [], schema: [] }
   if (!existsSync(FIXTURES_DIR)) {
     corpus.problems.push('contracts/fixtures does not exist')
     return corpus
@@ -348,6 +382,7 @@ function loadCorpus(): Corpus {
     else if (family === 'connection') corpus.connection.push(withFile as ConnectionCase)
     else if (family === 'serialization') corpus.serialization.push(withFile as SerializationCase)
     else if (family === 'schema') corpus.schema.push(withFile as SchemaCase)
+    else if (family === 'migration') corpus.migration.push(withFile as MigrationCase)
     else corpus.config.push(withFile as ConfigCase)
   }
   corpus.problems.push(...checkUniqueNames(names))
@@ -393,7 +428,7 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
     nodes: c.nodes.map((n) => ({
       id: n.id,
       type: n.type,
-      typeVersion: 1,
+      typeVersion: getLatestNodeDefinition(n.type)?.version ?? 1, // the catalog serves only the latest version of a type
       label: n.id,
       config: {}, // checkConnection never reads config, so this format does not depend on catalog defaults
       position: { x: 0, y: 0 },
@@ -409,8 +444,9 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
 
 const MIN_COUNTS = {
   // T5b (C1): the old schema.required rejection moved from invalid to valid (valid up, invalid down by one), config grew.
-  total: 415, valid: 21, invalid: 96, connection: 22, config: 19, serialization: 109, serializationInvalid: 9,
-  schema: 148, schemaValidation: 75, schemaDefaults: 8, schemaCheck: 65,
+  // T6: 9 invalid cases (version errors, v1 maxIterations) and the new migration family (10).
+  total: 434, valid: 21, invalid: 105, connection: 22, config: 19, serialization: 109, serializationInvalid: 9,
+  schema: 148, schemaValidation: 75, schemaDefaults: 8, schemaCheck: 65, migration: 10,
 }
 
 // Which kind a schema case is (the three shapes are told apart by `applyDefaults` / `checkSchema`).
@@ -481,7 +517,7 @@ describe('fixture corpus', () => {
   // Floors: deleting fixtures must fail the run. Raise them when you add cases; never lower them.
   test('no fixtures have been deleted (minimum counts)', () => {
     const counts = {
-      total: corpus.valid.length + corpus.invalid.length + corpus.connection.length + corpus.config.length + corpus.serialization.length + corpus.schema.length,
+      total: corpus.valid.length + corpus.invalid.length + corpus.connection.length + corpus.config.length + corpus.serialization.length + corpus.schema.length + corpus.migration.length,
       valid: corpus.valid.length,
       invalid: corpus.invalid.length,
       connection: corpus.connection.length,
@@ -491,9 +527,10 @@ describe('fixture corpus', () => {
       schemaValidation: schemaValidation.length,
       schemaDefaults: corpus.schema.filter((c) => schemaKind(c) === 'defaults').length,
       schemaCheck: corpus.schema.filter((c) => schemaKind(c) === 'check').length,
+      migration: corpus.migration.length,
     }
     expect(counts.total, 'total cases').toBeGreaterThanOrEqual(MIN_COUNTS.total)
-    for (const family of ['valid', 'invalid', 'connection', 'config', 'serialization', 'schema', 'schemaValidation', 'schemaDefaults', 'schemaCheck'] as const) {
+    for (const family of ['valid', 'invalid', 'connection', 'config', 'serialization', 'schema', 'schemaValidation', 'schemaDefaults', 'schemaCheck', 'migration'] as const) {
       expect(counts[family], `${family} cases`).toBeGreaterThanOrEqual(MIN_COUNTS[family])
     }
   })
@@ -529,7 +566,9 @@ describe('workflow/valid fixtures', () => {
       const input = workflowInput(c)
       const result = importWorkflow(input, nodeDefinitions)
       expect(result.ok, `${c.file}: expected a valid workflow, got ${JSON.stringify(result.ok ? [] : result.errors)}`).toBe(true)
-      if (result.ok) expect(result.workflow, `${c.file}: imported workflow differs from the input`).toEqual(JSON.parse(asText(input)))
+      if (!result.ok) return
+      expect(result.workflow, `${c.file}: imported workflow differs from the input`).toEqual(JSON.parse(asText(input)))
+      expect(result.upgrades, `${c.file}: a valid fixture is already at the latest versions, so nothing is upgraded`).toEqual([])
     })
   }
 })
@@ -541,6 +580,26 @@ describe('workflow/invalid fixtures', () => {
       expect(result.ok, `${c.file}: expected import to fail`).toBe(false)
       if (result.ok) return
       expect(asMultiset(result.errors), `${c.file}: errors ({code, path}, order-insensitive)`).toEqual(asMultiset(c.expect.errors ?? []))
+    })
+  }
+})
+
+describe('migration fixtures (node upgrades in memory)', () => {
+  for (const c of corpus.migration) {
+    test(c.name, () => {
+      const text = JSON.stringify(c.input)
+      const result = importWorkflow(text, nodeDefinitions)
+      expect(result.ok, `${c.file}: expected a valid workflow, got ${JSON.stringify(result.ok ? [] : result.errors)}`).toBe(true)
+      if (!result.ok) return
+      expect(result.upgrades, `${c.file}: upgrade reports`).toEqual(c.expect.upgrades)
+      expect(result.workflow, `${c.file}: migrated workflow`).toEqual(c.expect.workflow)
+      // The upgraded workflow exports to the new version, and that text imports again with nothing left to upgrade.
+      const exported = serializeWorkflow(result.workflow)
+      const again = importWorkflow(exported, nodeDefinitions)
+      expect(again.ok, `${c.file}: the export did not import again`).toBe(true)
+      if (!again.ok) return
+      expect(again.upgrades, `${c.file}: a re-import of the export upgrades nothing`).toEqual([])
+      expect(serializeWorkflow(again.workflow), `${c.file}: re-export differs`).toBe(exported)
     })
   }
 })

@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, test } from './fixtures.ts'
 
 interface ExportedWorkflow {
@@ -151,5 +154,82 @@ test.describe('import', () => {
     await expect(alert.getByText('at /nodes/0/type', { exact: true })).toBeVisible()
     await expect(editor.nodes).toHaveCount(3)
     await expect(editor.edges).toHaveCount(2)
+  })
+})
+
+// A version 1 agent file, as an older editor wrote it (maxIterations was a plain number).
+const agentFile = (typeVersion: number, maxIterations: number) =>
+  JSON.stringify(
+    {
+      schemaVersion: '1.0',
+      id: 'wf_old',
+      name: 'Old agent',
+      description: '',
+      nodes: [
+        { id: 'a', type: 'agent.autonomous', typeVersion, label: 'Agent', config: { provider: 'ollama', maxIterations }, position: { x: 100, y: 100 } },
+      ],
+      edges: [],
+      metadata: {},
+    },
+    null,
+    2,
+  ) + '\n'
+
+const UPGRADE_TEXT = 'Upgraded 1 node (Agent v1 to v2). Review the changes. Your original file was not modified.'
+
+test.describe('node upgrades (H3)', () => {
+  test('a version 1 agent file is upgraded in memory: banner with the note, field shows 3, the file on disk is unchanged', async ({ editor }) => {
+    const dir = mkdtempSync(join(tmpdir(), 'agentforge-e2e-'))
+    try {
+      const file = join(dir, 'old-agent.json')
+      writeFileSync(file, agentFile(1, 2.5))
+      const before = readFileSync(file)
+
+      await editor.page.getByLabel('Import workflow file').setInputFiles(file)
+
+      const banner = editor.page.getByRole('status').filter({ hasText: 'Upgraded' })
+      await expect(banner.getByText(UPGRADE_TEXT, { exact: true })).toBeVisible()
+      await expect(banner.getByText('maxIterations 2.5 was not a whole number and was rounded to 3')).toBeVisible()
+      await expect(editor.nodes).toHaveCount(1)
+      await editor.node('agent.autonomous').click({ position: { x: 30, y: 10 } })
+      await expect(editor.settings.getByLabel('Max iterations')).toHaveValue('3')
+
+      // The importer only reads: the bytes on disk are exactly what they were.
+      expect(readFileSync(file).equals(before)).toBe(true)
+
+      // Exporting is a separate, explicit action that writes a NEW file at the new version.
+      const exported = JSON.parse((await editor.exportWorkflow()).text) as { nodes: { typeVersion: number; config: { maxIterations: number } }[] }
+      expect(exported.nodes[0].typeVersion).toBe(2)
+      expect(exported.nodes[0].config.maxIterations).toBe(3)
+      expect(readFileSync(file).equals(before)).toBe(true)
+
+      await banner.getByRole('button', { name: 'Dismiss' }).click()
+      await expect(banner).toHaveCount(0)
+      await expect(editor.nodes).toHaveCount(1) // dismissing the banner changes nothing else
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a file newer than this editor is rejected with node.version-newer: error panel, graph untouched, no banner', async ({ editor }) => {
+    await editor.buildPipeline()
+    await editor.importText(agentFile(3, 5))
+
+    const alert = editor.toolbar.getByRole('alert')
+    await expect(alert.getByText('node.version-newer', { exact: true })).toBeVisible()
+    await expect(alert.getByText('at /nodes/0/typeVersion', { exact: true })).toBeVisible()
+    await expect(alert.getByText(/created by a newer editor/)).toBeVisible()
+    await expect(editor.nodes).toHaveCount(3)
+    await expect(editor.edges).toHaveCount(2)
+    await expect(editor.page.getByRole('status').filter({ hasText: 'Upgraded' })).toHaveCount(0)
+  })
+
+  test('New clears a visible banner', async ({ editor }) => {
+    await editor.importText(agentFile(1, 7))
+    const banner = editor.page.getByRole('status').filter({ hasText: 'Upgraded' })
+    await expect(banner.getByText(UPGRADE_TEXT, { exact: true })).toBeVisible()
+    await editor.page.getByRole('button', { name: 'New' }).click()
+    await expect(banner).toHaveCount(0)
+    await expect(editor.nodes).toHaveCount(0)
   })
 })

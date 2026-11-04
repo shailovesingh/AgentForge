@@ -1,0 +1,29 @@
+{
+  "name": "mig-agent-half-49-5",
+  "description": "49.5 rounds half UP to 50, the top of the allowed range (half to even would give 50 too, but 2.5 and 48.5 tell the rules apart).",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 49.5 }, "position": { "x": 10, "y": 20 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": {
+    "upgrades": [{ "nodeId": "a", "type": "agent.autonomous", "from": 1, "to": 2, "notes": ["maxIterations 49.5 was not a whole number and was rounded to 50"] }],
+    "workflow": {
+      "schemaVersion": "1.0",
+      "id": "wf_1",
+      "name": "Sample",
+      "description": "",
+      "nodes": [
+        { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": { "provider": "ollama", "maxIterations": 50 }, "position": { "x": 10, "y": 20 } }
+      ],
+      "edges": [],
+      "metadata": {}
+    }
+  }
+}

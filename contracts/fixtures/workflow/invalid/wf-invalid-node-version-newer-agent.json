@@ -1,0 +1,17 @@
+{
+  "name": "wf-invalid-node-version-newer-agent",
+  "description": "An agent.autonomous node at typeVersion 3 is newer than the catalog (version 2): node.version-newer at the node's typeVersion, and nothing is migrated.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "t", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 3, "label": "a", "config": { "provider": "ollama" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "node.version-newer", "path": "/nodes/1/typeVersion" }] }
+}

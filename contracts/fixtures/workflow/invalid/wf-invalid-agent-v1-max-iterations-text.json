@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-agent-v1-max-iterations-text",
+  "description": "A version 1 agent whose maxIterations is text is left unchanged by the migration and fails schema.type, exactly as version 1 would have.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "a", "config": { "provider": "ollama", "maxIterations": "10" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "schema.type", "path": "/nodes/0/config/maxIterations" }] }
+}

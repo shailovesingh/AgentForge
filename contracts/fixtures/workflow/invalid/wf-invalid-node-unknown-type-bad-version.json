@@ -1,0 +1,16 @@
+{
+  "name": "wf-invalid-node-unknown-type-bad-version",
+  "description": "A node of an unknown TYPE with a bad version is node.unknown-type at the node's type (the version is not judged for a type the catalog does not have).",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "m", "type": "mystery.node", "typeVersion": 99, "label": "m", "config": {}, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "node.unknown-type", "path": "/nodes/0/type" }] }
+}

@@ -121,6 +121,26 @@ describe('editor store', () => {
     expect(wf().nodes).toEqual([])
   })
 
+  test('upgrades: stored by loadWorkflow, dismissed, cleared by reset and replaced by any later load', () => {
+    const report = { nodeId: 'a', type: 'agent.autonomous', from: 1, to: 2, notes: ['n'] }
+    expect(store().upgrades).toEqual([])
+    store().loadWorkflow(createEmptyWorkflow(), [report])
+    expect(store().upgrades).toEqual([report])
+    store().dismissUpgrades()
+    expect(store().upgrades).toEqual([])
+
+    store().loadWorkflow(createEmptyWorkflow(), [report])
+    store().reset()
+    expect(store().upgrades).toEqual([])
+
+    store().loadWorkflow(createEmptyWorkflow(), [report])
+    store().loadWorkflow(createEmptyWorkflow()) // a later load without upgrades clears the banner
+    expect(store().upgrades).toEqual([])
+    store().loadWorkflow(createEmptyWorkflow(), [report])
+    store().loadWorkflow(createEmptyWorkflow(), [{ ...report, nodeId: 'b' }])
+    expect(store().upgrades.map((u) => u.nodeId)).toEqual(['b'])
+  })
+
   test('setWorkflowName', () => {
     store().setWorkflowName('My flow')
     expect(wf().name).toBe('My flow')

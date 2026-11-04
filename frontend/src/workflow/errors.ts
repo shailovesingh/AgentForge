@@ -14,7 +14,10 @@ export const ERROR_CODES = [
   'doc.invalid-field',
   'node.malformed',
   'node.duplicate-id',
+  // Only for a node TYPE that is not in the catalog. A known type with a version problem is one of the next two.
   'node.unknown-type',
+  'node.version-newer',
+  'node.no-migration-path',
   'edge.malformed',
   'edge.duplicate-id',
   'connection.unknown-node',
@@ -49,7 +52,15 @@ export const ERROR_CODES = [
 
 export type ErrorCode = (typeof ERROR_CODES)[number]
 
-/** `path` is an RFC 6901 JSON Pointer into the imported document ("" is the whole document). */
+/** The most errors one validation or migration pass reports (the first ones, in document order). */
+export const MAX_ERRORS = 20
+
+/**
+ * `path` is an RFC 6901 JSON Pointer into the imported document ("" is the whole document).
+ * After a node migration (nodeMigrations.ts) the path points into the MIGRATED document. That has exactly
+ * the structure of the file that was read, so every node and edge index is unchanged: a migration never
+ * adds, removes or reorders nodes or edges. Only values inside a node (`typeVersion`, `config`) can differ.
+ */
 export interface ValidationError {
   code: ErrorCode
   path: string

@@ -1,0 +1,34 @@
+{
+  "name": "mig-two-agents",
+  "description": "Two version 1 agents in one file are each upgraded and reported, in document order; only the fractional one carries a note.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a1", "type": "agent.autonomous", "typeVersion": 1, "label": "First", "config": { "provider": "ollama", "maxIterations": 2.5 }, "position": { "x": 0, "y": 0 } },
+      { "id": "a2", "type": "agent.autonomous", "typeVersion": 1, "label": "Second", "config": { "provider": "groq", "maxIterations": 7 }, "position": { "x": 300, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": {
+    "upgrades": [
+      { "nodeId": "a1", "type": "agent.autonomous", "from": 1, "to": 2, "notes": ["maxIterations 2.5 was not a whole number and was rounded to 3"] },
+      { "nodeId": "a2", "type": "agent.autonomous", "from": 1, "to": 2, "notes": [] }
+    ],
+    "workflow": {
+      "schemaVersion": "1.0",
+      "id": "wf_1",
+      "name": "Sample",
+      "description": "",
+      "nodes": [
+        { "id": "a1", "type": "agent.autonomous", "typeVersion": 2, "label": "First", "config": { "provider": "ollama", "maxIterations": 3 }, "position": { "x": 0, "y": 0 } },
+        { "id": "a2", "type": "agent.autonomous", "typeVersion": 2, "label": "Second", "config": { "provider": "groq", "maxIterations": 7 }, "position": { "x": 300, "y": 0 } }
+      ],
+      "edges": [],
+      "metadata": {}
+    }
+  }
+}
