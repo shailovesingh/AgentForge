@@ -664,8 +664,27 @@ Phase 1.1: T5a (pure JSON Schema subset validator) implemented, reviewed, fixed 
 
 **Verification by the Principal Architect (commands actually run, `frontend/`):** at `a009b20`: `npm run verify` **exit 0, 14 test files, 905 unit tests, 30 e2e passed**; `git show --stat`; the `jsonSchema.ts` diff read. The implementer's mutation proofs (seven, including the fixture-level ones) were not repeated by Claude. Only the reviewer's own-validator comparison and the implementer's mutation results rest on subagent reports.
 
+**T5b: the catalog, importer and config panel move onto the schema subset (commits in order):**
+
+| Commit | What |
+|---|---|
+| `7b09662` | Sonnet implementer: `NodeDefinition.configSchema` is an `ObjectSchema` (`additionalProperties: false` everywhere); initial values are explicit schema `default`s applied only by `applyDefaults` in `addNode`; `defaults` and `format: 'multiline'` removed; new `ui` block (textarea, rows, placeholder, order); `PROVIDERS` with `groq` (both enums derived from it, `groq` appended last to keep the option order; D-024 listed it first, the order is not a contract); the importer uses `validateAgainstSchema(..., { checkRequired: false })` (decision C1: an absent required key no longer rejects a file); `schema.required` is now unreachable from import (kept in `ERROR_CODES` as the execution-time code, test-only exemption list `workflow/codeExemptions.ts`); config panel rendered from schema + `ui`; the old `validateConfig` stack deleted; config fixtures carry a mandatory `checkRequired`; `wf-invalid-schema-required` moved to `workflow/valid`; two new valid workflow fixtures (empty config; absent required key); `builtin.catalog.json` regenerated. 926 unit tests, 33 e2e. |
+| `44bd7f4` | Sonnet implementer, review fixes (below). 934 unit tests, 35 e2e. |
+
+**Independent review (Opus 5.5, read-only) of `7b09662`: PASS WITH FINDINGS, no blockers, one major.** The reviewer compared the pre-T5b and post-T5b importers on **60,000 generated documents** (all six node types; wrong types, out-of-range numbers, prototype-named keys, NUL, lone surrogates, absent required keys; accepted documents compared byte for byte on re-export): every difference was one of the two intended ones (absent required keys import; `groq` accepted) except an accidental message-text change; it also compared `parseConfigInput` on 48 raw inputs for every catalog property (754 identical, 92 differences, all provider fields), and ran 15+ mutants (reports; not repeated by Claude). Findings and triage (all fixed in `44bd7f4` unless stated):
+
+| # | Finding | Disposition |
+|---|---|---|
+| Major M1 | **A real UI bug that C1 made reachable:** after importing a node with `config: {}`, the Provider dropdown DISPLAYED "ollama" (a browser shows the first option when the value matches none) while the config held no provider; the panel misstated the document (and a user re-picking the shown option fires no change event). The same applied to every absent enum property | **Fixed**: a disabled "(not set)" placeholder option shown whenever the value is not one of the options; two e2e tests (empty config shows the placeholder and exports without `provider`; picking a provider commits it); the existing "new node starts at ollama" e2e now also asserts the export |
+| m1 | Import messages showed JSON Pointer escapes for config keys containing a slash or tilde (`a~1b`) | **Fixed**: unescaped for the message only (codes and paths unchanged); test |
+| m2 | Most of the `ui` widget vocabulary was accepted but not rendered; `rows` and `ui.order` untested (a mutant survived) | **Fixed**: the catalog test accepts only what the panel honours (`textarea` on strings; the rest is documented as reserved), e2e asserts `rows`, `propertyOrder` extracted (React-free) and unit-tested |
+| m3 | `codeExemptions.ts` claims "tests only" but nothing enforced it | **Fixed**: source-text guard (no non-test file imports it) with a regex self-test |
+| Nits | `errors.ts` header stale | **Fixed**. *Not changed:* the `applyDefaults` single-call-site guard can be bypassed by an aliased import (acceptable for its purpose); `parseConfigInput` reports only the first array-item error without the item path (no catalog array yet); the enum message joins values with ", " (ambiguous only for values containing a comma, none exist); the message unescape is flat (no catalog key produces a nested path) |
+
+**Verification by the Principal Architect (commands actually run, `frontend/`):** at `7b09662`: exit 0, 14 files, 926 unit, 33 e2e; at `44bd7f4`: `npm run verify` **exit 0, 15 test files, 934 unit tests, 35 e2e passed**; `git show --stat` for both commits; fixture counts (workflow/valid 21, invalid 96, config 19 at `7b09662`). The implementer's mutation proofs and the reviewer's differential and mutation runs were not repeated by Claude. **Process notes:** the T5b implementer used a here-doc that mangled `CONFIG_SCHEMA.md` (restored with `git checkout` of its own file, redone with the Edit tool) and ran a stray `python3` that hung (stopped, changed nothing). The `44bd7f4` fix commit has only the Principal Architect's verification, no second Opus pass.
+
 **Status:**
-T5a **accepted**. T5b (catalog conversion to the subset, `ui` block, `defaults` removed, importer C1, config panel from schema, `groq`, deleting the old validator) is with the implementer; Lesson L6 (T5a) with the tutor.
+T5 (T5a and T5b) **accepted**. T6 (node migrations, `agent.autonomous` version 2, upgrade banner, `migration` fixtures) is with the implementer; Lesson L7 (T5b) with the tutor.
 
 **Next Task:**
-T5b review, then T6 (node migrations; `agent.autonomous` v2); **MS-B report to the PO after T6.**
+T6 review and acceptance; then **MS-B report to the PO** (T1 to T6 done). After the PO's decision: T8, T7, T9, T10.

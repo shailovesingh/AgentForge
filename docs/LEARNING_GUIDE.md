@@ -3,7 +3,7 @@
 > **For the Product Owner.** Part 1 is a plain-language **primer** (reference material: what we are building and how the code is organised). Part 2 is the **teaching record** (lessons actually taught and what you demonstrated).
 > The **curriculum and statuses** are in `docs/LEARNING.md`. Learning progress is tracked separately from implementation progress.
 > **Living document.** The Principal Architect updates it at the end of every task (D-028). The primer describes the project **as it is today**; where something is planned but not built, it says so.
-> Last updated: 2026-11-05, after Phase 1.1 T5a and its review fixes (Lesson L6, commits `96cc80d` and `a009b20`).
+> Last updated: 2026-11-05, after Phase 1.1 T5b and its review fixes (Lesson L7, commits `7b09662` and `44bd7f4`). T6 (node migrations) is running and is not described here.
 
 # Part 1: Primer
 
@@ -26,7 +26,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 |---|---|
 | The visual editor in the browser: drag nodes from a library, connect them with rules, edit each node's settings, save the workflow to a `.json` file and load it back | Running workflows (the "engine") |
 | A catalog of 6 node types | AI models, agents, tools (Phase 4) |
-| 905 unit tests (at commit `a009b20`) and 30 browser tests | Natural-language workflow generation (Phase 5) |
+| 934 unit tests in 15 test files and 35 browser tests (at commit `44bd7f4`) | Natural-language workflow generation (Phase 5) |
 | A CI workflow that runs the checks on GitHub | The backend server, database, saving to a server (Phase 2) |
 
 **Important:** today everything runs **in your browser only**. There is no server. Nothing runs a workflow yet. The editor produces a *description* of a workflow; later phases will execute it.
@@ -34,7 +34,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | Phase | What it delivers | Status |
 |---|---|---|
 | 1 | The visual editor | Done and accepted |
-| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 4 of 10 done, plus T5a, the first half of task 5; T5b is next) |
+| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 5 of 10 done, with task 5 in two halves, T5a and T5b; T6, upgrading old files, is next) |
 | 2 | Backend server and database; save/load workflows | Planned, not approved |
 | 3 | Execution engine: actually run workflows | Planned |
 | 4 | AI runtime: LLM and Agent nodes | Planned |
@@ -73,7 +73,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **Catalog and node definition.** The catalog is the list of node types the platform offers. A *definition* describes one type: its ports, its settings, its icon. The library, the settings forms, the validator and (later) the engine and the AI generator all read the same catalog, so there is one source of truth. See `frontend/src/catalog/nodes.ts`.
 
-**Config schema.** A description of what settings a node accepts (for example `temperature` is a number from 0 to 2). The settings panel builds its form from it, and the importer uses it to check files. We use a small, documented subset of **JSON Schema**, a standard way to describe JSON. (The checker for that subset is built and tested, Lesson L6; the editor itself still runs the older checks until task T5b switches it over.)
+**Config schema.** A description of what settings a node accepts (for example `temperature` is a number from 0 to 2). The settings panel builds its form from it, and the importer uses it to check files. We use a small, documented subset of **JSON Schema**, a standard way to describe JSON. The checker for that subset (Lesson L6) is now the only one: since T5b (Lesson L7) the catalog, the "new node" step, the settings panel and the importer all use it. A setting's starting value is its schema `default`, applied only when you create a node; how a setting is *drawn* (a multi-line box, its height) lives in a separate `ui` block, never in the schema.
 
 **Workflow JSON.** The file format. A minimal real example (a trigger connected to an output):
 
@@ -99,7 +99,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **`schemaVersion` vs `typeVersion`.** Two separate version numbers. `schemaVersion` versions the *file format*. `typeVersion` versions *one node type* (if we change how the Agent node works, it becomes version 2). Keeping them separate lets each evolve without breaking the other.
 
-**Migration.** Upgrading an old file to the current format *in memory*, without overwriting the original. Planned in Phase 1.1 (tasks T5 and T6).
+**Migration.** Upgrading an old file to the current format *in memory*, without overwriting the original. Planned in Phase 1.1 (task T6, in progress; not built at the time of Lesson L7).
 
 **Validation (errors) vs warnings.** *Errors* mean the file is structurally wrong (unknown node type, impossible connection); it is rejected. *Warnings* mean "this looks incomplete" (an empty required setting, an unconnected node); they never stop you from working. We keep them strictly separate (decision D-018).
 
@@ -111,7 +111,9 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **Credentials.** API keys and passwords. **They never go inside a workflow file** (decision D-016). Later, workflows will refer to a stored credential by id. Until then, a detector will warn if someone pastes a secret into a setting (planned, task T9).
 
-**Provider.** Which AI service a node uses: Ollama (local), OpenAI, Anthropic or Groq. We design so adding one does not change the file format.
+**Provider.** Which AI service a node uses: Ollama (local), OpenAI, Anthropic or Groq. We design so adding one does not change the file format. Groq was added in T5b; the one `PROVIDERS` list in `frontend/src/catalog/nodes.ts` feeds both the LLM Prompt and the Agent node.
+
+**Incomplete drafts (decision C1, built in T5b, Lesson L7).** A file whose node is missing a *required* setting (for example an LLM Prompt with no `provider`) still imports. The editor must be able to hold half-finished work. A wrong type, a value outside the allowed list or range, or an unknown setting are still errors. A missing required setting is meant to become a *warning* in the editor (planned, task T7) and an *error only when the workflow is run* (Phase 3, planned).
 
 **Strict parsing (built in task T4a, Lesson L4).** Reading an imported file with our own small parser instead of the browser's built-in one, so that problems the built-in parser hides (a repeated key, a number too big to store exactly, a file that is not valid UTF-8) become clear errors. It also enforces AgentForge's limits: numbers no larger than 2^53 - 1 in magnitude, nesting at most 64 levels, files at most 5,000,000 bytes. See `frontend/src/workflow/strictJson.ts` and `valuePolicy.ts`.
 
@@ -129,7 +131,9 @@ frontend/src/
     types.ts          what a Workflow, node, edge, port and node definition look like
     connections.ts    "may this edge exist?" (the 7 connection rules)
     validate.ts       checks an imported file and returns a clean Workflow or a list of errors
-    configSchema.ts   checks a node's settings against its schema
+    jsonSchema.ts     the JSON Schema subset checker and applyDefaults (T5a, L6)
+    configSchema.ts   parses what you type into one settings field and checks it against that property's schema
+    codeExemptions.ts two lists of error codes that tests exempt; imported by tests only (T5b)
     migrate.ts        upgrades old file formats
     serialize.ts      export to text (with the export guard), import from text (bytes or text)
     canonicalJson.ts  the two repeatable JSON text writers: compact (for hashing) and pretty (for files) (T4b)
@@ -142,7 +146,8 @@ frontend/src/
                  translates our workflow into React Flow's objects
   nodes/         WorkflowNode.tsx: one component that draws every node type from the catalog
   library/       the searchable, draggable list of node types
-  config-panel/  the settings form for the selected node
+  config-panel/  the settings form for the selected node, generated from the node's schema (ConfigPanel.tsx)
+                 and propertyOrder.ts, the small helper that decides the field order
   app/           the page layout and the toolbar (New / Import / Export)
 frontend/e2e/    browser tests that click through the real app (Playwright)
 frontend/src/contracts/fixtures.test.ts   the runner for the shared fixtures
@@ -154,7 +159,7 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 1. `library/Library.tsx` starts a drag that carries the text `llm.prompt`.
 2. `canvas/Canvas.tsx` receives the drop, converts the mouse position to canvas coordinates, and calls `addNode`.
-3. `store/editorStore.ts` looks up the definition in the catalog, creates a node with default settings, and updates the workflow.
+3. `store/editorStore.ts` looks up the definition in the catalog, creates a node whose settings come from `applyDefaults(def.configSchema)` (the schema's `default`s), and updates the workflow.
 4. The store change re-renders: `canvas/flowMapping.ts` converts the workflow to React Flow objects, and `nodes/WorkflowNode.tsx` draws the box with its ports.
 5. You connect two ports: `Canvas.tsx` asks `workflow/connections.ts` whether it is allowed, and only then calls `store.connect`.
 6. You click Export: `app/Toolbar.tsx` calls `exportWorkflowText` in `serialize.ts`, which checks the workflow against the limits, writes it with `canonicalJson.ts` (keys sorted, one exact layout) and only then lets the browser download the `.json` file. If a check fails, the toolbar says "Export failed. No file was created."
@@ -165,8 +170,8 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 | Kind | Tool | What it does | Command |
 |---|---|---|---|
-| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, and the shared fixtures in `contracts/`). 905 at commit `a009b20`. | `npm test` |
-| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 30 today. | `npm run test:e2e` |
+| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the catalog and the shared fixtures in `contracts/`). 934 in 15 test files at commit `44bd7f4`. | `npm test` |
+| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 35 at commit `44bd7f4`. | `npm run test:e2e` |
 | **Type check** | TypeScript | Catches mismatched data shapes before running | part of `npm run build` |
 | **Lint** | Oxlint | Catches suspicious code patterns | `npm run lint` |
 | **Everything** | | All of the above, in order | `npm run verify` |
@@ -219,7 +224,7 @@ npm run dev              # open http://localhost:5173
 
 ## 10. What happens next
 
-Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6; nothing uses the validator yet); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider; **T6** upgrading old files; **T8** the branch rules written down; **T7** warnings in the editor; **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
+Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (next; running now, not described in a lesson yet); **T8** the branch rules written down; **T7** warnings in the editor; **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
 
 ## 11. Glossary, quick reference
 
@@ -254,6 +259,7 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | **L4** | Phase 1.1 T4a: strict JSON parsing and the policy limits | 3 (main), 12, 1 | 2026-11-04 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L5** | Phase 1.1 T4b (commits `dd33e84`, `d2ef493`): canonical compact JSON, pretty export JSON and the export guard | 3 (main), 1, 12 | 2026-11-04 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L6** | Phase 1.1 T5a (commits `96cc80d`, `a009b20`): the JSON Schema subset validator, explicit `applyDefaults` and the `schema` fixtures | 3 (main), 7, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
+| **L7** | Phase 1.1 T5b (commits `7b09662`, `44bd7f4`): the catalog, importer (decision C1) and settings panel move onto the JSON Schema subset | 7 (main), 3, 2, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
 
 ## Concept index
 
@@ -318,6 +324,16 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | Rules two languages must agree on: code-point string length, safe integers, enum equality (`true` versus `1`, JavaScript versus Python) | 3, 7, 12 | L6 | Explained (no evidence) |
 | A temporary, named exemption list for codes no workflow can produce yet (`SCHEMA_ONLY_CODES`) and a no-production-import guard test | 12 | L6 | Explained (no evidence) |
 | The three fixture case kinds (validation, defaults, schema check); a property test against an independent reference; a soundness corollary; a reviewer's independent validator and mutation-found fixture gaps (reports) | 12 | L6 | Explained (no evidence) |
+| The node catalog as the single source of truth: one `configSchema` (a JSON Schema subset, `additionalProperties: false`) per node, and a `ui` block for presentation only | 7, 2, 3 | L7 | Explained (no evidence) |
+| A form generated from a schema instead of one hand-written form per node (`ConfigPanel.tsx`, `propertyOrder.ts`); reserved `ui` widget values | 2, 7 | L7 | Explained (no evidence) |
+| Who applies defaults and who checks `required`, at each moment (creation, import, editing, future execution); the incomplete draft (decision C1, D-025) | 3, 7 | L7 | Explained (no evidence) |
+| Imported data is never silently changed: the importer keeps `raw.config` as read; defaults are applied only in `addNode` | 3 | L7 | Explained (no evidence) |
+| A behaviour change can make an unreachable state reachable somewhere else: the "(not set)" select that stops the screen from lying about the data | 2, 3, 12 | L7 | Explained (no evidence) |
+| One list, derived everywhere (`PROVIDERS`), enforced by an identity assertion; adding `groq` without changing existing option order | 7, 12 | L7 | Explained (no evidence) |
+| Differential testing between the old and new implementation (the reviewer's 60,000-document run, a report); only the intended differences may appear | 12 | L7 | Explained (no evidence) |
+| Golden values copied from the brief (not computed from the code), source-text guards (`applyDefaults` has one caller; `codeExemptions` is imported by tests only) and a mutation-found weak test | 12 | L7 | Explained (no evidence) |
+| A temporary exemption list for an execution-only code (`schema.required` in `codeExemptions.ts`); fixtures that state their mode (`checkRequired` on every config fixture) | 3, 12 | L7 | Explained (no evidence) |
+| Messages for people versus paths for programs: undoing JSON Pointer escapes in the message only | 3 | L7 | Explained (no evidence) |
 | Primer concepts (workflow, node, port, edge, catalog, config schema, `schemaVersion` vs `typeVersion`, validation vs warnings, DAG, credentials) | 1, 2, 3, 6, 7 | Primer (Part 1) | Explained as reference (no evidence, no lesson) |
 
 ---
@@ -1280,3 +1296,163 @@ Reading the diagram aloud, for an interview: the same `errors` list is passed do
 4. The subset excludes `$ref`, `anyOf` and `pattern` on purpose. Explain the reason for each in terms of Pydantic and of the two runtimes. What will the Phase 2 backend therefore have to do, and what does the statement "TypeScript only, no Python parity claimed" in `CONFIG_SCHEMA.md` mean for what we may say today in an interview?
 5. Name three places where JavaScript and Python would give different answers for a validator like this one (think about enum equality, string length and the integer range), say what AgentForge chose in each case, and explain why `enumEquals` is a separate exported function with its own unit test instead of being left inline in `validate`. Then explain the sentence "a check that only a property test catches will be missing from the Python port" and say what you would add so it is not missing.
 6. The tests for this task include language-neutral fixtures, a seeded property test against an independent reference, a totality test, and (from the review) an independent re-implementation and mutation testing. For each, say what kind of mistake it can catch that the others cannot. Why is the early return after `schema.type` pinned by a fixture that uses `checkRequired: true`, and what behaviour could a Python port silently get wrong if that fixture did not exist?
+
+---
+
+## Lesson L7: One description per node, three users (the catalog, the importer and the settings panel move onto the JSON Schema subset)
+
+**Task:** Phase 1.1 T5b (catalog conversion, explicit defaults at node creation, the importer behaviour of decision C1, the settings panel generated from the schema, the Groq provider), commit `7b09662`, plus its review-fix commit `44bd7f4`. **Modules:** 7 (Node Registry and Data Propagation: the catalog as the single source of truth), 3 (Workflow JSON and State Management: explicit defaults, incomplete drafts, the schema as a contract), 2 (Frontend and React Flow: a form generated from data), 12 (Security, Testing and Deployment: differential testing, golden values, mutation testing, guards).
+
+*Status of the code described here.* This lesson describes the code **at commit `44bd7f4`**. **T6 (node migrations, including version 2 of `agent.autonomous`) is running as I write and adds migrations; it is not described here and nothing below is a claim about it.** The working tree may therefore already differ from what you read in `frontend/src/catalog/nodes.ts`, `store/`, `validate.ts`, `serialize.ts` and `app/`; the commit is the reference (`git show 44bd7f4:frontend/src/catalog/nodes.ts`). **What I verified myself:** I read both commits' messages and `--stat`, and these files as they are at `44bd7f4`: `frontend/src/catalog/nodes.ts` and `index.ts`, `frontend/src/workflow/types.ts`, `validate.ts`, `configSchema.ts`, `codeExemptions.ts`, `errors.ts` (header), `jsonSchema.ts` (the exported names), `frontend/src/store/editorStore.ts` (`addNode`), `frontend/src/config-panel/ConfigPanel.tsx`, `propertyOrder.ts` and its test, `frontend/src/catalog/catalog.test.ts`, the guards in `frontend/src/store/editorStore.test.ts`, `frontend/e2e/config-panel.e2e.ts`, `contracts/CONFIG_SCHEMA.md`, the changed fixtures, and the old (pre-`7b09662`) `types.ts`, `configSchema.ts`, `nodes.ts` and `validate.ts` for the before-and-after. I counted the fixture files with `git ls-tree` (workflow/valid 21, workflow/invalid 96, config 19, schema 148). **What I did not run:** the test suites. The counts **15 test files, 934 unit tests and 35 browser tests at `44bd7f4`** are the numbers recorded by the Principal Architect in `docs/DEVELOPMENT_LOG.md` (reported to me; I did not repeat them because the working tree has moved on to T6). The reviewer's 60,000-document comparison and the mutation runs are **reports** and are labelled as such below.
+
+### 1. The problem
+
+Lesson L6 built a careful, tested validator for node settings, but at that commit **nothing used it**. The real editor still ran on the old, home-made code, and that code had four problems that you can see by reading the pre-`7b09662` files:
+
+- **The catalog described settings in a private, weak language.** `ConfigProperty` in `frontend/src/workflow/types.ts` knew only `string`, `number`, `boolean` and `object`, with `enum`, `minimum`, `maximum`. No `integer` (so the Agent's `maxIterations` accepted `2.5`), no length limits, no lists.
+- **Starting values lived in a second place.** Each node definition had a `defaults` object next to its `configSchema`. Two descriptions of the same thing can drift apart.
+- **Presentation was mixed into validity.** `format: 'multiline'` is not a rule about valid data; it is the settings panel's wish to draw a bigger box.
+- **An incomplete draft was rejected on import.** The old `validateConfig` returned a `schema.required` error whenever a required key was absent. But an editor must be able to hold unfinished work (decision D-017): a user saves a half-built "LLM Prompt" with no provider yet, and gets "Import failed" on the way back in. That contradicts what the editor is for. Decision D-025 ("C1") had already said the file should import.
+
+So the task is a **switch-over**: take the validator of L6 and make it the one thing that describes, creates, checks and draws a node's settings, and delete the old code.
+
+### 2. The concept
+
+Think of the catalog entry for a node as a **form template that is also a rulebook**. It says, for one node type, "these are the settings you may have, here is each one's type and limits, here is its starting value". Three different parts of the program read that one template and each uses a different part of it:
+
+1. **Creating a node** copies the starting values out of it (`applyDefaults`).
+2. **Importing a file** checks the file against its rules (`validateAgainstSchema`, with the "do not insist on required settings" switch off).
+3. **Drawing the settings panel** builds the form from it (the types decide the controls, a separate `ui` block decides the look).
+
+The technical terms:
+
+- **Single source of truth.** One place that defines a fact; everything else derives from it. Here: `configSchema` in `frontend/src/catalog/nodes.ts`.
+- **Schema-driven UI** (a form generated from a schema, rather than one hand-written form per node).
+- **Separation of validation and presentation.** What makes data valid goes in `configSchema`; how it is displayed goes in the optional `ui` block, which a validator ignores.
+- **Explicit versus implicit defaults** (introduced in L6; this task is where the one explicit call happens).
+- **Incomplete draft** (decision C1): a document that is structurally sound but has a required setting still empty. Structurally sound means every setting that *is* present has the right type, value range and name.
+
+### 3. Why we selected this approach
+
+1. **Reuse the tested validator instead of keeping two.** Two validators in one program disagree sooner or later (D-032 accepted that only for the short gap between T5a and T5b). After T5b the old `validateConfig`, the `ConfigProperty` and `ConfigSchema` types, `format: 'multiline'` and `NodeDefinition.defaults` are all deleted (the commit message of `7b09662` lists them; the type check and the test "the old presentation and defaults fields are gone" in `catalog.test.ts` keep them deleted).
+2. **Defaults are applied in exactly one place, and the importer never applies them.** Suppose the importer quietly filled in a missing `provider` with `ollama`. Then *importing a file would change its data*; the user's file says one thing and the editor holds another; export would write something the user never wrote, and the "export, import, export gives identical bytes" promise of L5 would quietly depend on the catalog's current defaults. So `validateWorkflow` in `frontend/src/workflow/validate.ts` stores `config: raw.config`, the object it read, untouched. The only production caller of `applyDefaults` is `addNode` in `frontend/src/store/editorStore.ts`, and a test enforces that by reading source text (section 6).
+3. **Decision C1: `checkRequired: false` at import.** The importer calls `validateAgainstSchema(def.configSchema, raw.config, { checkRequired: false })`. Wrong types, values outside an `enum`, out-of-range numbers and unknown keys are still errors. A *missing* required key is not. Execution in Phase 3 (planned) will call it with `true`. D-025 also says the editor will show such gaps as `required-field-empty` **warnings**; that warning is **planned (task T7)** and is not built.
+4. **`schema.required` becomes unreachable from import.** This has a consequence for the test guards. Earlier guards (L2, L3) require that every error code has a workflow fixture that produces it. Now no workflow can produce `schema.required`, so it is put on a **temporary, named exemption list**, `SCHEMA_ONLY_CODES` in `frontend/src/workflow/codeExemptions.ts`, with a comment that says why ("Execution-only: import validates with checkRequired: false"). It is still covered, by the `schema` and `config` fixture families, which can state `checkRequired: true`. The file is a **test-only** module: its header says "Imported by tests only", and a guard in `editorStore.test.ts` fails if production code imports it (section 6).
+5. **A separate `ui` block, with a small honest vocabulary.** The type `NodeUi` in `frontend/src/workflow/types.ts` allows five `widget` values, but **only `textarea` (on a string) is rendered**; the others (`text`, `select`, `json`, `checkbox`) are *reserved*. The review (finding m2) made that explicit: `contracts/CONFIG_SCHEMA.md` says so, and the catalog test only accepts widgets the panel honours, so nobody writes a hint that silently does nothing.
+6. **Groq without touching the file format.** `PROVIDERS = ['ollama', 'openai', 'anthropic', 'groq']` is one exported constant in `frontend/src/catalog/nodes.ts`; both `llm.prompt` and `agent.autonomous` use it as their `provider` enum. `groq` is **appended last** so the existing option order in the dropdown does not change. Adding a provider is a catalog change, not a schema-version change.
+
+### 4. How it works internally
+
+**The shape of a catalog entry (at `44bd7f4`).** `NodeDefinition` has `configSchema: ObjectSchema` (an object schema from `jsonSchema.ts`) and an optional `ui?: NodeUi`. `defaults` is gone. Every one of the six catalog schemas sets `additionalProperties: false`, which keeps the old behaviour that an unknown setting is an error (the standard JSON Schema default would allow extras; the catalog test asserts the `false`). A small example, abridged from the `llm.prompt` entry:
+
+- `provider`: a string with `enum: PROVIDERS`, `default: 'ollama'`
+- `prompt`: a string, `default: ''`
+- `temperature`: a number from 0 to 2, `default: 0.7`
+- `required: ['provider', 'prompt']`
+- `ui.fields`: `systemPrompt` and `prompt` are `{ widget: 'textarea', rows: 4 }`
+
+Note that `required` and `default` are **different questions**. A property can be required and still have a default (every required property in today's catalog has one), or be required with none. A new node gets the default; an imported node gets whatever the file says, including nothing.
+
+```mermaid
+flowchart TD
+  CAT["frontend/src/catalog/nodes.ts<br/>configSchema (ObjectSchema: properties, required,<br/>defaults, additionalProperties false) + ui"]
+  CAT --> A["(a) Node creation: addNode in editorStore.ts<br/>config = applyDefaults(def.configSchema)<br/>only explicit defaults; a required key without a default stays absent"]
+  CAT --> B["(b) Import: validateWorkflow in validate.ts<br/>validateAgainstSchema(def.configSchema, raw.config, checkRequired false)<br/>errors for type, enum, range, unknown key; NEVER fills in or changes the config"]
+  CAT --> C["(c) Settings panel: ConfigPanel.tsx<br/>propertyOrder(def): ui.order first, then schema order<br/>one ConfigField per property, control chosen by schema type and ui"]
+  C --> D{"string property with an enum?"}
+  D -- "yes" --> E{"stored value equals one of the enum entries?"}
+  E -- "yes" --> F["select shows that option"]
+  E -- "no: absent, e.g. imported draft" --> G["select shows a disabled option (not set)<br/>the config is unchanged until the user picks"]
+  D -- "no" --> H["text input, textarea (ui widget textarea or object/array), or checkbox"]
+  C --> I["User types: parseConfigInput(prop, raw) in configSchema.ts<br/>validateAgainstSchema(prop, value, checkRequired false)<br/>commit to the store only if it validates"]
+```
+
+**(a) Creating a node.** `addNode(type, position)` looks up the latest catalog definition and builds `{ id, type, typeVersion, label, config: applyDefaults(def.configSchema), position }`. `applyDefaults` (L6) returns a fresh object with a deep copy of each explicit default; the test "two nodes of the same type never share a nested object" in `catalog.test.ts` changes one node's `headers` and checks that a second node and the catalog are unaffected.
+
+**(b) Importing.** For each node, `validateWorkflow` finds the definition by type and version (`node.unknown-type` if there is none), then runs the schema check and maps each `{code, path, message}` onto the document path `/nodes/<i>/config<path>`. The check does not stop at the first problem. If the result has any error, the document is rejected as a whole (the existing 20-error cap and rules are unchanged).
+
+**(c) Drawing the panel.** `ConfigPanel.tsx` asks `propertyOrder(def)` for the property names (the helper is in its own React-free file, `propertyOrder.ts`, with unit tests, so its behaviour can be tested without a browser) and renders one `ConfigField` per name with `prop` (the schema for that property) and `ui` (its hint, if any). The control is chosen from the schema: `boolean` gives a checkbox; a `string` with `enum` gives a select; an `object` or `array` (or a string whose hint is `textarea`) gives a textarea, with `ui.rows` if given, otherwise 5 rows for JSON and 4 for text; everything else is a text input (with a numeric keyboard hint for `number` and `integer`). A field keeps a **draft** (the text in the control); each change goes through `parseConfigInput`, which parses object and array text with the strict parser from L4, validates that one value with `checkRequired: false` (a single property has nothing to be "required" of), applies the document policy limits from L4, and only then calls `updateNodeConfig`. An invalid draft shows an error and the last valid value stays in the store.
+
+**The "(not set)" case, and why it exists.** This is the most instructive thing in the task. Before C1, a node in the store always had a provider, because the importer rejected files without one and `addNode` always filled one in (the user could change it, but never remove it). After C1, a node can be imported with `config: {}`. The select control then received a value (`''`) that matched none of its options. **A browser shows the first option when a select's value matches nothing**, so the panel displayed "ollama" while the config held **no provider at all**. The screen lied about the data; and exporting would write a file with no provider, which the user, looking at the screen, would not expect. The fix in `44bd7f4` (review finding M1): in `ConfigField`, if no enum entry equals the current draft, render a **disabled** `(not set)` option and select it; once the user picks a real option the placeholder disappears. The e2e test "an imported node without a provider shows '(not set)' and exports no provider until one is picked" in `frontend/e2e/config-panel.e2e.ts` imports a workflow with an empty `llm.prompt` config, checks the dropdown shows `(not set)` first and disabled, **exports and checks the file really has no `provider` key** (so viewing a node changes nothing), then picks `ollama` and checks the export now has it.
+
+### 5. How it communicates with other components
+
+- **Catalog to everything.** `frontend/src/catalog/index.ts` re-exports `PROVIDERS` and `nodeDefinitions` and provides `getNodeDefinition(type, version)` and `getLatestNodeDefinition(type)`. The store uses the latest definition (creation); the importer uses the exact version stored in the file; the panel uses the version of the selected node.
+- **Store to panel.** The panel reads the selected node from the Zustand store (`useEditorStore`) and writes through `updateNodeConfig`. The store never validates; the panel does, before committing. (The architecture rule "every load goes through migrate then validate" concerns loading documents; panel input is validated at the form.)
+- **Importer to errors.** `validate.ts` produces `{code, path, message}` with the `schema.*` codes of L2 and L6. A review fix (finding m1): the *message* names the setting the way the user wrote it. The path is a JSON Pointer in which `/` and `~` inside a key are written `~1` and `~0`; the first version of the new code derived the message from that escaped path, so the human text showed the escaped form (the review's report). The fix undoes the escapes in the message only (first `~1`, then `~0`, in the order RFC 6901 requires), and the test in `serialize.test.ts` tries the keys `a/b`, `a~b` and `a~1b`, checking the path is escaped and the message is not. **Code and path are the contract; the message is for people.**
+- **Fixtures.** The `config` fixture family (`contracts/fixtures/config/`, 19 files at `44bd7f4`) validates a catalog node's config against the catalog schema. T5b made a `checkRequired` field **mandatory** in every config fixture, so a case always states the mode it runs in. The old `cfg-missing-required` became two: `cfg-missing-required-checked` (an empty `llm.prompt` config with `checkRequired: true` expects `schema.required` at `/provider` and at `/prompt`) and `cfg-missing-required-unchecked` (the same config with `false` expects no errors). The workflow family changed in the same direction: `wf-invalid-schema-required` was **deleted** from `workflow/invalid` and two **valid** fixtures were added, `wf-valid-incomplete-required-key-absent` (an `llm.prompt` with `config: { prompt: 'hi' }`, no provider) and `wf-valid-empty-config-required-keys` (empty configs for an `llm.prompt` and an `http.request` node). Fixtures for `groq` (`cfg-valid-provider-groq-agent`, `cfg-valid-provider-groq-llm-prompt`) and one that pins `maxIterations: 2.5` as still valid (`cfg-valid-max-iterations-fraction`; its description says T6 turns it into an integer with a migration, and the catalog source carries a matching comment) were added.
+- **Planned, not built.** The `required-field-empty` warning (T7); the node migrations of T6 (which may call `applyDefaults` when a new version introduces a property, as `CONFIG_SCHEMA.md` anticipates); execution with `checkRequired: true` (Phase 3). **TypeScript only: no Python parity is claimed.**
+
+**Who applies defaults and who checks `required`, moment by moment (at `44bd7f4`):**
+
+| Moment | Code | Applies defaults? | Checks `required`? | Other schema rules (type, enum, range, unknown key) |
+|---|---|---|---|---|
+| Creating a node | `addNode` calls `applyDefaults(def.configSchema)` | **Yes**, explicit defaults only; a required key with no default stays absent | No | Not checked (the defaults are valid by the catalog test) |
+| Importing a file | `validateWorkflow` calls `validateAgainstSchema(..., { checkRequired: false })` | **Never**; `raw.config` is kept exactly as read | **No** (decision C1) | Yes: any violation rejects the document |
+| Editing in the panel | `parseConfigInput` validates one property value with `checkRequired: false` | No | No (one property) | Yes, for that value; invalid input is not committed |
+| Executing (Phase 3, planned, not built) | planned: `validateAgainstSchema(..., { checkRequired: true })` | Not decided here | **Yes**, as errors (D-025) | Yes |
+| Warning the user (T7, planned, not built) | planned `required-field-empty` warning | n/a | Reported as a warning, never blocks (D-018) | n/a |
+
+### 6. Important code paths
+
+| Where | What it does |
+|---|---|
+| `frontend/src/catalog/nodes.ts`: `PROVIDERS`, `nodeDefinitions` | The six definitions; schema `default`s; `additionalProperties: false`; `ui` hints; the one provider list |
+| `frontend/src/workflow/types.ts`: `NodeDefinition`, `NodeUi` | `configSchema: ObjectSchema`, optional `ui`; no `defaults` |
+| `frontend/src/store/editorStore.ts`: `addNode` | The only production call of `applyDefaults` |
+| `frontend/src/workflow/validate.ts`: `validateWorkflow` | Importer: `checkRequired: false`, path mapping, message with unescaped key; never changes `config` |
+| `frontend/src/workflow/configSchema.ts`: `parseConfigInput` | Parse typed text for one property (strict parser for JSON), validate, apply the policy limits; returns a value or an error |
+| `frontend/src/config-panel/ConfigPanel.tsx`: `ConfigPanel`, `ConfigField`, `toDraft` | Form generated from schema and `ui`; the `(not set)` option |
+| `frontend/src/config-panel/propertyOrder.ts` | Field order: `ui.order` first (existing names, each once), then the rest in schema order |
+| `frontend/src/workflow/codeExemptions.ts`: `EXPORT_ONLY_CODES`, `SCHEMA_ONLY_CODES` | Test-only exemption lists; `schema.required` is on the second |
+| `contracts/CONFIG_SCHEMA.md` | The specification: status, `checkRequired` and C1, defaults, the `ui` block, error codes |
+| `frontend/src/catalog/catalog.test.ts` | Catalog tests: schema in the subset, `additionalProperties: false`, `PROVIDERS` identity, `ui` vocabulary, literal initial configs |
+| `frontend/src/store/editorStore.test.ts` | The two source-text guards |
+| `frontend/e2e/config-panel.e2e.ts` | Browser tests, including the export-checking provider and `(not set)` tests and the `rows` assertion |
+
+**How the tests are built (Module 12).**
+
+- **Golden values copied from the brief.** The test "addNode produces exactly the documented initial config for each of the six types" in `catalog.test.ts` states the literal config of each type (for example `{ provider: 'ollama', model: '', systemPrompt: '', prompt: '', temperature: 0.7 }`), and its comment says they are copied from the brief, **not computed from the catalog**. If the expectation were computed from the catalog, a mistake in the catalog would pass its own test. This is how the claim "existing nodes start exactly as before" is checked.
+- **A guard by reading source text.** "applyDefaults is called by production code in exactly one place: addNode" uses Vite's eager raw-text import of every source file, drops tests and `jsonSchema.ts` itself, and requires the list of callers to equal `['/src/store/editorStore.ts']` with one call there. It turns the sentence "the importer never fills in defaults" into a checked fact.
+- **Test-only code kept out of production.** "codeExemptions is imported by tests only" does the same for the exemption file; it includes a **self-test of its own regular expression** (it must match a static import, a re-export and a dynamic `import()`, and must not match a different file name or a comment), then requires at least one test importer (so the guard cannot pass vacuously) and no production importer. This came from review finding m3.
+- **A single list, proved by identity.** The test compares `providers` to `PROVIDERS` with `toEqual` *and* with `toBe` (same object). With only `toEqual`, a literal copy of the list in `nodes.ts` would pass; the `toBe` assertion fails for any copy. (See the review story below.)
+- **Behaviour through the browser.** Typing and exporting in a real browser catches what unit tests on functions cannot: that the select shows what the config holds.
+
+### 7. Alternatives and trade-offs
+
+| Option | Good | Costs |
+|---|---|---|
+| **Settings panel generated from the schema plus a small `ui` block (chosen)** | One definition per node; adding a node or a setting needs no new form code; the panel cannot drift from the validator | A generic form is less flexible than a custom one; the `ui` vocabulary must be policed (the reserved widgets) |
+| **A hand-coded form per node type** | Full control of layout and wording | Six forms now and one more per node forever; each can disagree with the validator; the exact failure the catalog exists to avoid |
+| **A library such as react-jsonschema-form** (general knowledge, not evaluated here) | Mature, generates forms from JSON Schema, has a separate `uiSchema` (the same split we made) | A new dependency (needs approval, `CLAUDE.md` section 4); our own error codes, strict parsing and policy limits would still need wiring; a bigger feature surface than six node types need |
+| **Implicit defaults on import** (fill in missing values) | Every node looks complete; no "(not set)" state | Importing changes the file's data; hides the user's mistake; the export is no longer what was imported; imports depend on today's catalog version |
+| **Reject incomplete drafts on import (the old behaviour)** | Simple; every imported node is complete | You cannot reload your own unfinished work; contradicts D-017 and D-025 |
+| **Derive the UI only from TypeScript types** | Less data | Types are erased at run time; they cannot be sent to a backend or an AI generator, and they cannot say "between 0 and 2" or "one of these four" |
+| **Make `required` also mean "must have a default"** | Removes the "(not set)" case | Forces a made-up default for settings with no sensible one (a prompt, a URL); the plan's revision P1 rejects this explicitly |
+
+### 8. Real-world applications
+
+*From general knowledge, not from this repository.*
+
+- **Schema-driven forms** are everywhere: workflow tools describe each node's parameters as data and render a settings panel from it; Kubernetes-style and OpenAPI tooling generate forms and documentation from schemas. Keeping presentation hints in a separate block mirrors the `uiSchema` of React JSON Schema Form.
+- **Draft saves.** Any product that lets you save unfinished work (document editors, form builders, CI configuration) separates "well-formed" from "complete", and enforces completeness only at the moment of use (submit, run, deploy). Decision C1 is that pattern.
+- **Differential testing when replacing a component.** Before swapping an old implementation for a new one, teams run both on the same large input set and inspect every difference (used when migrating parsers, query planners and payment rules). The only differences allowed are the intended ones.
+- **UI that must not misrepresent state.** A control that displays something the model does not hold (an unselected dropdown showing its first item, a checkbox that looks off for "unknown") is a classic source of silent data errors in forms; "unset" is usually given its own visible state.
+- **Single source of truth with an enforcing test.** Large codebases derive enums and lists from one definition and use a test or lint rule to forbid copies.
+
+### Three lessons from our own review (real examples)
+
+1. **Differential testing found nothing it should not have, and one thing nobody meant.** The Opus reviewer ran the **old** validator and the **new** one on about **60,000 generated documents** and compared the results (the reviewer's report, relayed by the Principal Architect; I did not repeat it). The only differences were the two intended ones: an absent required key now imports, and `groq` is now an accepted provider. It also found **one accidental difference**: for a config key containing a slash or a tilde, the *message* text changed, because the new code derives the setting name in the message from the path, which is JSON-Pointer-escaped. That was fixed in `44bd7f4` (the message undoes the escapes; I read `validate.ts` and the test in `serialize.test.ts`). The lesson: when you replace a component, "all tests still pass" is not enough; **compare the old and the new on the same inputs and demand an explanation for every difference**. A difference you did not intend is a bug in one of them.
+2. **A behaviour change made a state reachable that was unreachable before, and the bug appeared in the UI, not in the validator.** This is the "(not set)" story of section 4 (review finding M1, fixed in `44bd7f4`). Nothing in the changed validator was wrong. C1 was a deliberate, approved decision. But a different part of the system had been relying on the old rule ("every node has a provider") without anyone writing that down. The reviewer found it (the report; I read the fix and its test, not the review itself); the way to find such a bug is to ask what the importer now allows and walk each consumer of the config. The e2e test checks the **export**, not just what is displayed, because the displayed value was exactly the thing that could not be trusted. Habit to take away: when you loosen a rule, list every consumer of the data and ask "what do they do with the newly possible values?".
+3. **Mutation testing exposed two weak tests (a report from the review round; I did not repeat the runs).** First, a **literal copy** of the provider list in place of the shared constant survived all tests, because the assertion only compared contents; the identity assertion (`toBe(PROVIDERS)`) was added, with a message "derived from PROVIDERS itself, not a second copy of the list". Second, the textarea's `rows` setting survived because nothing observed it; the e2e assertion `toHaveAttribute('rows', '4')` was added (and a second test for the default 5 rows of a JSON field). In both cases the code had a rule and the tests had no way to notice it being broken. The same review round added the source-text guard for `codeExemptions` (m3) and the `ui` vocabulary check (m2). I also noticed, reading the panel (my own observation, not a review finding, and not a bug in today's catalog): a `boolean` property that is absent is drawn as an **unchecked** box (`checked={value === true}`), which is the same kind of "the screen shows a value the config does not hold" problem. No catalog property is a boolean today, so it cannot occur yet.
+
+### Knowledge Check / Interview Questions
+
+*Answers are not given here. Study this lesson and `docs/LEARNING.md`, then answer all questions in the dedicated learning session at the end of the project.*
+
+1. A user saves a draft containing an LLM Prompt node with no `provider` and later imports the file. Walk the file through the importer: which function checks the config, with which `checkRequired` value, what does it do with the missing `provider`, and what does the settings panel show for that node? Then say what each of these would do with the same node: creating a fresh LLM Prompt node, and (Phase 3, planned) executing the workflow. Why is it correct that these four moments behave differently?
+2. The importer stores `config: raw.config` and never applies defaults. Give two concrete harms if it filled in `provider: 'ollama'` for you, one about the "export, import, export is byte-identical" promise from Lesson L5 and one about hiding a mistake. Why is `addNode` still allowed to apply defaults, and how does the test "applyDefaults is called by production code in exactly one place" make the rule hard to break by accident?
+3. Explain the "(not set)" bug as a chain of causes: what was true before decision C1 that made it impossible, what C1 changed, why did the browser display "ollama" for a node whose config had no provider, and why does the e2e test export the workflow instead of only checking what the dropdown shows? Name another control in the panel (reading `ConfigField`) that could have the same problem if the catalog had a certain kind of property, and say what you would do.
+4. Compare generating the settings panel from `configSchema` plus a `ui` block with (a) one hand-written form per node and (b) a form library. For each, say what would drift or what would have to be wired by hand. Why does the `ui` block exist at all instead of putting `multiline` back into the schema, and what does it mean that most `widget` values are "reserved"? What does the catalog test do to stop a reserved value from being used?
+5. `schema.required` can no longer be produced by importing a workflow, yet it stays in `ERROR_CODES`. Explain why, where it is exempted from the "every code has a workflow fixture" guard and why that exemption list may be imported only by tests, and which fixtures still cover the code. What does it mean that every config fixture now has a mandatory `checkRequired` field?
+6. The review used a 60,000-document differential run between the old and the new implementation, and mutation testing. For each of these four findings (the escaped key in a message, the "(not set)" select, the copied provider list, the `rows` attribute), say which technique found it and why an ordinary test run that was already green had not. When you replace a working component, what would you do to be confident the only behaviour changes are the intended ones?
