@@ -1,0 +1,15 @@
+{
+  "name": "sch-check-enum-on-array-with-default",
+  "description": "enum (of the wrong JSON type) on an array schema with a default: only /enum; the default is skipped.",
+  "schema": {
+    "type": "array",
+    "enum": 5,
+    "default": []
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum"
+    }
+  ]
+}

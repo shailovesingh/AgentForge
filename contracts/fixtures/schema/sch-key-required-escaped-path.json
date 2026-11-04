@@ -1,0 +1,25 @@
+{
+  "name": "sch-key-required-escaped-path",
+  "description": "A required key containing / and ~ is reported with an escaped JSON Pointer.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a/b~c": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "a/b~c"
+    ]
+  },
+  "value": {},
+  "options": {
+    "checkRequired": true
+  },
+  "expect": [
+    {
+      "code": "schema.required",
+      "path": "/a~1b~0c"
+    }
+  ]
+}

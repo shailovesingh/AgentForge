@@ -1,0 +1,14 @@
+{
+  "name": "sch-check-enum-empty",
+  "description": "An empty enum can never be satisfied.",
+  "schema": {
+    "type": "string",
+    "enum": []
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum"
+    }
+  ]
+}

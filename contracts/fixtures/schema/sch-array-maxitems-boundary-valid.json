@@ -1,0 +1,16 @@
+{
+  "name": "sch-array-maxitems-boundary-valid",
+  "description": "A list whose length equals maxItems is valid.",
+  "schema": {
+    "type": "array",
+    "maxItems": 2
+  },
+  "value": [
+    1,
+    2
+  ],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": []
+}

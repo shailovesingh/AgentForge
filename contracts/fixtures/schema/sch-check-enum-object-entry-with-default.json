@@ -1,0 +1,17 @@
+{
+  "name": "sch-check-enum-object-entry-with-default",
+  "description": "enum on an object schema with an object entry and a default: only /enum, no spurious /default.",
+  "schema": {
+    "type": "object",
+    "enum": [
+      {}
+    ],
+    "default": {}
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum"
+    }
+  ]
+}

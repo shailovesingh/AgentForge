@@ -1,0 +1,15 @@
+{
+  "name": "sch-check-minlength-above-maxlength",
+  "description": "minLength greater than maxLength is reported at maxLength.",
+  "schema": {
+    "type": "string",
+    "minLength": 3,
+    "maxLength": 2
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/maxLength"
+    }
+  ]
+}

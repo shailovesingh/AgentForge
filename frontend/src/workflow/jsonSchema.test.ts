@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { ERROR_CODES } from './errors'
-import { applyDefaults, checkSchemaSubset, validateAgainstSchema } from './jsonSchema'
+import { applyDefaults, checkSchemaSubset, enumEquals, validateAgainstSchema } from './jsonSchema'
 import type { JsonSchema, ObjectSchema } from './jsonSchema'
 
 const EMOJI = String.fromCodePoint(0x1f600) // one code point, two UTF-16 units
@@ -192,9 +192,67 @@ describe('checkSchemaSubset', () => {
     expect(paths(cycle)).toEqual(['/items'.repeat(16)])
   })
 
-  test('a default is validated only when its schema is sound (no throw on a malformed schema)', () => {
+  test('a default is validated only when its node and everything beneath it is sound (never throws, never reported otherwise)', () => {
     expect(() => checkSchemaSubset({ type: 'object', required: 5, default: {} })).not.toThrow()
     expect(paths({ type: 'object', required: 5, default: {} })).toEqual(['/required'])
+    // the reproducers from the T5a review: an enum of the wrong JSON type on a type that has no enum
+    expect(paths({ type: 'array', enum: 5, default: [] })).toEqual(['/enum'])
+    expect(paths({ type: 'object', enum: null, default: {} })).toEqual(['/enum'])
+    expect(paths({ type: 'object', properties: { a: { type: 'array', enum: 1, default: [] } } })).toEqual(['/properties/a/enum'])
+    expect(paths({ type: 'object', enum: [{}], default: {} })).toEqual(['/enum'])
+    // the node's own problem (an unknown keyword) also hides its bad default; a sound sibling's default is still checked
+    expect(paths({ type: 'string', bogus: 1, default: 5 })).toEqual(['/bogus'])
+    expect(paths({ type: 'object', properties: { a: { type: 'string', bogus: 1 }, b: { type: 'integer', default: 'x' } } })).toEqual(['/properties/a/bogus', '/properties/b/default'])
+    // a problem beneath hides the parent's default too
+    expect(paths({ type: 'object', properties: { a: { type: 'integer', minimum: 'x' } }, default: { a: 'y' } })).toEqual(['/properties/a/minimum'])
+  })
+
+  test('enum entries must have the schema type; an empty enum is a problem', () => {
+    expect(paths({ type: 'string', enum: [1, true] })).toEqual(['/enum/0', '/enum/1'])
+    expect(paths({ type: 'integer', enum: [1.5, 2 ** 53, 3] })).toEqual(['/enum/0', '/enum/1'])
+    expect(paths({ type: 'number', enum: [1.5, NaN] })).toEqual(['/enum/1'])
+    expect(paths({ type: 'boolean', enum: [true, 1] })).toEqual(['/enum/1'])
+    expect(paths({ type: 'string', enum: [] })).toEqual(['/enum'])
+    expect(paths({ type: 'string', enum: ['a', 'b'], default: 'a' })).toEqual([])
+  })
+
+  test('unsatisfiable ranges are problems at the max keyword; equal limits are fine', () => {
+    expect(paths({ type: 'string', minLength: 3, maxLength: 2 })).toEqual(['/maxLength'])
+    expect(paths({ type: 'integer', minimum: 2, maximum: 1 })).toEqual(['/maximum'])
+    expect(paths({ type: 'array', minItems: 2, maxItems: 1 })).toEqual(['/maxItems'])
+    expect(paths({ type: 'string', minLength: 2, maxLength: 2 })).toEqual([])
+    expect(paths({ type: 'number', minimum: 1, maximum: 1 })).toEqual([])
+    expect(paths({ type: 'array', minItems: 0, maxItems: 0 })).toEqual([])
+  })
+
+  test('a duplicate required name is a problem at the later occurrence', () => {
+    const properties = { a: { type: 'string' as const }, b: { type: 'string' as const } }
+    expect(paths({ type: 'object', properties, required: ['a', 'b', 'a', 'a'] })).toEqual(['/required/2', '/required/3'])
+    expect(paths({ type: 'object', properties, required: ['a', 'b'] })).toEqual([])
+  })
+})
+
+describe('validateAgainstSchema options are mandatory at runtime', () => {
+  const schema: JsonSchema = { type: 'string' }
+  test('a missing or malformed options value throws a TypeError', () => {
+    const call = (options: unknown) => () => validateAgainstSchema(schema, 'x', options as { checkRequired: boolean })
+    for (const bad of [undefined, null, {}, { checkRequired: 1 }, { checkRequired: 'true' }, { checkRequired: undefined }, 5, 'x', []]) {
+      expect(call(bad), JSON.stringify(bad)).toThrow(TypeError)
+    }
+    expect(call({ checkRequired: true })).not.toThrow()
+    expect(call({ checkRequired: false })).not.toThrow()
+  })
+})
+
+describe('enumEquals', () => {
+  test('same JSON type and value; a boolean never equals a number or text (a loose == would accept these)', () => {
+    expect(enumEquals(1, 1)).toBe(true)
+    expect(enumEquals('a', 'a')).toBe(true)
+    expect(enumEquals(true, true)).toBe(true)
+    expect(enumEquals(0, -0)).toBe(true)
+    for (const [a, b] of [[1, true], [true, 1], [0, false], [0, ''], [0, '0'], [1, '1'], ['1', 1], [false, ''], [false, '0'], [0, null], ['', false]] as const) {
+      expect(enumEquals(a, b), `${String(a)} vs ${String(b)}`).toBe(false)
+    }
   })
 })
 
@@ -414,5 +472,104 @@ describe('property test: the validator agrees with an independent reference', ()
       expect(Object.keys(defaults).every((k) => properties[k].default !== undefined)).toBe(true)
     }
     expect(withDefaults).toBeGreaterThan(500)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Totality: checkSchemaSubset never throws, whatever it is given
+// ---------------------------------------------------------------------------
+
+const KEYWORDS = ['type', 'title', 'description', 'default', 'enum', 'minLength', 'maxLength', 'minimum', 'maximum', 'items', 'minItems', 'maxItems', 'properties', 'required', 'additionalProperties', '$ref', 'bogus', '__proto__'] as const
+const setOwn = (o: Record<string, unknown>, key: string, value: unknown): void => {
+  Object.defineProperty(o, key, { value, enumerable: true, writable: true, configurable: true }) // an own __proto__ key too
+}
+
+/** A random JSON value of a random type (null, numbers, text, booleans, lists, objects), nested up to `depth`. */
+function randJson(r: Rand, depth: number): unknown {
+  const kind = Math.floor(r() * (depth > 0 ? 8 : 5))
+  switch (kind) {
+    case 0: return null
+    case 1: return pick(r, [0, -0, 1, -1, 1.5, 2 ** 53, 1e308, -5])
+    case 2: return pick(r, ['', 'a', 'string', 'object', 'integer', EMOJI])
+    case 3: return r() < 0.5
+    case 4: return pick(r, KEYWORDS)
+    case 5: return Array.from({ length: Math.floor(r() * 4) }, () => randJson(r, depth - 1))
+    default: {
+      const out: Record<string, unknown> = {}
+      for (let i = Math.floor(r() * 4); i > 0; i--) setOwn(out, pick(r, [...KEYS, ...KEYWORDS]), randJson(r, depth - 1))
+      return out
+    }
+  }
+}
+
+/** Corrupts a schema in place: keyword values replaced by random JSON, keywords dropped or added, at every level. */
+function corrupt(r: Rand, node: unknown): unknown {
+  if (typeof node !== 'object' || node === null || Array.isArray(node)) return node
+  const out = node as Record<string, unknown>
+  for (const key of Object.keys(out)) {
+    const roll = r()
+    if (roll < 0.1) out[key] = randJson(r, 3)
+    else if (roll < 0.13) delete out[key]
+    else if (key === 'properties' && typeof out[key] === 'object' && out[key] !== null) {
+      for (const k of Object.keys(out[key] as object)) (out[key] as Record<string, unknown>)[k] = corrupt(r, (out[key] as Record<string, unknown>)[k])
+    } else if (key === 'items' || key === 'additionalProperties') out[key] = corrupt(r, out[key])
+  }
+  if (r() < 0.3) setOwn(out, pick(r, KEYWORDS), randJson(r, 3))
+  if (r() < 0.2) setOwn(out, 'default', randJson(r, 3))
+  return out
+}
+
+function anySchemaLikeValue(r: Rand): unknown {
+  const roll = r()
+  if (roll < 0.1) return randJson(r, 5)
+  if (roll < 0.15) {
+    // a chain deeper than the 16-level limit
+    let node: unknown = { type: 'string' }
+    for (let i = 0; i < 18; i++) node = { type: 'array', items: node, default: [] }
+    return corrupt(r, node)
+  }
+  const schema = genSchema(r, 3)
+  if (r() < 0.5) schema.default = genValue(r, schema, pick(r, [0, 0.3]))
+  return corrupt(r, structuredClone(schema))
+}
+
+describe('checkSchemaSubset is total', () => {
+  const N = 3000
+  test(`${N} seeded random and corrupted schema values never throw; a clean verdict means the validator is safe too`, () => {
+    const r = rng(20261105)
+    let clean = 0
+    let reported = 0
+    for (let i = 0; i < N; i++) {
+      const schema = anySchemaLikeValue(r)
+      let problems: ReturnType<typeof checkSchemaSubset> = []
+      try {
+        problems = checkSchemaSubset(schema)
+      } catch (e) {
+        throw new Error(`pair ${i} threw (${String(e)}): ${JSON.stringify(schema)}`)
+      }
+      if (problems.length > 0) {
+        reported++
+        for (const p of problems) expect(typeof p.path === 'string' && p.message !== '', `pair ${i}`).toBe(true)
+        continue
+      }
+      clean++
+      // soundness corollary: a schema with no problems can be used by the validator on any value without throwing
+      for (const checkRequired of [true, false]) {
+        expect(() => validateAgainstSchema(schema as JsonSchema, randJson(r, 3), { checkRequired }), `pair ${i}: ${JSON.stringify(schema)}`).not.toThrow()
+      }
+    }
+    expect(reported, 'schemas with problems').toBeGreaterThan(N * 0.3)
+    expect(clean, 'schemas with no problems').toBeGreaterThan(N * 0.05)
+  })
+
+  test('total on the awkward shapes too: cyclic objects, non-objects, own __proto__, deep nesting', () => {
+    const cyclicProps: Record<string, unknown> = { type: 'object' }
+    cyclicProps.properties = { self: cyclicProps }
+    const proto = JSON.parse('{"type":"object","properties":{"__proto__":{"type":"string","default":5}},"__proto__":{"type":"string"}}')
+    for (const value of [undefined, null, 0, '', true, [], [1], {}, cyclicProps, proto, { type: 'array', items: [] }, { type: 'object', properties: [] }, { type: 'object', additionalProperties: null }]) {
+      expect(() => checkSchemaSubset(value)).not.toThrow()
+    }
+    // the own __proto__ keyword is unknown; the sound property named __proto__ still has its bad default reported
+    expect(checkSchemaSubset(proto).map((p) => p.path)).toEqual(['/__proto__', '/properties/__proto__/default'])
   })
 })

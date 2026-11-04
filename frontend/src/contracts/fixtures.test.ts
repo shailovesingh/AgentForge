@@ -9,7 +9,7 @@ import { canonicalCompact, exportPretty } from '../workflow/canonicalJson'
 import { validateConfig } from '../workflow/configSchema'
 import { checkConnection } from '../workflow/connections'
 import { ERROR_CODES, jsonPointer } from '../workflow/errors'
-import { applyDefaults, checkSchemaSubset, validateAgainstSchema } from '../workflow/jsonSchema'
+import { SCHEMA_ONLY_CODES, applyDefaults, checkSchemaSubset, validateAgainstSchema } from '../workflow/jsonSchema'
 import type { JsonSchema, ObjectSchema } from '../workflow/jsonSchema'
 import { importWorkflow, serializeWorkflow } from '../workflow/serialize'
 import { strictParse } from '../workflow/strictJson'
@@ -37,11 +37,12 @@ const isBase64 = (b: unknown): boolean => typeof b === 'string' && b.length % 4 
 // tested in errors.test.ts and serialize.test.ts. Every other code stays strictly covered.
 export const EXPORT_ONLY_CODES: readonly string[] = ['value.not-json-data']
 
-// SECOND EXPLICIT EXEMPTION LIST (temporary, T5a): codes of JSON Schema subset keywords that no catalog
-// schema uses yet, so no workflow/invalid fixture can produce them. They are covered by the `schema` family
-// instead (guard below). T5b converts the catalog: remove an entry from here as soon as a workflow/invalid
-// fixture covers it, and delete the list when it is empty.
-export const SCHEMA_ONLY_CODES: readonly string[] = ['schema.minLength', 'schema.maxLength', 'schema.minItems', 'schema.maxItems']
+// SECOND EXPLICIT EXEMPTION LIST (temporary, T5a): SCHEMA_ONLY_CODES, imported from jsonSchema.ts (one
+// definition, shared with errors.test.ts): codes of JSON Schema subset keywords that no catalog schema uses
+// yet, so no workflow/invalid fixture can produce them. They are covered by the `schema` family instead
+// (guard below). T5b converts the catalog: remove an entry as soon as a workflow/invalid fixture covers it,
+// and delete the list when it is empty.
+const SCHEMA_ONLY: readonly string[] = SCHEMA_ONLY_CODES
 
 // What a fixture may expect: every code except the export-only ones.
 const KNOWN_CODES: readonly string[] = ERROR_CODES.filter((c) => !EXPORT_ONLY_CODES.includes(c))
@@ -410,8 +411,8 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
 }
 
 const MIN_COUNTS = {
-  total: 387, valid: 19, invalid: 97, connection: 22, config: 15, serialization: 109, serializationInvalid: 9,
-  schema: 125, schemaValidation: 66, schemaDefaults: 8, schemaCheck: 51,
+  total: 410, valid: 19, invalid: 97, connection: 22, config: 15, serialization: 109, serializationInvalid: 9,
+  schema: 148, schemaValidation: 75, schemaDefaults: 8, schemaCheck: 65,
 }
 
 // Which kind a schema case is (the three shapes are told apart by `applyDefaults` / `checkSchema`).
@@ -435,7 +436,7 @@ describe('fixture corpus', () => {
   test('every error code is expected by at least one workflow/invalid fixture', () => {
     const covered = new Set(corpus.invalid.flatMap((c) => c.expect.errors ?? []).map((e) => e.code))
     expect(
-      ERROR_CODES.filter((code) => !EXPORT_ONLY_CODES.includes(code) && !SCHEMA_ONLY_CODES.includes(code) && !covered.has(code)),
+      ERROR_CODES.filter((code) => !EXPORT_ONLY_CODES.includes(code) && !SCHEMA_ONLY.includes(code) && !covered.has(code)),
       'codes with no workflow/invalid fixture',
     ).toEqual([])
   })
@@ -638,13 +639,37 @@ describe('config fixtures', () => {
   }
 })
 
+// Static `from '...'`, side-effect `import '...'` and dynamic `import('...')`, with or without an extension;
+// the module name must be a whole path segment (jsonSchemaFoo and notjsonSchema are other modules).
+const IMPORTS_JSON_SCHEMA = /(?:\bfrom|\bimport)\s*\(?\s*['"](?:[^'"]*\/)?jsonSchema(?:\.[cm]?[jt]sx?)?['"]/
+
 describe('jsonSchema.ts is not used by production code yet (T5b switches the code over)', () => {
+  test('the guard regex catches every import form and ignores other module names', () => {
+    for (const text of [
+      "import { a } from './jsonSchema'",
+      'import { a } from "./jsonSchema"',
+      "import { a } from './jsonSchema.ts'",
+      "import type { J } from '../workflow/jsonSchema'",
+      "import './jsonSchema'",
+      "const m = await import('./jsonSchema')",
+      "const m = await import( './jsonSchema.ts' )",
+      "export { a } from './jsonSchema.js'",
+    ]) expect(IMPORTS_JSON_SCHEMA.test(text), text).toBe(true)
+    for (const text of [
+      "import { a } from './jsonSchemaFoo'",
+      "import { a } from './notjsonSchema'",
+      "import { a } from './errors'",
+      "const jsonSchema = 'x'",
+      "// see ./jsonSchema in the docs",
+    ]) expect(IMPORTS_JSON_SCHEMA.test(text), text).toBe(false)
+  })
+
   test('only test files import it', () => {
     const src = resolve(import.meta.dirname, '..')
     const offenders = readdirSync(src, { recursive: true, withFileTypes: true })
       .filter((d) => d.isFile() && /\.(ts|tsx)$/.test(d.name) && !d.name.endsWith('.test.ts') && d.name !== 'jsonSchema.ts')
       .map((d) => relative(src, join(d.parentPath, d.name)).split(sep).join('/'))
-      .filter((file) => /from\s+['"][^'"]*jsonSchema['"]/.test(readFileSync(join(src, file), 'utf8')))
+      .filter((file) => IMPORTS_JSON_SCHEMA.test(readFileSync(join(src, file), 'utf8')))
     expect(offenders).toEqual([])
   })
 })
@@ -654,7 +679,10 @@ describe('schema fixtures (JSON Schema subset validator, explicit applyDefaults,
     test(c.name, () => {
       switch (schemaKind(c)) {
         case 'defaults': {
+          // the schema must be inside the subset and the result must be a valid (possibly incomplete) config
+          expect(checkSchemaSubset(c.schema), `${c.file}: the fixture's own schema is outside the subset`).toEqual([])
           const actual = applyDefaults(c.schema as ObjectSchema)
+          expect(validateAgainstSchema(c.schema as JsonSchema, actual, { checkRequired: false }), `${c.file}: applyDefaults result must validate with checkRequired false`).toEqual([])
           // compared as text so the order of the keys counts too
           expect(JSON.stringify(actual), `${c.file}: applyDefaults result (key order counts)`).toBe(JSON.stringify((c.expect as { value: unknown }).value))
           return

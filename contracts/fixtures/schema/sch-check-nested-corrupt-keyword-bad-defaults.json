@@ -1,0 +1,23 @@
+{
+  "name": "sch-check-nested-corrupt-keyword-bad-defaults",
+  "description": "A bad keyword in a nested property: only that keyword, neither the nested default nor the parent default is reported.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "integer",
+        "minimum": "x",
+        "default": "s"
+      }
+    },
+    "default": {
+      "a": "y"
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/minimum"
+    }
+  ]
+}

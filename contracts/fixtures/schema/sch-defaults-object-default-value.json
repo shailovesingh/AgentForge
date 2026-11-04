@@ -1,6 +1,6 @@
 {
-  "name": "sch-defaults-object-default-copied",
-  "description": "An explicit object default is copied whole.",
+  "name": "sch-defaults-object-default-value",
+  "description": "An explicit object default appears in the result with its contents and key order (whether it is a copy is tested in jsonSchema.test.ts).",
   "schema": {
     "type": "object",
     "properties": {

@@ -1,0 +1,15 @@
+{
+  "name": "sch-check-minitems-above-maxitems",
+  "description": "minItems greater than maxItems is reported at maxItems.",
+  "schema": {
+    "type": "array",
+    "minItems": 3,
+    "maxItems": 2
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/maxItems"
+    }
+  ]
+}

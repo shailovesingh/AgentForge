@@ -1,0 +1,20 @@
+{
+  "name": "sch-check-enum-string-wrong-entries",
+  "description": "enum entries must have the schema type: 1 and true in a string enum are problems at their entries.",
+  "schema": {
+    "type": "string",
+    "enum": [
+      1,
+      true
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum/0"
+    },
+    {
+      "path": "/enum/1"
+    }
+  ]
+}

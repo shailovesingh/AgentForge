@@ -1,0 +1,17 @@
+{
+  "name": "sch-check-enum-boolean-in-number",
+  "description": "A boolean entry in a number enum is a problem at its entry.",
+  "schema": {
+    "type": "number",
+    "enum": [
+      1,
+      true
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum/1"
+    }
+  ]
+}

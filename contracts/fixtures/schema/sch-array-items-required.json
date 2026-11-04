@@ -1,0 +1,33 @@
+{
+  "name": "sch-array-items-required",
+  "description": "checkRequired true reaches objects inside array items.",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "properties": {
+        "a": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "a"
+      ]
+    }
+  },
+  "value": [
+    {},
+    {
+      "a": "x"
+    }
+  ],
+  "options": {
+    "checkRequired": true
+  },
+  "expect": [
+    {
+      "code": "schema.required",
+      "path": "/0/a"
+    }
+  ]
+}

@@ -219,6 +219,8 @@ is one of three kinds, told apart by which field it has:
   `expect`: a list of `{ code, path }` (empty = valid), with `schema.*` codes only. `path` is relative to `value`.
   `value` may be any JSON value; an own `__proto__` key written in the file is an own key after parsing.
 - **defaults**: `"applyDefaults": true` and `expect: { "value": { ... } }`, compared as JSON text so key order counts.
+  The runner also checks that the case's schema passes `checkSchemaSubset` and that the result validates against
+  it with `checkRequired: false`.
 - **schema check**: `"checkSchema": true` and `expect`: a list of `{ path }` (paths into the schema; message text is
   not compared).
 
@@ -261,7 +263,7 @@ the independent statement of what the code must do.
    `workflow/invalid` case, every `connection.*` code by at least one `connection` case, and the `serialization`
    family must keep covering its own rejection codes; the runner enforces all three. Every `schema.*` code must also
    appear in a `schema` or `config` case (the four length and item codes are exempt from the `workflow/invalid`
-   requirement through an explicit, temporary list in the runner until the catalog uses those keywords).
+   requirement through an explicit, temporary list (`SCHEMA_ONLY_CODES` in `jsonSchema.ts`, shared by the runners) until the catalog uses those keywords).
 
 ## Never edit expected values just to make a test pass
 

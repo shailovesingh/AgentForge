@@ -1,0 +1,22 @@
+{
+  "name": "sch-check-required-duplicate",
+  "description": "A name listed twice in required is a problem at the later occurrence (the 2020-12 metaschema needs unique items).",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "a",
+      "a"
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/required/1"
+    }
+  ]
+}

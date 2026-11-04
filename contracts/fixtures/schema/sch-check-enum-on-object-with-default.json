@@ -1,0 +1,15 @@
+{
+  "name": "sch-check-enum-on-object-with-default",
+  "description": "enum null on an object schema with a default: only /enum; the default is skipped.",
+  "schema": {
+    "type": "object",
+    "enum": null,
+    "default": {}
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum"
+    }
+  ]
+}

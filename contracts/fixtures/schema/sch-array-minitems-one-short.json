@@ -1,0 +1,20 @@
+{
+  "name": "sch-array-minitems-one-short",
+  "description": "A list one shorter than minItems is rejected.",
+  "schema": {
+    "type": "array",
+    "minItems": 2
+  },
+  "value": [
+    1
+  ],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.minItems",
+      "path": ""
+    }
+  ]
+}

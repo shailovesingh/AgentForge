@@ -1,0 +1,30 @@
+{
+  "name": "sch-object-required-under-additional",
+  "description": "checkRequired true reaches an object validated through an additionalProperties schema.",
+  "schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "object",
+      "properties": {
+        "a": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "a"
+      ]
+    }
+  },
+  "value": {
+    "x": {}
+  },
+  "options": {
+    "checkRequired": true
+  },
+  "expect": [
+    {
+      "code": "schema.required",
+      "path": "/x/a"
+    }
+  ]
+}

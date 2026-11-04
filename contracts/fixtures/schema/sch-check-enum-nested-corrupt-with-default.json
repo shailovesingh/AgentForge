@@ -1,0 +1,20 @@
+{
+  "name": "sch-check-enum-nested-corrupt-with-default",
+  "description": "A corrupted enum in a nested array property with a default: the nested /enum only.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "a": {
+        "type": "array",
+        "enum": 1,
+        "default": []
+      }
+    }
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/properties/a/enum"
+    }
+  ]
+}

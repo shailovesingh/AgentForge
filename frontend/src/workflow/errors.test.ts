@@ -3,7 +3,7 @@ import { nodeDefinitions } from '../catalog'
 import { CONNECTION_ERROR_MESSAGES } from './connections'
 import { ERROR_CODES, jsonPointer } from './errors'
 import type { ErrorCode } from './errors'
-import { validateAgainstSchema } from './jsonSchema'
+import { SCHEMA_ONLY_CODES, validateAgainstSchema } from './jsonSchema'
 import type { SchemaError } from './jsonSchema'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importWorkflow } from './serialize'
 import type { Workflow } from './types'
@@ -55,10 +55,9 @@ const withMetadata = (raw: string): string => JSON.stringify(base()).replace('"m
 // Every other code must keep an import case; do not add a code here to dodge that.
 const EXPORT_ONLY_CODES = ['value.not-json-data'] as const
 type ExportOnlyCode = (typeof EXPORT_ONLY_CODES)[number]
-// SECOND EXPLICIT EXEMPTION LIST (temporary): codes of keywords the JSON Schema subset validator supports
-// but no catalog schema uses yet, so no workflow import can produce them. They are tested through
-// validateAgainstSchema below. T5b converts the catalog; delete this list then if a catalog schema uses them.
-const SCHEMA_ONLY_CODES = ['schema.minLength', 'schema.maxLength', 'schema.minItems', 'schema.maxItems'] as const
+// SECOND EXPLICIT EXEMPTION LIST (temporary): SCHEMA_ONLY_CODES, the one shared definition in jsonSchema.ts
+// (also used by fixtures.test.ts): subset keywords no catalog schema uses yet, so no workflow import can produce
+// them. They are tested through validateAgainstSchema below. T5b converts the catalog; delete the list then.
 type SchemaOnlyCode = (typeof SCHEMA_ONLY_CODES)[number]
 type NotImportable = ExportOnlyCode | SchemaOnlyCode
 const NOT_IMPORTABLE: readonly string[] = [...EXPORT_ONLY_CODES, ...SCHEMA_ONLY_CODES]

@@ -1,0 +1,20 @@
+{
+  "name": "sch-enum-boolean-rejects-number",
+  "description": "1 is not a boolean: schema.type, never a match for true.",
+  "schema": {
+    "type": "boolean",
+    "enum": [
+      true
+    ]
+  },
+  "value": 1,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

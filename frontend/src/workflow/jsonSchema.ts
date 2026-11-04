@@ -66,6 +66,21 @@ function typeProblem(type: string, value: unknown): string | null {
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
+/**
+ * Enum equality: the same JSON type and the same value, so a boolean never equals a number (JavaScript `===`
+ * says the same; Python's `True == 1` would not, so a port must compare the types too). Kept as its own
+ * function so a test can pin it directly: after the type checks in `validate` and `checkSchemaSubset` both
+ * sides always have the schema's type, so a loose `==` there could not be told apart through `validate` alone.
+ */
+export const enumEquals = (a: unknown, b: unknown): boolean => a === b
+
+/**
+ * TEMPORARY exemption list (T5a): codes of subset keywords that no catalog schema uses yet, so no imported
+ * workflow can produce them. The test files share this one definition. T5b converts the catalog: remove an
+ * entry as soon as a workflow/invalid fixture covers it, and delete the list when it is empty.
+ */
+export const SCHEMA_ONLY_CODES = ['schema.minLength', 'schema.maxLength', 'schema.minItems', 'schema.maxItems'] as const
+
 function validate(schema: JsonSchema, value: unknown, path: string, checkRequired: boolean, errors: SchemaError[]): void {
   const add = (code: SchemaErrorCode, message: string): void => {
     errors.push({ code, path, message })
@@ -74,7 +89,7 @@ function validate(schema: JsonSchema, value: unknown, path: string, checkRequire
   const wrongType = typeProblem(schema.type, value)
   if (wrongType) return add('schema.type', wrongType) // every other keyword is skipped for this node
 
-  if (schema.enum !== undefined && !schema.enum.some((option) => option === value)) {
+  if (schema.enum !== undefined && !schema.enum.some((option) => enumEquals(option, value))) {
     add('schema.enum', 'must be one of the allowed values')
   }
 
@@ -134,8 +149,15 @@ function validate(schema: JsonSchema, value: unknown, path: string, checkRequire
  * Validates `value` against `schema`. `checkRequired` is mandatory so no caller applies it by accident:
  * importing a document uses `false` (decision C1: an absent required key is not a structural error),
  * execution uses `true`. Defaults are never applied here.
+ *
+ * Precondition: `schema` passes `checkSchemaSubset`. A malformed, cyclic or over-deep schema is not supported
+ * here (the validator itself does not guard against it and may throw); callers check the schema once, when it is loaded.
+ * Throws a TypeError when `options.checkRequired` is not a boolean (the option is mandatory at runtime too).
  */
 export function validateAgainstSchema(schema: JsonSchema, value: unknown, options: { checkRequired: boolean }): SchemaError[] {
+  if (typeof options !== 'object' || options === null || typeof options.checkRequired !== 'boolean') {
+    throw new TypeError('validateAgainstSchema: options must be { checkRequired: true | false }')
+  }
   const errors: SchemaError[] = []
   validate(schema, value, '', options.checkRequired, errors)
   return errors
@@ -189,7 +211,14 @@ export const NON_GOAL_KEYWORDS: readonly string[] = [
 
 const isCount = (v: unknown): boolean => Number.isSafeInteger(v) && (v as number) >= 0
 
-/** Reports every way `schema` falls outside the subset; an empty list means it is well-formed. */
+/**
+ * Reports every way `schema` falls outside the subset; an empty list means it is well-formed. Total: it
+ * accepts any value (including a cyclic object) and never throws.
+ *
+ * The `default` rule is uniform: a `default` is validated against its own schema only when that schema node
+ * and every schema node beneath it have no problem of their own; otherwise the default is skipped (never
+ * reported), so the validator only ever runs on a sound schema.
+ */
 export function checkSchemaSubset(schema: unknown): SchemaProblem[] {
   const problems: SchemaProblem[] = []
   checkNode(schema, '', 1, problems)
@@ -202,6 +231,7 @@ function checkNode(node: unknown, path: string, depth: number, problems: SchemaP
   }
   if (depth > MAX_SCHEMA_DEPTH) return bad(path, `schemas may be nested at most ${MAX_SCHEMA_DEPTH} levels deep`)
   if (!isPlainObject(node)) return bad(path, 'a schema must be an object')
+  const before = problems.length // the default rule at the end compares against this
   const get = (key: string): unknown => (Object.hasOwn(node, key) ? node[key] : undefined)
   const has = (key: string): boolean => Object.hasOwn(node, key)
 
@@ -219,7 +249,6 @@ function checkNode(node: unknown, path: string, depth: number, problems: SchemaP
     if (SUPPORTED_KEYWORDS.includes(key) && !allowed.includes(key)) bad(path + jsonPointer(key), `"${key}" is not allowed on type "${type}"`)
   }
 
-  const before = problems.length
   for (const key of ['title', 'description']) {
     if (has(key) && typeof get(key) !== 'string') bad(path + jsonPointer(key), `"${key}" must be a string`)
   }
@@ -230,13 +259,25 @@ function checkNode(node: unknown, path: string, depth: number, problems: SchemaP
     if (allowed.includes(key) && has(key) && !(typeof get(key) === 'number' && Number.isFinite(get(key)))) bad(path + jsonPointer(key), `"${key}" must be a finite number`)
   }
 
+  // An unsatisfiable range is a problem at the max keyword (the later one of the pair).
+  for (const [low, high, valid] of [
+    ['minLength', 'maxLength', isCount],
+    ['minItems', 'maxItems', isCount],
+    ['minimum', 'maximum', (v: unknown) => typeof v === 'number' && Number.isFinite(v)],
+  ] as const) {
+    if (allowed.includes(high) && valid(get(low)) && valid(get(high)) && (get(low) as number) > (get(high) as number)) {
+      bad(path + jsonPointer(high), `"${low}" must not be greater than "${high}"`)
+    }
+  }
+
   const options = get('enum')
   if (allowed.includes('enum') && has('enum')) {
     if (!Array.isArray(options)) bad(path + '/enum', '"enum" must be a list')
+    else if (options.length === 0) bad(path + '/enum', '"enum" must not be empty (nothing could satisfy it)')
     else {
+      // every entry must itself be a valid value of the schema's type (an integer enum holds safe integers)
       options.forEach((option, i) => {
-        const primitive = typeof option === 'string' || typeof option === 'boolean' || (typeof option === 'number' && Number.isFinite(option))
-        if (!primitive) bad(path + jsonPointer('enum', i), 'enum values must be strings, numbers or booleans')
+        if (typeProblem(type, option) !== null) bad(path + jsonPointer('enum', i), `enum values must be of type "${type}"`)
       })
     }
   }
@@ -253,10 +294,12 @@ function checkNode(node: unknown, path: string, depth: number, problems: SchemaP
       const required = get('required')
       if (!Array.isArray(required)) bad(path + '/required', '"required" must be a list of property names')
       else {
+        const seen = new Set<string>()
         required.forEach((name, i) => {
           if (typeof name !== 'string' || !isPlainObject(properties) || !Object.hasOwn(properties, name)) {
             bad(path + jsonPointer('required', i), 'every required name must be a key of "properties"')
-          }
+          } else if (seen.has(name)) bad(path + jsonPointer('required', i), `"${name}" is listed more than once`)
+          if (typeof name === 'string') seen.add(name)
         })
       }
     }
@@ -268,8 +311,8 @@ function checkNode(node: unknown, path: string, depth: number, problems: SchemaP
     }
   }
 
-  // A default must be a valid value of its own schema. Only checked when the schema below it is sound,
-  // so the validator never runs on a malformed schema.
+  // A default must be a valid value of its own schema. Only checked when this node and everything beneath
+  // it is sound (no problem since entry), so the validator never runs on a malformed schema.
   if (has('default') && get('default') !== undefined && problems.length === before) {
     for (const error of validateAgainstSchema(node as unknown as JsonSchema, get('default'), { checkRequired: false })) {
       bad(path + '/default' + error.path, `the default ${error.message}`)

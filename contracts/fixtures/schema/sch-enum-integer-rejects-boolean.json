@@ -1,0 +1,20 @@
+{
+  "name": "sch-enum-integer-rejects-boolean",
+  "description": "true is not an integer, even though JavaScript === and Python == may treat it like 1: schema.type.",
+  "schema": {
+    "type": "integer",
+    "enum": [
+      1
+    ]
+  },
+  "value": true,
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.type",
+      "path": ""
+    }
+  ]
+}

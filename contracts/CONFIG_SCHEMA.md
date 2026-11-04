@@ -19,7 +19,7 @@ subset. The code is `frontend/src/workflow/jsonSchema.ts`; the fixtures are in `
 | `type` | all (required) | one of `string`, `number`, `integer`, `boolean`, `array`, `object` | JSON Schema, with the integer rule below |
 | `title`, `description` | all | annotations, never affect validity | JSON Schema |
 | `default` | all | the initial value; see "Defaults" | JSON Schema annotation; applied only by `applyDefaults` |
-| `enum` | string, number, integer, boolean | the value must `===` one entry; entries are strings, finite numbers or booleans | JSON Schema, restricted to primitives |
+| `enum` | string, number, integer, boolean | the value must equal one entry (see "Enum equality"); every entry must itself have the schema's type; the list must not be empty | JSON Schema, restricted to primitives |
 | `minLength`, `maxLength` | string | length limits counted in **code points** | **AgentForge policy** (see below) |
 | `minimum`, `maximum` | number, integer | inclusive limits | JSON Schema |
 | `items` | array | one schema for every element | JSON Schema (single schema only) |
@@ -38,6 +38,12 @@ copy them):
   with magnitude at most 2^53 - 1. `9007199254740992` is not a valid integer. This matches the document-wide number
   rule in `CANONICAL_JSON.md` and `README.md`.
 - **`number`** is a finite number (no NaN, no infinity; JSON cannot carry them anyway).
+- **Enum equality.** A value equals an enum entry when it has **the same JSON type and the same value**. A boolean
+  never equals a number (`true` is not `1`, `false` is not `0`) and text never equals a number. JavaScript's `===`
+  gives exactly this; a port must not rely on a loose equality (Python's `True == 1` is true and would be wrong).
+  The value's type is checked first (`true` against `type: integer` is `schema.type`, not `schema.enum`), and
+  `checkSchemaSubset` requires every entry to have the schema's own type (an `integer` enum holds safe integers, a
+  `number` enum finite numbers), so on a sound schema both sides of the comparison always have the same type.
 - **Wrong type skips the rest.** A value of the wrong type reports `schema.type` for that node and **no other
   keyword** is checked for it.
 - **Own keys only.** Keys of a validated object are untrusted. A key is matched against `properties` only if
@@ -66,10 +72,29 @@ Why:
 - **`type` as a list** (`["string", "null"]`) is not supported either: `type` is exactly one of the six names.
 
 `checkSchemaSubset(schema)` also reports: a wrong or missing `type`; a keyword on the wrong type (`minLength` on a
-number); `required` entries that are not own keys of `properties`; an `enum` entry that is not a string, finite
-number or boolean; a keyword value of the wrong kind (a negative or fractional `minLength`, a non-numeric `minimum`);
-a `default` that does not validate against its own schema (checked with `checkRequired: false`); and nesting deeper
-than **16** levels (the root is level 1; `items`, `properties` and `additionalProperties` each add one).
+number, `enum` on an array or object); `required` entries that are not own keys of `properties`, and a name listed
+twice in `required` (a problem at `/required/<i>` of the **later** occurrence; the 2020-12 metaschema requires
+`uniqueItems`); an `enum` that is empty (at `/enum`) or has an entry that is not of the schema's type (at
+`/enum/<i>`); a keyword value of the wrong kind (a negative or fractional `minLength`, a non-numeric `minimum`);
+an unsatisfiable range, reported at the **max** keyword: `minLength` greater than `maxLength`, `minimum` greater than
+`maximum`, `minItems` greater than `maxItems` (equal limits are fine); a `default` that does not validate against its
+own schema (checked with `checkRequired: false`); and nesting deeper than **16** levels (the root is level 1;
+`items`, `properties` and `additionalProperties` each add one).
+
+**The `default` rule.** A `default` is validated against its own schema **only when that schema node, and every
+schema node beneath it, has no problem of its own**; otherwise the `default` is skipped and never reported. So a
+schema with a bad keyword, an unknown keyword or a bad nested schema reports that problem and not a second,
+derived one about the default, and the validator only ever runs on a sound schema. The rule is the same at every
+level.
+
+**`checkSchemaSubset` is total.** It accepts any value (including `null`, a list, a cyclic object or a schema whose
+keywords have the wrong JSON type) and returns a list of problems; it never throws. A seeded property test checks
+this on thousands of random and corrupted schemas.
+
+**Precondition of the validator.** `validateAgainstSchema` assumes its `schema` passes `checkSchemaSubset` (callers
+check a schema once, when it is loaded). A malformed or cyclic schema is not supported by the validator itself and
+it may throw. Its `options` argument is mandatory at runtime too: a missing `options`, or an `options.checkRequired`
+that is not `true` or `false`, throws a `TypeError`.
 
 ## `checkRequired`
 
@@ -107,7 +132,7 @@ never compared by a fixture.
   `schema.maxLength`, `schema.minItems`, `schema.maxItems`.
 - The four length and item codes are produced by this validator but no catalog schema uses those keywords yet, so no
   workflow import can produce them. They are covered by the `schema` fixture family (and listed in an explicit,
-  temporary exemption list in the runners until T5b).
+  temporary exemption list, `SCHEMA_ONLY_CODES` in `jsonSchema.ts`, shared by both test runners, until T5b).
 - Order is stable but not part of the contract: `required` errors first (in the order of the `required` list), then
   the value's own keys in key order, then array elements by index. Fixtures compare as multisets.
 
@@ -134,6 +159,10 @@ Validation case. `value` is any JSON value (including `null`). `options` is exac
 
 Defaults case. The result of `applyDefaults(schema)` must equal `expect.value`, **including key order** (compared as
 JSON text, so avoid integer-like key names in these fixtures: their order differs between JavaScript and Python).
+The runner also requires the case's `schema` to pass `checkSchemaSubset` and the result to validate against the
+schema with `checkRequired: false` (a required property without a default stays absent, which that mode allows).
+The comparison is of JSON text, so it cannot show that a default is a copy and not the schema's own object; that is
+a unit test, not a fixture.
 
 ```json
 { "name": "...", "description": "...", "schema": ..., "checkSchema": true, "expect": [ { "path": "/properties/a/pattern" } ] }

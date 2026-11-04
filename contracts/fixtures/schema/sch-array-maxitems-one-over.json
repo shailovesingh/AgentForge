@@ -1,0 +1,22 @@
+{
+  "name": "sch-array-maxitems-one-over",
+  "description": "A list one longer than maxItems is rejected.",
+  "schema": {
+    "type": "array",
+    "maxItems": 2
+  },
+  "value": [
+    1,
+    2,
+    3
+  ],
+  "options": {
+    "checkRequired": false
+  },
+  "expect": [
+    {
+      "code": "schema.maxItems",
+      "path": ""
+    }
+  ]
+}

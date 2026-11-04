@@ -1,6 +1,6 @@
 {
-  "name": "sch-object-required-order",
-  "description": "Several absent required keys are all reported.",
+  "name": "sch-object-required-multiple",
+  "description": "Several absent required keys are each reported (compared as a multiset; the order of the errors is not part of the contract).",
   "schema": {
     "type": "object",
     "properties": {

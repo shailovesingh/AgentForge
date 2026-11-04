@@ -1,0 +1,15 @@
+{
+  "name": "sch-check-unknown-keyword-bad-default",
+  "description": "An unknown keyword plus a default of the wrong type: only the keyword is reported; the default is skipped.",
+  "schema": {
+    "type": "string",
+    "bogus": 1,
+    "default": 5
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/bogus"
+    }
+  ]
+}

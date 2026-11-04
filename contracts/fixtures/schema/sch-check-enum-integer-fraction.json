@@ -1,0 +1,16 @@
+{
+  "name": "sch-check-enum-integer-fraction",
+  "description": "An integer enum entry must be a safe integer: 1.5 is a problem at its entry.",
+  "schema": {
+    "type": "integer",
+    "enum": [
+      1.5
+    ]
+  },
+  "checkSchema": true,
+  "expect": [
+    {
+      "path": "/enum/0"
+    }
+  ]
+}
