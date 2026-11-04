@@ -313,6 +313,25 @@ describe('import rejects bad files with specific codes, paths and messages', () 
     })
   })
 
+  test('the message names a config key as the user wrote it; only the path carries JSON Pointer escapes', () => {
+    const llm = sample.nodes[1].config
+    const cases = [
+      ['a/b', 'a~1b'],
+      ['a~b', 'a~0b'],
+      ['a~1b', 'a~01b'], // a literal "~1" in the key must not turn into "/"
+    ]
+    for (const [key, escaped] of cases) {
+      const errors = errorsOf(withEdit((w) => (w.nodes[1].config = { ...llm, [key]: 1 })))
+      expect(errors).toEqual([
+        {
+          code: 'schema.additionalProperties',
+          path: `/nodes/1/config/${escaped}`,
+          message: `nodes[1] ("l"): config "${key}" is not a known setting.`,
+        },
+      ])
+    }
+  })
+
   test('edges: unknown node, bad port, type mismatch, input occupied', () => {
     const ghost = errorsOf(withEdit((w) => (w.edges[0].target.nodeId = 'ghost')))[0]
     expect(ghost).toMatchObject({ code: 'connection.unknown-node', path: '/edges/0' })

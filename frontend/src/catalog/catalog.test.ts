@@ -45,13 +45,11 @@ describe('node catalog', () => {
   })
 
   describe('the ui block', () => {
-    const WIDGETS = {
-      text: ['string', 'number', 'integer'],
-      textarea: ['string', 'number', 'integer'],
-      select: ['string', 'number', 'integer', 'boolean'], // and the property must have an enum
-      json: ['object', 'array'],
-      checkbox: ['boolean'],
-    } as const
+    // Only what the config panel really renders: `widget: 'textarea'` on a string property. Every other widget
+    // value is accepted by the type but RESERVED (see contracts/CONFIG_SCHEMA.md), so a catalog definition must not use it.
+    const WIDGETS: Record<string, readonly string[]> = {
+      textarea: ['string'],
+    }
 
     test.each(nodeDefinitions.map((d) => [d.type, d] as const))('%s: order and fields name existing properties; widgets fit their type', (_type, def) => {
       const properties = def.configSchema.properties ?? {}
@@ -62,8 +60,8 @@ describe('node catalog', () => {
         expect(Object.hasOwn(properties, key), `ui.fields "${key}"`).toBe(true)
         if (field.widget === undefined) continue
         const property = properties[key]
-        expect(WIDGETS[field.widget] as readonly string[], `${key}: widget ${field.widget} on type ${property.type}`).toContain(property.type)
-        if (field.widget === 'select') expect(property.enum, `${key}: select needs an enum`).toBeDefined()
+        expect(Object.hasOwn(WIDGETS, field.widget), `${key}: widget ${field.widget} is reserved, not rendered by the panel`).toBe(true)
+        expect(WIDGETS[field.widget], `${key}: widget ${field.widget} on type ${property.type}`).toContain(property.type)
       }
     })
 

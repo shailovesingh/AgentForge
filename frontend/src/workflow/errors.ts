@@ -1,4 +1,5 @@
-// Structured validation errors for the import path. Codes are stable and namespaced; the
+// Structured validation errors for import and export, plus the execution-time code `schema.required` and the export-only code
+// `value.not-json-data`. Codes are stable and namespaced; the
 // message is the human-readable text shown to the user. See docs/PHASE1_1_PLAN.md section 3.2.
 // Only codes that are actually produced belong here (by import, export, or the schema validator); later tasks add their own.
 

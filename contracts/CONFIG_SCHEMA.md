@@ -136,11 +136,19 @@ A catalog definition may carry `ui` next to `configSchema`; a validator ignores 
 ui?: { order?: string[]; fields?: Record<string, { widget?: 'text' | 'textarea' | 'select' | 'json' | 'checkbox'; rows?: number; placeholder?: string }> }
 ```
 
-- `order` lists property names; the panel shows them first, then any other property in schema order.
+- **Honoured by the panel today:** `widget: 'textarea'` on a `string` property, `rows` (on a textarea), `placeholder`
+  (text input and textarea), and `order`. **Every other `widget` value** (`text`, `select`, `json`, `checkbox`) is
+  accepted by the TypeScript type but **reserved**: it is not rendered, has no effect on the panel and none on
+  validation. The panel always picks the control from the schema type.
+- `order` lists property names; the panel shows them first (a name that is not a property is ignored, a name listed
+  twice is shown once), then any other property in schema order.
 - Without a hint the panel renders from the schema type: `string` a text input, `string` with `enum` a select,
   `number` and `integer` a text input with a numeric keyboard hint, `boolean` a checkbox, `object` and `array` the
   JSON editor. `widget: 'textarea'` (with `rows`) makes a string multiline; the four multiline settings use it.
-- The catalog tests check that `order` and `fields` name existing properties and that a widget fits its property type.
+- An enum select whose value is absent (for example an imported draft, decision C1) shows a disabled `(not set)`
+  entry, so the panel never displays a value the config does not hold; picking a real option commits it.
+- The catalog tests check that `order` and `fields` name existing properties and that a catalog definition uses
+  only widgets the panel honours (today `textarea` on a `string`).
 
 ## Error codes and paths
 

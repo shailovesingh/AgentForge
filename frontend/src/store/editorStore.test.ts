@@ -37,6 +37,26 @@ describe('editor store', () => {
     expect(sources['/src/store/editorStore.ts'].match(new RegExp(call, 'g'))).toHaveLength(1)
   })
 
+  test('codeExemptions is imported by tests only, never by production code', () => {
+    // Matches a module specifier ending in codeExemptions (static import, re-export or dynamic import()).
+    const specifier = /['"][^'"\n]*\/codeExemptions(\.ts)?['"]/
+    // Self-test of the regex: it must catch the real forms and ignore unrelated text.
+    expect(specifier.test(`import { X } from './codeExemptions'`)).toBe(true)
+    expect(specifier.test(`export * from "../workflow/codeExemptions.ts"`)).toBe(true)
+    expect(specifier.test(`const m = await import('./codeExemptions')`)).toBe(true)
+    expect(specifier.test(`import { X } from './codeExemptionsOther'`)).toBe(false)
+    expect(specifier.test(`// see codeExemptions.ts for the lists`)).toBe(false)
+
+    const sources = import.meta.glob<string>('/src/**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true })
+    const isTest = (file: string) => /\.test\.tsx?$/.test(file)
+    const importers = Object.entries(sources)
+      .filter(([file]) => !file.endsWith('/src/workflow/codeExemptions.ts') && specifier.test(sources[file]))
+      .map(([file]) => file)
+    // Tests do import it (the guard is not vacuous), and nothing else does.
+    expect(importers.some(isTest)).toBe(true)
+    expect(importers.filter((file) => !isTest(file))).toEqual([])
+  })
+
   test('addNode rejects unknown types', () => {
     expect(() => store().addNode('nope', { x: 0, y: 0 })).toThrow('Unknown node type')
   })

@@ -3,15 +3,9 @@ import { getNodeDefinition } from '../catalog'
 import { useEditorStore } from '../store/editorStore'
 import { parseConfigInput } from '../workflow/configSchema'
 import type { JsonSchema } from '../workflow/jsonSchema'
-import type { NodeDefinition, NodeUi } from '../workflow/types'
+import type { NodeUi } from '../workflow/types'
 import styles from './ConfigPanel.module.css'
-
-/** Property names in display order: `ui.order` first (existing names only), then every other property in schema order. */
-function propertyOrder(def: NodeDefinition): string[] {
-  const keys = Object.keys(def.configSchema.properties ?? {})
-  const ordered = (def.ui?.order ?? []).filter((key) => keys.includes(key))
-  return [...new Set([...ordered, ...keys])]
-}
+import { propertyOrder } from './propertyOrder'
 
 export function ConfigPanel() {
   const selectedId = useEditorStore((s) => (s.selectedNodeIds.length === 1 ? s.selectedNodeIds[0] : null))
@@ -121,8 +115,15 @@ function ConfigField({
       />
     )
   } else if (prop.type === 'string' && prop.enum) {
+    // An absent (or out-of-enum) value must not look like the first option: show a disabled "(not set)" instead.
+    const isSet = prop.enum.some((option) => String(option) === draft)
     control = (
-      <select {...common} value={draft} onChange={(e) => onText(e.target.value)}>
+      <select {...common} value={isSet ? draft : ''} onChange={(e) => onText(e.target.value)}>
+        {!isSet && (
+          <option value="" disabled>
+            (not set)
+          </option>
+        )}
         {prop.enum.map((option) => (
           <option key={String(option)} value={String(option)}>
             {String(option)}

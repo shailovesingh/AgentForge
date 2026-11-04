@@ -69,8 +69,10 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
     // Decision C1: an absent required key is NOT a structural error, so an incomplete draft imports.
     // Execution (Phase 3) will validate with checkRequired: true.
     for (const { code, path, message } of validateAgainstSchema(def.configSchema, raw.config, { checkRequired: false })) {
-      // `path` is relative to the config object ("/provider"); the message names the setting without the leading slash.
-      err(code, jsonPointer('nodes', i, 'config') + path, `${at} ("${raw.id}"): config "${path.slice(1)}" ${message}.`)
+      // `path` is relative to the config object ("/provider"); the message names the setting without the leading slash,
+      // with the JSON Pointer escapes undone (`~1` first, then `~0`, per RFC 6901) so a key "a/b" reads "a/b", not "a~1b".
+      const setting = path.slice(1).replace(/~1/g, '/').replace(/~0/g, '~')
+      err(code, jsonPointer('nodes', i, 'config') + path, `${at} ("${raw.id}"): config "${setting}" ${message}.`)
     }
     nodes.push({
       id: raw.id,

@@ -57,12 +57,54 @@ test.describe('config panel', () => {
     await editor.drop('LLM Prompt', 400, 200)
     await expect(editor.settings.getByLabel('Provider')).toHaveValue('ollama')
     await expect(editor.settings.getByLabel('Temperature')).toHaveValue('0.7')
+    // The displayed value alone could come from the browser showing the first option; the config must really hold it.
+    const llm = nodesOf((await editor.exportWorkflow()).text).find((n) => n.type === 'llm.prompt')!
+    expect(llm.config.provider).toBe('ollama')
+    expect(llm.config.temperature).toBe(0.7)
   })
 
-  test('a multiline setting (System prompt) is still a textarea', async ({ editor }) => {
+  test('an imported node without a provider shows "(not set)" and exports no provider until one is picked', async ({ editor }) => {
+    const workflow = {
+      schemaVersion: '1.0',
+      id: 'wf_empty_config',
+      name: 'Empty config',
+      description: '',
+      nodes: [{ id: 'l', type: 'llm.prompt', typeVersion: 1, label: 'LLM', config: {}, position: { x: 100, y: 100 } }],
+      edges: [],
+      metadata: {},
+    }
+    await editor.importText(JSON.stringify(workflow))
+    await editor.node('llm.prompt').click({ position: { x: 30, y: 10 } })
+
+    const provider = editor.settings.getByLabel('Provider')
+    await expect(provider).toHaveValue('')
+    await expect(provider.locator('option:checked')).toHaveText('(not set)')
+    // The placeholder cannot be picked again, and the four real providers follow it.
+    await expect(provider.locator('option')).toHaveText(['(not set)', 'ollama', 'openai', 'anthropic', 'groq'])
+    await expect(provider.locator('option').first()).toBeDisabled()
+
+    // Only viewing the node changed nothing: the config still has no provider.
+    const before = nodesOf((await editor.exportWorkflow()).text).find((n) => n.type === 'llm.prompt')!
+    expect(Object.hasOwn(before.config, 'provider')).toBe(false)
+
+    // Picking ollama (the first real option) commits it; the placeholder disappears.
+    await provider.selectOption('ollama')
+    await expect(provider).toHaveValue('ollama')
+    await expect(provider.locator('option')).toHaveText(['ollama', 'openai', 'anthropic', 'groq'])
+    const after = nodesOf((await editor.exportWorkflow()).text).find((n) => n.type === 'llm.prompt')!
+    expect(after.config.provider).toBe('ollama')
+  })
+
+  test('a multiline setting (System prompt) is still a textarea, with the rows the catalog asks for', async ({ editor }) => {
     await editor.drop('LLM Prompt', 400, 200)
     await expect(editor.settings.getByLabel('System prompt')).toHaveJSProperty('tagName', 'TEXTAREA')
+    await expect(editor.settings.getByLabel('System prompt')).toHaveAttribute('rows', '4') // ui.rows from the catalog
     await expect(editor.settings.getByLabel('Model')).toHaveJSProperty('tagName', 'INPUT')
+  })
+
+  test('a JSON setting is a textarea with the default 5 rows (no ui.rows)', async ({ editor }) => {
+    await editor.drop('Manual Trigger', 100, 200)
+    await expect(editor.settings.getByLabel('Initial payload')).toHaveAttribute('rows', '5')
   })
 
   test('commits valid edits and never commits invalid input', async ({ editor }) => {
