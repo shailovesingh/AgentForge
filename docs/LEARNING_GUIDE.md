@@ -3,7 +3,7 @@
 > **For the Product Owner.** Part 1 is a plain-language **primer** (reference material: what we are building and how the code is organised). Part 2 is the **teaching record** (lessons actually taught and what you demonstrated).
 > The **curriculum and statuses** are in `docs/LEARNING.md`. Learning progress is tracked separately from implementation progress.
 > **Living document.** The Principal Architect updates it at the end of every task (D-028). The primer describes the project **as it is today**; where something is planned but not built, it says so.
-> Last updated: 2026-11-05, after Phase 1.1 T5b and its review fixes (Lesson L7, commits `7b09662` and `44bd7f4`). T6 (node migrations) is running and is not described here.
+> Last updated: 2026-11-05, after Phase 1.1 T6 and its review fixes (Lesson L8, commits `2baee23` and `be43319`).
 
 # Part 1: Primer
 
@@ -26,7 +26,8 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 |---|---|
 | The visual editor in the browser: drag nodes from a library, connect them with rules, edit each node's settings, save the workflow to a `.json` file and load it back | Running workflows (the "engine") |
 | A catalog of 6 node types | AI models, agents, tools (Phase 4) |
-| 934 unit tests in 15 test files and 35 browser tests (at commit `44bd7f4`) | Natural-language workflow generation (Phase 5) |
+| Old files keep working: a file saved with an older version of a node is upgraded in memory and the editor tells you (the original file is never rewritten) | Natural-language workflow generation (Phase 5) |
+| 988 unit tests in 17 test files and 39 browser tests (at commit `be43319`) | |
 | A CI workflow that runs the checks on GitHub | The backend server, database, saving to a server (Phase 2) |
 
 **Important:** today everything runs **in your browser only**. There is no server. Nothing runs a workflow yet. The editor produces a *description* of a workflow; later phases will execute it.
@@ -34,7 +35,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | Phase | What it delivers | Status |
 |---|---|---|
 | 1 | The visual editor | Done and accepted |
-| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 5 of 10 done, with task 5 in two halves, T5a and T5b; T6, upgrading old files, is next) |
+| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 6 of 10 done, with task 5 in two halves, T5a and T5b; T6, upgrading old files, is done; T8, the branch rules, is next) |
 | 2 | Backend server and database; save/load workflows | Planned, not approved |
 | 3 | Execution engine: actually run workflows | Planned |
 | 4 | AI runtime: LLM and Agent nodes | Planned |
@@ -99,7 +100,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **`schemaVersion` vs `typeVersion`.** Two separate version numbers. `schemaVersion` versions the *file format*. `typeVersion` versions *one node type* (if we change how the Agent node works, it becomes version 2). Keeping them separate lets each evolve without breaking the other.
 
-**Migration.** Upgrading an old file to the current format *in memory*, without overwriting the original. Planned in Phase 1.1 (task T6, in progress; not built at the time of Lesson L7).
+**Migration.** Upgrading an old file to the current format *in memory*, without overwriting the original. Built in Phase 1.1 task T6 (Lesson L8): when you import a file, each node whose `typeVersion` is older than the catalog's is upgraded by a chain of small steps (`frontend/src/workflow/nodeMigrations.ts`); the Agent node's `maxIterations` became a whole number in version 2, so a version 1 value such as 2.5 is rounded half up to 3 with a note. A banner tells you what changed. A node *newer* than the editor, or older with no path, is an error (`node.version-newer`, `node.no-migration-path`). Writing the upgraded file to a server is planned (Phase 2), not built.
 
 **Validation (errors) vs warnings.** *Errors* mean the file is structurally wrong (unknown node type, impossible connection); it is rejected. *Warnings* mean "this looks incomplete" (an empty required setting, an unconnected node); they never stop you from working. We keep them strictly separate (decision D-018).
 
@@ -134,7 +135,8 @@ frontend/src/
     jsonSchema.ts     the JSON Schema subset checker and applyDefaults (T5a, L6)
     configSchema.ts   parses what you type into one settings field and checks it against that property's schema
     codeExemptions.ts two lists of error codes that tests exempt; imported by tests only (T5b)
-    migrate.ts        upgrades old file formats
+    migrate.ts        upgrades old document formats (schemaVersion; no steps registered yet)
+    nodeMigrations.ts upgrades old node versions (typeVersion) in memory, and reports what changed (T6)
     serialize.ts      export to text (with the export guard), import from text (bytes or text)
     canonicalJson.ts  the two repeatable JSON text writers: compact (for hashing) and pretty (for files) (T4b)
     strictJson.ts     our strict JSON parser for imported files (T4a)
@@ -148,7 +150,7 @@ frontend/src/
   library/       the searchable, draggable list of node types
   config-panel/  the settings form for the selected node, generated from the node's schema (ConfigPanel.tsx)
                  and propertyOrder.ts, the small helper that decides the field order
-  app/           the page layout and the toolbar (New / Import / Export)
+  app/           the page layout, the toolbar (New / Import / Export) and the upgrade banner (UpgradeBanner.tsx)
 frontend/e2e/    browser tests that click through the real app (Playwright)
 frontend/src/contracts/fixtures.test.ts   the runner for the shared fixtures
 ```
@@ -170,8 +172,8 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 | Kind | Tool | What it does | Command |
 |---|---|---|---|
-| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the catalog and the shared fixtures in `contracts/`). 934 in 15 test files at commit `44bd7f4`. | `npm test` |
-| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 35 at commit `44bd7f4`. | `npm run test:e2e` |
+| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the catalog and the shared fixtures in `contracts/`). 988 in 17 test files at commit `be43319`. | `npm test` |
+| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 39 at commit `be43319`. | `npm run test:e2e` |
 | **Type check** | TypeScript | Catches mismatched data shapes before running | part of `npm run build` |
 | **Lint** | Oxlint | Catches suspicious code patterns | `npm run lint` |
 | **Everything** | | All of the above, in order | `npm run verify` |
@@ -224,7 +226,7 @@ npm run dev              # open http://localhost:5173
 
 ## 10. What happens next
 
-Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (next; running now, not described in a lesson yet); **T8** the branch rules written down; **T7** warnings in the editor; **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
+Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (done, Lesson L8; its review fixes are committed); **T8** the branch rules written down (next); **T7** warnings in the editor; **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
 
 ## 11. Glossary, quick reference
 
@@ -260,6 +262,7 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | **L5** | Phase 1.1 T4b (commits `dd33e84`, `d2ef493`): canonical compact JSON, pretty export JSON and the export guard | 3 (main), 1, 12 | 2026-11-04 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L6** | Phase 1.1 T5a (commits `96cc80d`, `a009b20`): the JSON Schema subset validator, explicit `applyDefaults` and the `schema` fixtures | 3 (main), 7, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L7** | Phase 1.1 T5b (commits `7b09662`, `44bd7f4`): the catalog, importer (decision C1) and settings panel move onto the JSON Schema subset | 7 (main), 3, 2, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
+| **L8** | Phase 1.1 T6 (commits `2baee23`, `be43319`): versioned node migrations, `agent.autonomous` version 2, the upgrade banner | 3 (main), 7, 2, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
 
 ## Concept index
 
@@ -334,6 +337,19 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | Golden values copied from the brief (not computed from the code), source-text guards (`applyDefaults` has one caller; `codeExemptions` is imported by tests only) and a mutation-found weak test | 12 | L7 | Explained (no evidence) |
 | A temporary exemption list for an execution-only code (`schema.required` in `codeExemptions.ts`); fixtures that state their mode (`checkRequired` on every config fixture) | 3, 12 | L7 | Explained (no evidence) |
 | Messages for people versus paths for programs: undoing JSON Pointer escapes in the message only | 3 | L7 | Explained (no evidence) |
+| Two version numbers: `schemaVersion` (document, `migrate.ts`, no steps yet) versus `typeVersion` (one node type, `nodeMigrations.ts`) | 3, 7 | L8 | Explained (no evidence) |
+| A migration as a pure, deterministic, total function; a chain of single steps up to the catalog's latest version; one report per node | 3, 7, 12 | L8 | Explained (no evidence) |
+| Latest-only catalog plus a migration registry (history in the registry, not in the catalog) | 7 | L8 | Explained (no evidence) |
+| The five node-version outcomes (equal, older with chain, older without chain, newer, unknown type) and the codes `node.version-newer`, `node.no-migration-path`, `node.unknown-type` (now for unknown types only) | 3, 7 | L8 | Explained (no evidence) |
+| The two-phase import rule (version errors are returned alone, before validation) and why a wrong written spec is worse than none | 1, 3, 12 | L8 | Explained (no evidence) |
+| Upgrade in memory, never rewrite the saved file, never silent (`UpgradeReport`, the banner); the honest guarantees of "never overwritten" | 1, 3, 12 | L8 | Explained (no evidence) |
+| Port renames rewrite edges (supported and tested with synthetic registries; no real rename yet) | 3, 7 | L8 | Explained (no evidence) |
+| Half up versus half to even: a rule two languages must agree on (Python `round()` is general knowledge, not run); the `.5` fixtures that discriminate (2.5, 48.5) | 1, 3, 12 | L8 | Explained (no evidence) |
+| The equivalent mutant (`Math.round` versus `Math.floor(x + 0.5)`) and what to do about it: a written rule plus shared fixtures, not a test | 12 | L8 | Explained (no evidence) |
+| Differential testing against a reviewer's reference and old-versus-new importer (reports); fixtures must pin every behaviour a second implementation could get wrong | 12 | L8 | Explained (no evidence) |
+| Do not overclaim what a test proves (an e2e check that cannot fail because of the app); a widened source-text guard with a regex self-test | 12 | L8 | Explained (no evidence) |
+| A user-visible banner: an always-mounted `role=status` live region, keyboard focus returned to Import on Dismiss, bounded text (`shorten`) | 2 | L8 | Explained (no evidence) |
+| Database migration at read time with a save as a new immutable version (planned for Phase 2, not built) | 1, 4 | L8 | Explained (no evidence) |
 | Primer concepts (workflow, node, port, edge, catalog, config schema, `schemaVersion` vs `typeVersion`, validation vs warnings, DAG, credentials) | 1, 2, 3, 6, 7 | Primer (Part 1) | Explained as reference (no evidence, no lesson) |
 
 ---
@@ -1456,3 +1472,161 @@ flowchart TD
 4. Compare generating the settings panel from `configSchema` plus a `ui` block with (a) one hand-written form per node and (b) a form library. For each, say what would drift or what would have to be wired by hand. Why does the `ui` block exist at all instead of putting `multiline` back into the schema, and what does it mean that most `widget` values are "reserved"? What does the catalog test do to stop a reserved value from being used?
 5. `schema.required` can no longer be produced by importing a workflow, yet it stays in `ERROR_CODES`. Explain why, where it is exempted from the "every code has a workflow fixture" guard and why that exemption list may be imported only by tests, and which fixtures still cover the code. What does it mean that every config fixture now has a mandatory `checkRequired` field?
 6. The review used a 60,000-document differential run between the old and the new implementation, and mutation testing. For each of these four findings (the escaped key in a message, the "(not set)" select, the copied provider list, the `rows` attribute), say which technique found it and why an ordinary test run that was already green had not. When you replace a working component, what would you do to be confident the only behaviour changes are the intended ones?
+
+---
+
+## Lesson L8: Old files keep working (versioned node migrations, `agent.autonomous` version 2, and the upgrade banner)
+
+**Task:** Phase 1.1 T6 (versioned node migrations, decision H3), commit `2baee23`, plus its review-fix commit `be43319`. **Modules:** 3 (Workflow JSON and State Management: two version numbers, the import pipeline), 7 (Node Registry: the catalog over time, latest-only catalog plus a migration registry), 2 (Frontend: a user-visible banner, a live region, keyboard focus), 12 (Security, Testing and Deployment: differential testing against a reference, equivalent mutants, fixtures as a specification, honest test claims).
+
+*Status of the code described here.* This lesson describes the code **at commit `be43319`**. **What I verified myself:** I read both commits' messages and `--stat`, and these files at that state: `contracts/MIGRATIONS.md`, `contracts/README.md` (the import-phase rules), `frontend/src/workflow/nodeMigrations.ts` and `nodeMigrations.test.ts`, `serialize.ts` (`importWorkflow`), `validate.ts` (the version branch), `migrate.ts`, `errors.ts` (the code list), `frontend/src/catalog/nodes.ts` (`agent.autonomous`), `frontend/src/store/editorStore.ts`, `frontend/src/app/UpgradeBanner.tsx`, `describeUpgrades.ts`, `importButton.ts`, `Toolbar.tsx`, `App.tsx`, `frontend/e2e/import-export.e2e.ts`, the runner section for the `migration` family in `frontend/src/contracts/fixtures.test.ts`, the fixtures `mig-agent-half-48-5.json`, `wf-invalid-node-version-only-wins-over-document-errors.json` and `wf-invalid-node-version-only-no-edge-cascade.json` (and the file lists of `contracts/fixtures/migration/` and `workflow/invalid/`), and `docs/PHASE1_1_PLAN.md` section 3.3. **What I ran myself:** one small JavaScript check in this session, comparing `Math.round(x)` with `Math.floor(x + 0.5)` for about 5,000,000 random numbers between 1 and 50 plus values just below and just above every half: 0 differences (section 2). **What I did not run:** the test suites. The counts **17 test files, 988 unit tests and 39 browser tests at `be43319`** are the numbers from the Principal Architect's `npm run verify` (exit 0), reported to me. I also did not run Python: what I say about Python's `round()` is **general knowledge, not run in this session**. The reviewer's comparisons and mutation findings below are **reports**, not things I repeated. The migration to a database (Phase 2) is **planned and not implemented**.
+
+### 1. The problem
+
+Imagine you saved a workflow last week that contains an Agent node. In that file the Agent's "max iterations" setting is the number `2.5`. (A silly value, but the old version of the editor allowed it, because the setting was just "a number from 1 to 50".) This week we decide that max iterations must be a **whole number**, because "run the loop two and a half times" means nothing. The catalog changes, and now `2.5` is invalid.
+
+Three bad outcomes are possible, and we want none of them:
+
+1. **Your old file stops opening.** Every file made before the change would show "Import failed". That breaks the architecture rule "preserve backward compatibility" (`.claude/rules/architecture.md`).
+2. **Your file is changed behind your back.** If the editor quietly rewrote the old file on disk, you could not trust any file you own.
+3. **The change is invisible.** If `2.5` quietly became `3` and nobody told you, the workflow would behave differently and you would not know why.
+
+So the problem has three parts: keep old files working, never rewrite them, and always tell the user what changed. There is also a quiet fourth part, which the review found: the rules for all this must be written down precisely enough that a **second implementation** (the Python backend of Phase 2) behaves identically.
+
+### 2. The concept
+
+**Two version numbers, changing independently.** A workflow file has a `schemaVersion` at the top (the format of the whole document, today `"1.0"`) and every node has a `typeVersion` (the version of that one node type's settings and ports). If we change how the Agent node's settings work, the file format is the same, so only the Agent's `typeVersion` moves, from 1 to 2. Upgrading the first is `migrate()` in `frontend/src/workflow/migrate.ts` (a registry that is still **empty**: `MIGRATIONS = {}`, because `schemaVersion` has never changed). Upgrading the second is `migrateNodes()` in `frontend/src/workflow/nodeMigrations.ts`, which is new.
+
+**A migration** is a small, pure function that turns the settings written for version N into the settings for version N+1. "Pure" means: same input, same output, no clock, no random numbers, no file or network access, and it must not throw on any input (it is **total**).
+
+**Latest-only catalog, history in a registry.** The catalog (`frontend/src/catalog/nodes.ts`) serves only the newest definition of each node type: `agent.autonomous` has `version: 2` and nothing about version 1. The knowledge of how to get from 1 to 2 lives in a separate list, `NODE_MIGRATIONS` in `nodeMigrations.ts`. So the catalog never has to carry old definitions around.
+
+**In memory, never on disk.** The upgrade happens to the data after the file has been read. The saved file is never touched. If you later press Export, that creates a **new** file at the new version.
+
+**Half up versus half to even.** The first real migration rounds a fractional `maxIterations`. The rule is **half up**: `Math.floor(x + 0.5)`, so 2.5 becomes 3 and 3.5 becomes 4. Python's built-in `round()` rounds **half to even** (also called banker's rounding): 2.5 becomes 2, 3.5 becomes 4, 48.5 becomes 48. (General knowledge, not run in this session.) If the Python backend of Phase 2 used `round()`, the same file would upgrade to different values in the browser and on the server. This is why the rule is written in `contracts/MIGRATIONS.md` ("Rounding hazard for a Python port").
+
+**An equivalent mutant, again.** In Lesson L4 you met mutation testing (break the code on purpose; a good test then fails) and the *equivalent mutant* (a break that does not change behaviour, so no test can fail). Here is a sharper example. Change `Math.floor(value + 0.5)` in `nodeMigrations.ts` to `Math.round(value)`. In JavaScript these two agree on every value the migration touches (it only rounds values from 1 to 50 that have a fraction; I checked about 5,000,000 random values and the values around every half and found 0 differences, and `MIGRATIONS.md` states the same). So **no TypeScript test can tell them apart**, however clever. That is not because the tests are weak; the two programs are the same program for these inputs. But `Math.round` is *spelled* like the thing a Python author would be tempted to copy (`round`), and the two languages differ here. The tests in TypeScript therefore cannot protect the rule. Section 3 says what does.
+
+### 3. Why we selected this approach
+
+1. **A chain of small steps, up to the latest.** `migrateNodes` follows `from -> to` steps until it reaches the catalog's latest version. A node at version 1 of a type that is now at version 4 runs 1->2, 2->3, 3->4 and gets **one** report saying "from 1 to 4" with all the notes in order. The test "registry integrity" in `nodeMigrations.test.ts` forces every step to be exactly one version (`to` equals `from + 1`) and every version below the latest to have a step. The alternative (a direct migration from every old version to the latest) needs a new function for every old version each time the type changes.
+2. **Check the whole chain before running any step.** The code first builds the chain and only then migrates. A gap rejects the file before any migration of that node runs.
+3. **All or nothing.** If any node has a version problem, the import is rejected, and the editor keeps what is currently open. A half-migrated document would be a worse state than either end.
+4. **Never silent.** `migrateNodes` returns one `UpgradeReport` (`nodeId`, `type`, `from`, `to`, `notes`) per upgraded node, even when nothing visible changed (empty notes). The editor shows them. A migration that changed nothing is still reported, because the user should always know the file is not the one they saved.
+5. **Round only what was valid before.** The migration rounds `maxIterations` only if it is a finite number with a fractional part **and** was valid at version 1 (1 to 50). Everything else (absent, text, `null`, `0.5`, `51`, an already whole number) is left exactly as it is, so validation reports it as version 1 would have. A migration should not "fix" garbage, because then it would be guessing what the user meant.
+6. **Write the rule down and pin it with data, because tests in one language cannot.** The rounding rule is in `MIGRATIONS.md`, in a comment on `NODE_MIGRATIONS`, and in fixtures with values chosen so that the two rules disagree: `mig-agent-half-48-5.json` expects `49` and its description says outright that Python's round would give 48 and "a port that uses it fails here". Of the five `.5` fixtures (1.5, 2.5, 3.5, 48.5, 49.5) only 2.5 and 48.5 actually tell half up from half to even (the others agree under both rules); `MIGRATIONS.md` says so. **What you do about an equivalent mutant** is therefore not "write a test that fails" (impossible here) but: (a) say clearly in the spec why the rule matters, (b) put the discriminating cases in shared data that the *other* implementation must pass, (c) accept honestly that the TypeScript suite alone will not notice `Math.round`. A hand-written banker's-rounding mutant is **not** equivalent: it would give 2 for 2.5, and the table test "maxIterations is rounded HALF UP" in `nodeMigrations.test.ts` lists 2.5 and 48.5 (that last point is my reasoning from the table, not a run).
+7. **Version errors are a phase of their own.** See section 4. The review found that this behaviour had not been written down correctly.
+
+### 4. How it works internally
+
+The import pipeline (`importWorkflow` in `frontend/src/workflow/serialize.ts`):
+
+```mermaid
+flowchart TD
+  F["File bytes, read in the Toolbar<br/>(Toolbar.tsx onImport: file.arrayBuffer)"] --> S["size and UTF-8 checks, strictParse<br/>(parse errors stop here)"]
+  S --> D["migrate: document schemaVersion<br/>(migrate.ts, no real steps yet)"]
+  D --> N["migrateNodes: node typeVersion<br/>(nodeMigrations.ts, on the raw parsed document)"]
+  N -- "any node.version-newer or node.no-migration-path:<br/>ONLY those errors are returned, at most 20" --> E["error panel in the toolbar;<br/>open workflow untouched, no banner change"]
+  N -- "no version error: new document + UpgradeReport list" --> V["validateWorkflow: document, nodes, connections, config<br/>(validate.ts)"]
+  V -- "errors" --> E
+  V -- "valid" --> L["loadWorkflow(workflow, upgrades)<br/>(editorStore.ts)"]
+  L --> B["UpgradeBanner shows the reports<br/>(role status region); Dismiss clears them"]
+```
+
+**Phase 1: version problems only.** `migrateNodes` looks only at "well-formed" nodes: an object with a string `id`, a string `type` and an integer `typeVersion`. Anything else is left for the validator to call `node.malformed`. For each such node it compares the file's version with the catalog's latest version of that type. There are exactly five outcomes:
+
+| Node in the file | `migrateNodes` does | Result |
+|---|---|---|
+| Type known, version **equal** to the latest | nothing | node untouched, no report |
+| Type known, version **older**, complete chain of steps to the latest | runs the steps in order | new node at the latest version, **one** `UpgradeReport` (banner) |
+| Type known, version **older**, no complete chain (a gap, or below the first step, e.g. version 0) | nothing runs | error `node.no-migration-path` at `/nodes/<i>/typeVersion` |
+| Type known, version **newer** than the latest | nothing | error `node.version-newer` at `/nodes/<i>/typeVersion` ("created by a newer editor") |
+| Type **unknown** to the catalog | skips it | in phase 2, `validateWorkflow` reports `node.unknown-type` at `/nodes/<i>/type` |
+
+`node.unknown-type` is now **only** for an unknown type. Before T6 a known type with a bad version also gave `node.unknown-type`, which was a misleading name for "this node type exists, but not at that version". `validateWorkflow` still guards its own entry (it can be called without the migration step in a test): for a known type with a missing version it produces the version error via the shared helper `nodeVersionProblem`, with a message that says "has not been migrated" rather than claiming no migration exists (a review fix, tested in `nodeMigrations.test.ts`).
+
+**The two-phase rule.** If phase 1 finds even one version error, the import returns **only the version errors** (at most 20, in node order). Document-level errors, malformed nodes, duplicate ids, connection errors and config errors of the same file are not reported until the next import. Reason: a node of the wrong version cannot be checked against a catalog that does not have its version, so continuing would produce confusing follow-on errors (for example `connection.unknown-node` for every edge to that node). This is written in `contracts/README.md` ("Phase 1" and "Phase 2") and `MIGRATIONS.md` (rule 4), and pinned by two fixtures (see story b in the review section below).
+
+**What `migrateNodes` does to the data.** It never mutates its input (the test deep-freezes the input and checks it is unchanged). If no node needed upgrading it returns the input document itself; otherwise it returns a new document that shares every untouched node, edge and config by reference. It builds `Map`s for the catalog's latest versions and for the steps instead of using plain objects, because the `type` string comes from an untrusted file and a type named `constructor` or `__proto__` must be ordinary data, not a lookup into the object prototype (the same safe-lookup habit as L2 and L4; tested with prototype-named types). Errors are capped by `MAX_ERRORS` (20) from `errors.ts`.
+
+**Port renames.** A migration may also return `portRenames` (`inputs` and `outputs`, old name to new name). The edges that touch the migrated node are rewritten in the same step, so renaming a port cannot orphan an edge. **No real migration renames a port yet**; this is tested only with synthetic registries (`nodeMigrations.test.ts`: "port renames rewrite the matching edge ends", "renames of a chain compose in step order").
+
+**Phase 2: normal validation**, on the migrated document, using the latest catalog definition. Then `loadWorkflow(result.workflow, result.upgrades)` in the Toolbar calls the store (`editorStore.ts`), which keeps `upgrades` next to the workflow. `New` (`reset`) and any later load replace `upgrades`; `dismissUpgrades` empties it. A **failed** import calls neither, so the previous graph and the previous banner stay (an e2e test checks this).
+
+**The first real migration (`agent.autonomous` 1 to 2).** In `nodes.ts` the Agent entry is `version: 2` and `maxIterations` is `{ type: 'integer', minimum: 1, maximum: 50, default: 10 }`, with a comment pointing at the migration. New nodes are created at version 2 (`addNode` uses the latest definition). A version 1 agent whose value is already whole, or absent, **still migrates to version 2** and is reported with empty notes. A value like `50.4` or `0.5`, which was invalid at version 1 and is not rounded, now fails `schema.type` (it is not an integer) where version 1 would have said `schema.maximum` or `schema.minimum`; whole out-of-range values like `51` and text give the same error code as before. This is stated in `MIGRATIONS.md` and the property test checks it.
+
+**The banner (Module 2).** `UpgradeBanner.tsx` reads `upgrades` from the store with a selector and renders `describeUpgrades(upgrades)`: "Upgraded 1 node (Agent v1 to v2). Review the changes. Your original file was not modified.", then one line per note with the node id (cut to 40 characters) and the note (cut to 200) through `shorten`, so a hostile huge note cannot flood the page. Two accessibility details from the review: (a) the container with `role="status"` (a **live region**: screen readers announce changes inside it) is **always mounted**, empty when there is nothing to say, because a live region that is added to the page together with its content is often not announced, while one already in the page is (the code comment says this; it is general screen-reader behaviour, which I did not test); (b) when you press Dismiss, the button disappears, so keyboard focus would fall back to the page. The code moves focus to the Import button (`IMPORT_BUTTON_ID` in `importButton.ts`, set on the button in `Toolbar.tsx`), the thing you were using when the banner appeared. The e2e test asserts the region count is 1 before and after, and that Import has focus after Dismiss.
+
+### 5. How it communicates with other components
+
+- **Toolbar to importer.** `Toolbar.tsx` reads the picked file into bytes and calls `importWorkflow(bytes, nodeDefinitions)`. It never gives the importer a file handle, only the content (a guarantee, see section 6).
+- **Importer to the catalog.** `migrateNodes` receives the catalog as a parameter, together with the registry (a default parameter, `NODE_MIGRATIONS`). That is why tests can pass synthetic catalogs and registries to exercise chains and renames that the real registry does not have.
+- **Importer to the store.** The result `{ ok: true, workflow, upgrades }` goes to `loadWorkflow`; `{ ok: false, errors }` goes to the error panel only.
+- **Store to banner.** `UpgradeBanner` subscribes to `upgrades` through a selector; `App.tsx` mounts it.
+- **Fixtures to the future Python runner.** The `migration` fixture family (10 files in `contracts/fixtures/migration/`) holds a version 1 document in and the expected `upgrades` plus migrated `workflow` out; the runner in `frontend/src/contracts/fixtures.test.ts` imports each, compares both, and re-imports the exported result, expecting nothing to upgrade. The `workflow/invalid` family has the version cases (it has 107 files at `be43319`, 11 more than at `44bd7f4`). **TypeScript only: no Python parity is claimed.**
+- **Planned, not built (Phase 2).** `MIGRATIONS.md` says the backend will migrate **in memory at read time** and persist the upgraded workflow **only when the user saves**, as a **new immutable version**, never touching the stored old one. No backend exists.
+
+### 6. Important code paths
+
+| Where | What it does |
+|---|---|
+| `frontend/src/workflow/nodeMigrations.ts`: `NODE_MIGRATIONS`, `migrateNodes`, `nodeVersionProblem`, `UpgradeReport` | The registry (one real step), the pure pipeline stage, the shared version-error builder, the report type |
+| `frontend/src/workflow/serialize.ts`: `importWorkflow` | The full pipeline: size and encoding, `strictParse`, `migrate`, `migrateNodes`, `validateWorkflow`; returns `{ workflow, upgrades }` or errors |
+| `frontend/src/workflow/validate.ts` | The version branch for a known type with a missing version, and `node.unknown-type` for unknown types only |
+| `frontend/src/workflow/errors.ts` | The new codes `node.version-newer` and `node.no-migration-path` |
+| `frontend/src/catalog/nodes.ts`: `agent.autonomous` | `version: 2`, `maxIterations` as an integer |
+| `frontend/src/store/editorStore.ts`: `loadWorkflow`, `dismissUpgrades`, `reset` | Holds `upgrades` beside the workflow |
+| `frontend/src/app/UpgradeBanner.tsx`, `describeUpgrades.ts`, `importButton.ts` | The banner, its sentence, the focus target |
+| `contracts/MIGRATIONS.md`, `contracts/README.md` | The specification: eleven rules, the two phases, the rounding hazard, the fixture layout |
+| `contracts/fixtures/migration/*.json`, `workflow/invalid/wf-invalid-node-version-*.json` and `wf-invalid-agent-v1-*.json` | The executable specification |
+| `frontend/src/workflow/nodeMigrations.test.ts`, `frontend/e2e/import-export.e2e.ts` | Unit, property and source-guard tests; browser tests of the banner |
+
+**What "never overwritten" really means.** This was corrected in the review (the review section below, story c). The honest guarantees, from `MIGRATIONS.md` rule 8: (a) the importer only receives the file's **content**, never a handle it could write through; (b) a browser gives a page no write access to a file picked in a file input; (c) a source-text test in `nodeMigrations.test.ts` checks that the five import-path files (`nodeMigrations.ts`, `migrate.ts`, `serialize.ts`, `strictJson.ts`, `Toolbar.tsx`) use no write-capable, storage or network API (`showSaveFilePicker`, `createWritable`, `localStorage`, `fetch(` and so on). It first tests its own regular expressions on good and bad examples, so the guard cannot pass vacuously, the same habit as the `codeExemptions` guard in L7. Exporting is a separate, explicit action that creates a **new** file.
+
+### 7. Alternatives and trade-offs
+
+| Option | Good | Costs |
+|---|---|---|
+| **Latest-only catalog plus a migration registry, upgrade in memory (chosen)** | The catalog stays small; each step is tiny and testable; old files open; the file on disk is never touched; the user is told | A new registry to maintain; each type change needs a step and fixtures; old versions cannot be "executed as they were" |
+| **Keep every old node definition in the catalog and run old versions forever** | No data conversion; exact old behaviour | The catalog and (later) the engine registry grow without limit; every old version needs executors and tests forever; the UI must draw old forms; the single source of truth stops being single |
+| **Migrate in the database** (a bulk data migration of stored rows, for example with Alembic; general knowledge) | One-off, everything converted | Changes data nobody asked to change; irreversible without backups; needs a backend (**not built**); the planned Phase 2 design instead migrates at read time and saves a new version only on an explicit save |
+| **Rewrite the saved file automatically** | The file is current the next time | Violates trust: the user's file changes silently; a shared file would be changed by merely opening it; an older editor can no longer open it |
+| **Reject old files** | Trivial | Every catalog change breaks every saved workflow; contradicts the backward-compatibility rule |
+| **A versionless "tolerant reader"** (accept anything that looks close enough) | No version numbers | No way to know what an old file meant; rounding `2.5` and every similar rule becomes guesswork scattered through the code; two implementations drift apart |
+| **One direct migration from each old version to the latest** | One function per file version | A new function for every old version at every change; chains of single steps compose automatically |
+
+### 8. Real-world engineering applications
+
+*From general knowledge, not from this repository.*
+
+- **Database schema migrations** (Alembic, Rails, Flyway) are ordered single steps from version N to N+1, applied in sequence, with a table recording the version: the same shape as our chain.
+- **Schema evolution in data formats** (Protocol Buffers, Avro) and **API versioning** (Kubernetes converts between API versions) follow the same ideas: old data keeps working; a reader that meets a *newer* version than it knows either refuses or ignores safely, and ours refuses (`node.version-newer`).
+- **Office documents and design tools** open an older file, convert it in memory, and ask you to "Save as" the new format rather than overwriting the old one without asking.
+- **Lock files and state files** (Terraform state, package lock files) carry a format version and refuse a file written by a newer tool.
+- **Cross-language ports and conformance suites.** When one rule must hold in two languages, the shared test data and the written rule are the safeguard, exactly as for the JSON text rules of L5. Rounding is a classic place where languages differ.
+- **Differential testing against an independent reference**: write your own version of the specification and compare outputs on many generated inputs; any difference is a bug in one of the two or in the spec.
+
+### What the review found (real examples)
+
+The following are reports relayed to me, except where I say I read the code.
+
+**(a) The reviewer wrote its own implementation, and found no difference.** The Opus reviewer wrote its **own reference** of the migration pipeline from the specification and compared it with the real one on **6 runs of 20,000 generated documents (reported: 0 differences)**. It also compared the **old and the new importer** on **120,000 documents without version problems (reported: 0 differences, identical export bytes)**. The old importer is the one from before T6; the second comparison proves that adding the new stage changed nothing for any file that has no version problem. Lesson: an independent reimplementation catches the mistakes the author of a function repeats in its own test (L5 told the same story for the JSON writer). It does not prove the code correct; it says that two people reading the specification got the same answers.
+
+**(b) A major bug in the written spec, not in the code.** `contracts/README.md` said that document-level errors are reported first. But `importWorkflow` returns **only** version errors whenever one exists (`if (!upgraded.ok) return upgraded` in `serialize.ts`: I read it). A Python port following the README would have passed **every fixture** (none exercised the combination) and still disagreed with the TypeScript on real files. The fix in `be43319` is to write the two-phase rule down in `README.md` and `MIGRATIONS.md` and to add two fixtures that pin it: `wf-invalid-node-version-only-wins-over-document-errors.json` (a file with a missing document `id` and a newer node reports only `node.version-newer`) and `wf-invalid-node-version-only-no-edge-cascade.json` (an edge to a newer node does not cause a `connection.unknown-node` error). **A spec that is wrong is worse than no spec**, because people trust it. And a fixture suite must pin **every behaviour a second implementation could get wrong**, not just the ones the first implementation happens to test.
+
+**(c) A test that claimed more than it could prove.** The e2e test in `2baee23` was described as proving "the file on disk is never modified" (the commit message of `2baee23` says so). It reads the bytes of the picked file before and after an import and compares them. But the browser gives the page **no write access** to a file chosen in a file input, so this check **cannot fail because of the app**. Whatever we did in the code, the test would pass. That is a vacuous assertion (L1) with a confident name. The fix in `be43319`: the claim in `MIGRATIONS.md` rule 8 is reworded to the three real guarantees (section 6), the e2e check is **kept but labelled** in a comment as documenting the guarantee and unable to fail because of the app, and the source-text guard was **widened** from the migration files to the whole import path, with its regular expressions tested on examples. Lesson: do not overclaim what a test proves; say what the test *can* detect, and put the real protection somewhere that can fail.
+
+**(d) Smaller findings, all with fixes.** A misleading message when `validateWorkflow` is called on a not-yet-migrated node (it used to say "no migration"; now "has not been migrated", tested). The **cap of 20 errors** in `migrateNodes` had no test, which mutation testing exposed (a report); the test "the error list is capped at MAX_ERRORS" now has 25 bad nodes and expects exactly 20, in order. The banner's always-mounted live region and the focus move after Dismiss (section 4). A failed import after an upgrade must leave the previous banner and graph alone: an e2e test was added.
+
+**A process note, honestly.** The Principal Architect's record (`docs/DEVELOPMENT_LOG.md`) says the implementer broke the project's tool rules in **both** rounds: a stray `python` call early, and here-documents and in-place `perl` edits to create or change repository files. The results were checked by type check, lint, the full verify and a scan of the added lines (no carriage returns, no byte order marks, no decoded escape sequences), so the **outcome** was verified, but the **rule** was not kept. A correct result reached by a forbidden route is still a process failure, because the rules exist for the cases where nobody checks.
+
+### Knowledge Check / Interview Questions
+
+*Answers are not given here. Study this lesson and `docs/LEARNING.md`, then answer all questions in the dedicated learning session at the end of the project.*
+
+1. A saved workflow has an Agent node at `typeVersion` 1 with `maxIterations: 2.5`. Walk it through `importWorkflow` stage by stage (parse, document `migrate`, `migrateNodes`, `validateWorkflow`, `loadWorkflow`) and say what is produced at each stage, what the user sees, and what happens to the file on disk. Then change the file so the node says `typeVersion` 3, then 0, then a type `mystery.node`: for each, name the error code and its path, or say that no error occurs and why.
+2. Why are `schemaVersion` and `typeVersion` separate, and why does the catalog hold only the latest definition of each node type while the history lives in `NODE_MIGRATIONS`? What would break, in the catalog, the UI and (in Phase 3, planned) the engine, if the catalog kept every old version instead? What does it cost us that it does not?
+3. A file has a missing document `id` and also a node of `typeVersion` 3. What does the importer report, and why? Explain why this was a "major bug in the written spec, not in the code", why a Python port could have passed every fixture and still been wrong, and what the two new fixtures do about it. What general rule about fixtures does that suggest?
+4. The migration rounds half up with `Math.floor(x + 0.5)`. Explain half up versus half to even, why a Python backend using the built-in `round()` would disagree, and why `Math.round(x)` is an equivalent mutant in TypeScript while a hand-written banker's rounding is not. Since no TypeScript test can fail for `Math.round`, what exactly protects the future Python port? Which of the five `.5` fixtures actually discriminate between the two rules, and why do the other three not?
+5. An e2e test compared the bytes of the imported file before and after and was named as proving "the file on disk is never modified". Why can that test never fail because of the app? What are the real guarantees, and which of them could a future change break and be caught? Rewrite the test's claim honestly in one sentence.
+6. The reviewer ran two comparisons (a reference implementation written from the spec on generated documents, and the old versus the new importer on documents without version problems). What does each comparison prove, and what can neither prove? How is this different from the mutation checks in earlier lessons, and why does this lesson count an equivalent mutant as a reason for writing a specification rather than for writing a test?

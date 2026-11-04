@@ -39,6 +39,7 @@
 | D-030 | Claude works on local files only; the Product Owner pushes to GitHub when they choose | **Approved** |
 | D-031 | T4 split into T4a (strict parsing and policy checks) and T4b (canonical and export JSON); number policy as one magnitude rule; editor values obey the same policy | **Approved** (Principal Architect, within D-022 and D-026) |
 | D-032 | T4b outcomes: export-only error code, export never throws, distinct internal parser error; T5 split into T5a and T5b | **Approved** (Principal Architect, within D-022 and D-026) |
+| D-033 | Import is two phases: node version errors are returned alone, before validation; version errors never cascade through the importer | **Approved** (Principal Architect, within D-022 and D-026) |
 
 ---
 
@@ -271,3 +272,10 @@
   - **Internal parser failures** are reported with a distinct message ("Not valid JSON: internal parser error (please report this)") under the same code `doc.not-json`; the config panel shows it instead of "must be valid JSON".
   - **T5 is split like T4:** **T5a** (a pure JSON Schema subset validator, explicit `applyDefaults`, the `schema` fixture family, nothing existing changes) and **T5b** (catalog conversion, store defaults, ConfigPanel, `groq`, and the C1 behaviour in the importer). Each is implemented, independently reviewed and accepted on its own; the order T1 to T10 and the milestones are unchanged.
 - **Consequences:** old and new validators coexist between T5a and T5b (intentional; T5b deletes the old code). Soft spot recorded: the pointer of `value.not-json-data` is parsed from the writer's message (a structured error from `canonicalJson.ts` would be sturdier).
+
+## D-033 — Import is two phases: version errors are returned alone
+- **Status:** Approved (Principal Architect, 2026-11-05, Session 11; within D-022 and D-026; the Product Owner may overrule).
+- **Problem:** the T6 review found that `contracts/README.md` (the normative text a second implementation follows) did not match the importer: node version problems (`node.version-newer`, `node.no-migration-path`) are detected by `migrateNodes`, before `validateWorkflow` runs, so the importer returns only them whenever one exists.
+- **Decision:** keep the two phases and write them down. **Phase 1:** `migrateNodes` checks the version of every well-formed node; if any node has a version error, ONLY version errors are returned (node order, at most 20) and nothing else (no document, malformed, duplicate-id, connection or config error) is reported. **Phase 2:** otherwise the (migrated) document is validated as before. `validateWorkflow` called directly on an unmigrated document still reports a wrong-version node and may cascade (`connection.unknown-node`); that is not importer behaviour. Two `workflow/invalid` fixtures pin the phase.
+- **Alternatives:** merge the version errors with the validation errors (more information per attempt, but validation would need a representation for nodes that cannot be validated, more complex, and every second implementation must reproduce the merge order); keep the behaviour undocumented (rejected: the exact failure the review found).
+- **Consequences:** a user fixing a file may see validation errors only after the version problem is fixed (one extra import attempt); a second implementation (Phase 2) must follow the two-phase rule; contract text is part of the contract and must be checked against the code by fixtures.

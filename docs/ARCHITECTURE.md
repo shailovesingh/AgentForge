@@ -133,7 +133,7 @@ backend/tests/
 - `schemaVersion` versions the document format. `typeVersion` versions each node type's config and ports. They change independently.
 - **Credentials are never stored inline.** Config holds only a `credentialRef` (an opaque ID). Exports therefore never contain secrets.
 - `position` is the only UI data in the document, and the engine ignores it.
-- **Back-compat:** every load runs through `migrate(doc)`, which applies stepwise upgrades (`1.0 → 1.1 → …`). Old documents are never rejected only because their version is old. Breaking changes require a new major `schemaVersion` together with a migration.
+- **Back-compat:** every load runs through `migrate(doc)`, which applies stepwise upgrades of the document (`1.0 → 1.1 → …`), then `migrateNodes`, which upgrades each node to the latest catalog version of its type (`typeVersion`, e.g. `agent.autonomous` 1 → 2; spec `contracts/MIGRATIONS.md`; the upgrade is reported to the user and the saved file is never rewritten). Old documents are never rejected only because their version is old. Breaking changes require a new major `schemaVersion` together with a migration.
 
 **Source of truth (D-004)**
 
