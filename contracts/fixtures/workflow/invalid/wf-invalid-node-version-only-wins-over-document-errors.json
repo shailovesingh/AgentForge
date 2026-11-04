@@ -1,0 +1,15 @@
+{
+  "name": "wf-invalid-node-version-only-wins-over-document-errors",
+  "description": "Version errors are a phase before validation: a file with a missing document id AND a node newer than the catalog reports ONLY node.version-newer (no doc.invalid-field) until the version problem is fixed.",
+  "input": {
+    "schemaVersion": "1.0",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 3, "label": "a", "config": { "provider": "ollama" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "node.version-newer", "path": "/nodes/0/typeVersion" }] }
+}

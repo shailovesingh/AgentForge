@@ -8,7 +8,7 @@
     "description": "",
     "nodes": [
       { "id": "h", "type": "http.request", "typeVersion": 1, "label": "h", "config": { "method": "GET", "url": "" }, "position": { "x": 0, "y": 0 } },
-      { "id": "a", "type": "agent.autonomous", "typeVersion": 1, "label": "a", "config": { "provider": "ollama" }, "position": { "x": 0, "y": 0 } }
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "a", "config": { "provider": "ollama" }, "position": { "x": 0, "y": 0 } }
     ],
     "edges": [
       { "id": "e1", "source": { "nodeId": "h", "port": "status" }, "target": { "nodeId": "a", "port": "input" } }

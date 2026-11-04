@@ -24,7 +24,9 @@ bytes -> strictParse -> migrate (document schemaVersion) -> migrateNodes (node t
 
 `importWorkflow` runs all of it and returns `{ ok: true, workflow, upgrades }` or `{ ok: false, errors }`. `upgrades`
 is `[]` when nothing was upgraded. `migrateNodes` works on the RAW parsed document, before validation, and **never
-mutates its input** (it returns new objects).
+mutates its input**. When nothing is upgraded it returns the input document itself; otherwise it returns a new
+document that shares every untouched node, edge and config with the input by reference (only the upgraded nodes, and
+edges rewritten by a port rename, are new objects).
 
 ## Rules
 
@@ -34,16 +36,24 @@ mutates its input** (it returns new objects).
 2. **Which nodes are looked at.** Only a node that is an object with a string `id`, a string `type` and an integer
    `typeVersion`. Anything else is left alone for the validator (`node.malformed`). A node of a type the catalog does
    not have is left alone too: the validator reports `node.unknown-type` at `/nodes/<i>/type`. That code is **only**
-   for an unknown TYPE: a known type with a bad version is never `node.unknown-type`.
+   for an unknown TYPE: a known type with a bad version is never `node.unknown-type`. A node with a valid chain but a
+   `label` that is not a string, or a `config` that is not an object, is **skipped** (its version is not changed and no
+   migration runs); validation then reports it as `node.malformed`. (Version errors, rule 3, still apply to it.)
 3. **At the latest version:** untouched. **Lower, with a complete chain** of registered steps `from -> to` up to the
    latest: the steps run in order, and the node gets ONE upgrade report (`from` = the version in the file, `to` = the
    latest version, `notes` = all the notes in step order). **Lower, with no complete chain** (a gap, or below the
    first step, for example version 0): `node.no-migration-path` at `/nodes/<i>/typeVersion`. **Higher than the
    latest:** `node.version-newer` at `/nodes/<i>/typeVersion` ("created by a newer editor"). A non-integer
    `typeVersion` is not touched here (it is `node.malformed` in validation).
-4. **All or nothing.** All version errors of all nodes are collected (at most 20) and the import is rejected:
-   nothing is partially migrated, and the open workflow is never touched (the editor loads only a result that is
-   fully valid). The chain is checked completely before any migration of that node runs.
+4. **All or nothing, and a phase of its own.** All version errors of all nodes are collected (at most 20) and the
+   import is rejected: nothing is partially migrated, and the open workflow is never touched (the editor loads only a
+   result that is fully valid). The chain is checked completely before any migration of that node runs. The version
+   errors form a **phase BEFORE validation**: if any node has one, the import returns **only those version errors**.
+   No document-level (`doc.invalid-field`), malformed-node, duplicate-id, connection (including the
+   `connection.unknown-node` cascade for an edge to a wrong-version node) or config error is reported for that
+   import, even when the file has them; they appear on the next import, after the version problem is fixed. (That
+   cascade exists only when `validateWorkflow` is called directly, without the migration step.) Pinned by the
+   `wf-invalid-node-version-only-*` fixtures.
 5. **Pure, deterministic and total.** A migration has no I/O, clock or randomness, and it must not throw for ANY
    config: absent keys, wrong types, non-numbers, out-of-range values. A migration only changes what it understands.
    A value it does not understand is left exactly as it is, so validation reports it as the old version would have.
@@ -54,10 +64,15 @@ mutates its input** (it returns new objects).
 7. **Never silent.** Every migrated node is reported (`{ nodeId, type, from, to, notes }`), including a node whose
    migration changed nothing (empty `notes`). The editor shows a dismissible banner: *"Upgraded 1 node (Agent v1 to
    v2). Review the changes. Your original file was not modified."* followed by the notes.
-8. **Never overwritten.** The importer only reads. Nothing in this code path writes a file, storage or a network
-   request (a source-text test guards `nodeMigrations.ts` and `migrate.ts`). Exporting is an explicit user action that
-   produces a NEW file at the new version; an end-to-end test checks that the bytes of the imported file on disk are
-   unchanged.
+8. **Never overwritten.** The real guarantees are these. (a) The importer only receives the file's CONTENT (bytes read
+   from the file input); it is never given a handle it could write through. (b) The browser gives a page no write
+   access to a file the user picked in a file input. (c) A source-text test checks that the import path
+   (`nodeMigrations.ts`, `migrate.ts`, `serialize.ts`, `strictJson.ts` and the Toolbar import handler) uses no
+   write-capable or storage or network API (`showSaveFilePicker`, `showOpenFilePicker`, `createWritable`,
+   `FileSystemFileHandle`, `localStorage`, `sessionStorage`, `indexedDB`, `fetch(`, `XMLHttpRequest`). Exporting is an
+   explicit user action that produces a NEW file (a download) at the new version. An end-to-end test also checks the
+   bytes of the imported file before and after, but that check documents the guarantee and cannot fail because of the
+   app: the page has no write access to that file, and the export goes to a separate download path.
 9. **No downgrade.** A file exported at version 2 does not open in an older editor, which fails safely with
    `node.version-newer`.
 10. **Error paths.** After a migration, error paths point into the MIGRATED document. It has exactly the structure of
@@ -79,14 +94,15 @@ version 1 (from 1 to 50 inclusive)**. The rounding is **half up**: `Math.floor(x
 **Rounding hazard for a Python port.** Python's built-in `round()` rounds **half to even**: `round(2.5) == 2`,
 `round(48.5) == 48`. A Python implementation MUST implement half up (for example `math.floor(x + 0.5)`) or the same
 file would migrate to a different value on the two sides. The fixtures include .5 cases (1.5, 2.5, 3.5, 48.5, 49.5)
-for that reason. (In JavaScript, `Math.round` and `Math.floor(x + 0.5)` agree on every value from 1 to 50, so the rule
+for that reason; only 2.5 and 48.5 actually tell half up from half to even (the others agree under both rules). (In JavaScript, `Math.round` and `Math.floor(x + 0.5)` agree on every value from 1 to 50, so the rule
 is stated for the port's sake.)
 
 Every other value is left **unchanged**, with no note: absent (stays absent), text, `null`, a boolean, an array, an
 object, a number out of the version 1 range (`0.5`, `50.4`, `51`, `0`, negative numbers) and a number that is already
 whole. Validation then reports it. Note that a fractional number out of range (`50.4`, `0.5`) now fails the integer
 type first (`schema.type`), where version 1 would have said `schema.minimum` or `schema.maximum`; a whole number out
-of range (`51`) and text give the same error as at version 1.
+of range (`51`) and text give the same error CODE as at version 1 (the message wording differs: the setting must now
+be an integer, not a number).
 
 A version 1 agent whose value is already a whole number (or absent) **still migrates to version 2** and is reported
 with an **empty** notes list, so the user always sees that the node was upgraded.

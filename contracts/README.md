@@ -123,13 +123,24 @@ TypeScript runs these fixtures only; **no Python parity is claimed** until a Pyt
 
 #### Import semantics a second runner must follow
 
+- **Phase 1: node version errors, before anything else.** After the document is parsed (and its `schemaVersion`
+  migrated), the node migration step looks at every node that is an object with a string `id`, a string `type` and an
+  integer `typeVersion`, whose type the catalog has. If ANY such node has a version problem (`node.version-newer`, or
+  `node.no-migration-path`), the import returns **only those version errors** (in node order, at most 20) and
+  stops: no document-level, malformed-node, duplicate-id, connection or config error is reported for that import,
+  even if the file has some. Fix the version problem and the next import reports the rest (see
+  `wf-invalid-node-version-only-wins-over-document-errors` and `wf-invalid-node-version-only-no-edge-cascade`).
+  Details in `MIGRATIONS.md`.
+- **Phase 2: validation**, only when Phase 1 found no version error. The rest of this list describes it.
 - **Document-level errors stop validation.** If the document fields (`id`, `name`, `description`,
   `metadata`, `nodes`, `edges`) are wrong, those errors are returned and nodes and edges are not checked
   (see `wf-invalid-doc-error-stops-before-nodes`).
 - **Nodes** are checked in array order. Each node goes through these checks in this order: malformed
-  (`node.malformed`), duplicate id (`node.duplicate-id`), unknown type (`node.unknown-type`, only for a node TYPE the catalog does not have), then its version (`node.version-newer` or
-  `node.no-migration-path`, normally already reported by the migration step before validation; see `MIGRATIONS.md`), then its config. Exactly four cases are **not added**: a malformed node, a duplicate id (the **second**
-  occurrence is the one blamed and is dropped), an unknown type and a version problem. A node whose **only** problems are
+  (`node.malformed`), duplicate id (`node.duplicate-id`), unknown type (`node.unknown-type`, only for a node TYPE the
+  catalog does not have), then its config. (A version check also exists inside validation, but an import never
+  reaches it: Phase 1 already rejected every version problem. It matters only to a runner that calls the validator
+  directly, without the migration step.) Exactly three cases are **not added**: a malformed node, a duplicate id (the
+  **second** occurrence is the one blamed and is dropped) and an unknown type. A node whose **only** problems are
   config errors **is still added**: its config errors (`schema.*`, at `/nodes/<i>/config/<key>`) are
   reported and the node is kept, so edges that use it are checked normally (see
   `wf-invalid-config-error-node-still-connectable`).
@@ -138,9 +149,10 @@ TypeScript runs these fixtures only; **no Python parity is claimed** until a Pyt
   (`edge.duplicate-id`) is rejected first; then the connection rules run in the order given under
   `connection/*.json`. A cycle is therefore reported on the edge that closes it, and a rejected edge is
   not added.
-- Because a malformed, duplicate-id, unknown-type or wrong-version node is not added, such a node **cascades**: an edge
+- Because a malformed, duplicate-id or unknown-type node is not added, such a node **cascades**: an edge
   that uses it also fails with `connection.unknown-node` (see `wf-invalid-cascade-unknown-type-edge`). A
-  node with config errors does **not** cascade.
+  node with config errors does **not** cascade. A wrong-version node would cascade the same way, but only when the
+  validator is called directly: in an import Phase 1 has already returned just the version error (no edge error).
 - **At most 20 errors** are reported (`MAX_ERRORS` in `frontend/src/workflow/errors.ts`); the first 20 in
   the order above are kept (see `wf-invalid-error-cap`, built with `inputRepeat`).
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { getLatestNodeDefinition, nodeDefinitions } from '../catalog'
+import { MAX_ERRORS } from './errors'
 import { NODE_MIGRATIONS, migrateNodes } from './nodeMigrations'
 import type { NodeMigration } from './nodeMigrations'
 import { importWorkflow, serializeWorkflow } from './serialize'
@@ -122,6 +123,9 @@ describe('the real registry', () => {
   test('validateWorkflow on its own: a known type at a bad version is a version error, an unknown TYPE stays node.unknown-type', () => {
     const v1 = validateWorkflow(doc([agent('a', 3)]), nodeDefinitions)
     expect(!v1.ok && v1.errors.map((e) => [e.code, e.path])).toEqual([['node.no-migration-path', '/nodes/0/typeVersion']])
+    // the message must not claim there is no migration: there is one, validateWorkflow just was not given a migrated document
+    expect(!v1.ok && v1.errors[0].message).toContain('has not been migrated')
+    expect(!v1.ok && v1.errors[0].message).not.toMatch(/no migration/)
     const newer = validateWorkflow(doc([agent('a', 3, 3)]), nodeDefinitions)
     expect(!newer.ok && newer.errors.map((e) => [e.code, e.path])).toEqual([['node.version-newer', '/nodes/0/typeVersion']])
     const unknown = validateWorkflow(doc([sNode('m', 99, 'mystery.node')]), nodeDefinitions)
@@ -171,6 +175,17 @@ describe('migrateNodes with synthetic registries', () => {
     const r = migrate(doc([sNode('n', 4)]), catalog3, chain)
     expect(r).toMatchObject({ ok: false, errors: [{ code: 'node.version-newer', path: '/nodes/0/typeVersion' }] })
     expect(!r.ok && r.errors[0].message).toContain('newer editor')
+  })
+
+  test('the error list is capped at MAX_ERRORS: 25 bad-version nodes give exactly 20 errors, the first 20 in node order', () => {
+    const nodes = Array.from({ length: 25 }, (_, i) => sNode(`n${i}`, 9))
+    const r = migrate(doc(nodes), catalog3, chain)
+    expect(r.ok).toBe(false)
+    expect(!r.ok && r.errors).toHaveLength(MAX_ERRORS)
+    expect(!r.ok && r.errors.map((e) => e.path)).toEqual(Array.from({ length: MAX_ERRORS }, (_, i) => `/nodes/${i}/typeVersion`))
+    // gaps count toward the same cap
+    const mixed = migrate(doc(Array.from({ length: 25 }, (_, i) => sNode(`n${i}`, i % 2 === 0 ? 9 : 0))), catalog3, chain)
+    expect(!mixed.ok && mixed.errors).toHaveLength(MAX_ERRORS)
   })
 
   test('errors are collected for every node and then nothing is migrated', () => {
@@ -397,21 +412,58 @@ describe('the pipeline: property test over generated agent version 1 configs', (
   })
 })
 
-describe('source guard: the migration code has no file, storage, network, clock or randomness API', () => {
-  const sources = import.meta.glob<string>('/src/workflow/{nodeMigrations,migrate}.ts', { query: '?raw', import: 'default', eager: true })
+describe('source guards: the import path cannot write a file, store anything or call the network', () => {
+  const sources = import.meta.glob<string>(
+    ['/src/workflow/{nodeMigrations,migrate,serialize,strictJson}.ts', '/src/app/Toolbar.tsx'],
+    { query: '?raw', import: 'default', eager: true },
+  )
+  // The two pure migration files: no I/O of any kind, no clock, no randomness.
   const forbidden = /\b(fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|indexedDB|FileReader|showSaveFilePicker|createWriteStream|writeFile|writeFileSync|appendFile|navigator\.sendBeacon|Math\.random|Date\.now|performance\.now|setTimeout|crypto\.)\b|new Date\b/
+  // The whole import path (those two plus serialize, strictJson and the Toolbar): nothing that can write through a file the user
+  // picked, and no storage or network call. The Toolbar's EXPORT handler legitimately uses a Blob and a download link
+  // (URL.createObjectURL), which only creates a NEW file, so that is NOT forbidden here; neither are setTimeout and Date,
+  // which the pure files above exclude but the Toolbar uses (fitView).
+  const writeCapable = /\b(showSaveFilePicker|showOpenFilePicker|createWritable|FileSystemFileHandle|localStorage|sessionStorage|indexedDB|XMLHttpRequest)\b|\bfetch\s*\(/
   const importSpecifiers = (text: string) => [...text.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)].map((m) => m[1])
 
-  test('the regex catches the things it names (so the guard is not vacuous)', () => {
+  test('the regexes catch the things they name (so the guards are not vacuous) and ignore what is allowed', () => {
     for (const bad of ['fetch(url)', 'localStorage.setItem', 'new Date()', 'Date.now()', 'Math.random()', 'fs.writeFileSync(a)', 'crypto.randomUUID()']) {
       expect(forbidden.test(bad), bad).toBe(true)
     }
     expect(forbidden.test('const rounded = Math.floor(value + 0.5)')).toBe(false)
+    for (const bad of [
+      'await window.showSaveFilePicker()',
+      'window.showOpenFilePicker({})',
+      'const w = await handle.createWritable()',
+      'let h: FileSystemFileHandle',
+      'localStorage.getItem(k)',
+      'sessionStorage.x = 1',
+      'indexedDB.open(db)',
+      'await fetch(url)',
+      'await fetch (url)',
+      'new XMLHttpRequest()',
+    ]) {
+      expect(writeCapable.test(bad), bad).toBe(true)
+    }
+    for (const fine of ['URL.createObjectURL(new Blob([text]))', 'link.download = name', 'setTimeout(() => fitView(), 50)', 'const prefetch = 1', 'file.arrayBuffer()']) {
+      expect(writeCapable.test(fine), fine).toBe(false)
+    }
   })
 
-  test('both files are checked, use none of them, and import only ./errors and ./types', () => {
-    expect(Object.keys(sources).sort()).toEqual(['/src/workflow/migrate.ts', '/src/workflow/nodeMigrations.ts'])
-    for (const [file, text] of Object.entries(sources)) {
+  test('all five import-path files are checked, none uses a write-capable, storage or network API', () => {
+    expect(Object.keys(sources).sort()).toEqual([
+      '/src/app/Toolbar.tsx',
+      '/src/workflow/migrate.ts',
+      '/src/workflow/nodeMigrations.ts',
+      '/src/workflow/serialize.ts',
+      '/src/workflow/strictJson.ts',
+    ])
+    for (const [file, text] of Object.entries(sources)) expect(writeCapable.test(text), file).toBe(false)
+  })
+
+  test('the two pure migration files use none of the stricter list and import only ./errors and ./types', () => {
+    for (const file of ['/src/workflow/migrate.ts', '/src/workflow/nodeMigrations.ts']) {
+      const text = sources[file]
       expect(forbidden.test(text), file).toBe(false)
       for (const spec of importSpecifiers(text)) expect(['./errors', './types'], `${file} imports ${spec}`).toContain(spec)
     }

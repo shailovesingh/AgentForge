@@ -444,8 +444,8 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
 
 const MIN_COUNTS = {
   // T5b (C1): the old schema.required rejection moved from invalid to valid (valid up, invalid down by one), config grew.
-  // T6: 9 invalid cases (version errors, v1 maxIterations) and the new migration family (10).
-  total: 434, valid: 21, invalid: 105, connection: 22, config: 19, serialization: 109, serializationInvalid: 9,
+  // T6: 9 invalid cases (version errors, v1 maxIterations) and the new migration family (10); T6 review: 2 more invalid (the version phase).
+  total: 436, valid: 21, invalid: 107, connection: 22, config: 19, serialization: 109, serializationInvalid: 9,
   schema: 148, schemaValidation: 75, schemaDefaults: 8, schemaCheck: 65, migration: 10,
 }
 

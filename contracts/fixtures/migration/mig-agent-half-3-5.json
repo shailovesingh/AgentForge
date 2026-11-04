@@ -1,6 +1,6 @@
 {
   "name": "mig-agent-half-3-5",
-  "description": "3.5 rounds half UP to 4 (Python round() would give 4 here, but see 2.5 and 49.5: a port must be half up, not half to even).",
+  "description": "3.5 rounds half UP to 4 (half to even also gives 4 here; the cases that tell half up from half to even are 2.5 and 48.5, where Python round() gives 2 and 48).",
   "input": {
     "schemaVersion": "1.0",
     "id": "wf_1",

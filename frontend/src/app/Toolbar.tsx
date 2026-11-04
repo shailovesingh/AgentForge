@@ -7,6 +7,7 @@ import { useEditorStore } from '../store/editorStore'
 import type { ValidationError } from '../workflow/errors'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importTooLarge, importWorkflow } from '../workflow/serialize'
 import { shorten } from './shorten'
+import { IMPORT_BUTTON_ID } from './importButton'
 import styles from './Toolbar.module.css'
 
 // A path or message longer than this is cut when shown, so a huge key cannot flood the alert panel.
@@ -82,7 +83,7 @@ export function Toolbar() {
         <button type="button" onClick={() => useEditorStore.getState().reset()}>
           <FilePlus size={14} aria-hidden="true" /> New
         </button>
-        <button type="button" onClick={() => fileInput.current?.click()}>
+        <button id={IMPORT_BUTTON_ID} type="button" onClick={() => fileInput.current?.click()}>
           <Upload size={14} aria-hidden="true" /> Import
         </button>
         <button type="button" onClick={onExport}>

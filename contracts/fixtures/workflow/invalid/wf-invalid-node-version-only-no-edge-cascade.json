@@ -1,0 +1,17 @@
+{
+  "name": "wf-invalid-node-version-only-no-edge-cascade",
+  "description": "An edge that points at a node newer than the catalog gives only node.version-newer in an import: the version phase returns before edges are checked, so there is no connection.unknown-node cascade.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "t", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 3, "label": "a", "config": { "provider": "ollama" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [{ "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "a", "port": "input" } }],
+    "metadata": {}
+  },
+  "expect": { "valid": false, "errors": [{ "code": "node.version-newer", "path": "/nodes/1/typeVersion" }] }
+}

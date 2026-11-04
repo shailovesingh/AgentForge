@@ -69,15 +69,26 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 /**
  * The error for a node of a KNOWN type whose version the catalog does not have: newer than the latest, or
- * older with no migration path. Shared with validateWorkflow, so both report it the same way.
+ * older with no migration path. Shared with validateWorkflow. `unmigrated` is for a caller that never ran migrateNodes
+ * (validateWorkflow on its own): there an older node may well HAVE a migration, it just was not run, so the message
+ * must not claim there is none.
  */
-export function nodeVersionProblem(index: number, id: string, type: string, version: number, latest: number): ValidationError {
+export function nodeVersionProblem(
+  index: number,
+  id: string,
+  type: string,
+  version: number,
+  latest: number,
+  unmigrated = false,
+): ValidationError {
   const at = `nodes[${index}] ("${id}")`
   const code: ErrorCode = version > latest ? 'node.version-newer' : 'node.no-migration-path'
   const message =
     version > latest
       ? `${at}: ${type}@${version} was created by a newer editor (this editor has ${type}@${latest}).`
-      : `${at}: ${type}@${version} is too old and has no migration to ${type}@${latest}.`
+      : unmigrated
+        ? `${at}: ${type}@${version} is older than this editor's ${type}@${latest} and has not been migrated (migrateNodes must run before validateWorkflow).`
+        : `${at}: ${type}@${version} is too old and has no migration to ${type}@${latest}.`
   return { code, path: jsonPointer('nodes', index, 'typeVersion'), message }
 }
 
@@ -141,7 +152,11 @@ export function migrateNodes(
       const result = step.migrate({ label: raw.label, config })
       config = result.config
       notes.push(...result.notes)
-      if (result.portRenames) renamesByNode.set(raw.id, [...(renamesByNode.get(raw.id) ?? []), result.portRenames])
+      if (result.portRenames) {
+        const list = renamesByNode.get(raw.id) ?? []
+        list.push(result.portRenames)
+        renamesByNode.set(raw.id, list)
+      }
     }
     upgrades.push({ nodeId: raw.id, type: raw.type, from: version, to: newest, notes })
     return { ...raw, typeVersion: newest, config }

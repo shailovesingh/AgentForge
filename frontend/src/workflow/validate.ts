@@ -63,7 +63,7 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
       // is only reached when validateWorkflow is called on its own); node.unknown-type is for unknown TYPES only.
       const versions = catalog.filter((d) => d.type === raw.type).map((d) => d.version)
       if (versions.length > 0) {
-        const p = nodeVersionProblem(i, raw.id, raw.type, raw.typeVersion as number, Math.max(...versions))
+        const p = nodeVersionProblem(i, raw.id, raw.type, raw.typeVersion as number, Math.max(...versions), true)
         return err(p.code, p.path, p.message)
       }
       return err(

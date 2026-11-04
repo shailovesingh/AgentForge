@@ -178,12 +178,19 @@ const agentFile = (typeVersion: number, maxIterations: number) =>
 const UPGRADE_TEXT = 'Upgraded 1 node (Agent v1 to v2). Review the changes. Your original file was not modified.'
 
 test.describe('node upgrades (H3)', () => {
-  test('a version 1 agent file is upgraded in memory: banner with the note, field shows 3, the file on disk is unchanged', async ({ editor }) => {
+  // The "file on disk unchanged" checks below DOCUMENT the guarantee; they cannot fail because of the app: the page has no write
+  // access to a file chosen in a file input, and the export goes to Playwright's separate download path. The real guarantees are
+  // in contracts/MIGRATIONS.md rule 8 (the importer only gets the content; the source-text guard in nodeMigrations.test.ts).
+  test('a version 1 agent file is upgraded in memory: banner with the note, field shows 3 (and the picked file is, as always, untouched)', async ({ editor }) => {
     const dir = mkdtempSync(join(tmpdir(), 'agentforge-e2e-'))
     try {
       const file = join(dir, 'old-agent.json')
       writeFileSync(file, agentFile(1, 2.5))
       const before = readFileSync(file)
+      // the live region exists, and is empty, before anything is imported
+      const region = editor.page.getByRole('status')
+      await expect(region).toHaveCount(1)
+      await expect(region).toBeEmpty()
 
       await editor.page.getByLabel('Import workflow file').setInputFiles(file)
 
@@ -205,6 +212,9 @@ test.describe('node upgrades (H3)', () => {
 
       await banner.getByRole('button', { name: 'Dismiss' }).click()
       await expect(banner).toHaveCount(0)
+      await expect(region).toHaveCount(1) // the container stays mounted (empty), so the next banner is announced
+      await expect(region).toBeEmpty()
+      await expect(editor.page.getByRole('button', { name: 'Import' })).toBeFocused() // focus moved to a stable element
       await expect(editor.nodes).toHaveCount(1) // dismissing the banner changes nothing else
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -231,5 +241,25 @@ test.describe('node upgrades (H3)', () => {
     await editor.page.getByRole('button', { name: 'New' }).click()
     await expect(banner).toHaveCount(0)
     await expect(editor.nodes).toHaveCount(0)
+  })
+})
+
+test.describe('a failed import after an upgrade', () => {
+  test('leaves the previous banner, graph and settings untouched', async ({ editor }) => {
+    await editor.importText(agentFile(1, 2.5))
+    const banner = editor.page.getByRole('status').filter({ hasText: 'Upgraded' })
+    await expect(banner.getByText(UPGRADE_TEXT, { exact: true })).toBeVisible()
+    await expect(editor.nodes).toHaveCount(1)
+
+    await editor.importText(agentFile(3, 5)) // newer than this editor: rejected
+    const alert = editor.toolbar.getByRole('alert')
+    await expect(alert.getByText('node.version-newer', { exact: true })).toBeVisible()
+
+    // the banner of the previous (successful) import is still there, with its note, and the graph is the one that was loaded
+    await expect(banner.getByText(UPGRADE_TEXT, { exact: true })).toBeVisible()
+    await expect(banner.getByText('maxIterations 2.5 was not a whole number and was rounded to 3')).toBeVisible()
+    await expect(editor.nodes).toHaveCount(1)
+    await editor.node('agent.autonomous').click({ position: { x: 30, y: 10 } })
+    await expect(editor.settings.getByLabel('Max iterations')).toHaveValue('3')
   })
 })
