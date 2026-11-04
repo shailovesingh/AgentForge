@@ -3,7 +3,7 @@
 > **For the Product Owner.** Part 1 is a plain-language **primer** (reference material: what we are building and how the code is organised). Part 2 is the **teaching record** (lessons actually taught and what you demonstrated).
 > The **curriculum and statuses** are in `docs/LEARNING.md`. Learning progress is tracked separately from implementation progress.
 > **Living document.** The Principal Architect updates it at the end of every task (D-028). The primer describes the project **as it is today**; where something is planned but not built, it says so.
-> Last updated: 2026-11-04, after Phase 1.1 T4b and its review fixes (Lesson L5, revised for commit `d2ef493`).
+> Last updated: 2026-11-05, after Phase 1.1 T5a and its review fixes (Lesson L6, commits `96cc80d` and `a009b20`).
 
 # Part 1: Primer
 
@@ -26,7 +26,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 |---|---|
 | The visual editor in the browser: drag nodes from a library, connect them with rules, edit each node's settings, save the workflow to a `.json` file and load it back | Running workflows (the "engine") |
 | A catalog of 6 node types | AI models, agents, tools (Phase 4) |
-| 707 unit tests and 30 browser tests | Natural-language workflow generation (Phase 5) |
+| 905 unit tests (at commit `a009b20`) and 30 browser tests | Natural-language workflow generation (Phase 5) |
 | A CI workflow that runs the checks on GitHub | The backend server, database, saving to a server (Phase 2) |
 
 **Important:** today everything runs **in your browser only**. There is no server. Nothing runs a workflow yet. The editor produces a *description* of a workflow; later phases will execute it.
@@ -34,7 +34,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | Phase | What it delivers | Status |
 |---|---|---|
 | 1 | The visual editor | Done and accepted |
-| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 4 of 10 done) |
+| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 4 of 10 done, plus T5a, the first half of task 5; T5b is next) |
 | 2 | Backend server and database; save/load workflows | Planned, not approved |
 | 3 | Execution engine: actually run workflows | Planned |
 | 4 | AI runtime: LLM and Agent nodes | Planned |
@@ -73,7 +73,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **Catalog and node definition.** The catalog is the list of node types the platform offers. A *definition* describes one type: its ports, its settings, its icon. The library, the settings forms, the validator and (later) the engine and the AI generator all read the same catalog, so there is one source of truth. See `frontend/src/catalog/nodes.ts`.
 
-**Config schema.** A description of what settings a node accepts (for example `temperature` is a number from 0 to 2). The settings panel builds its form from it, and the importer uses it to check files. We use a small, documented subset of **JSON Schema**, a standard way to describe JSON.
+**Config schema.** A description of what settings a node accepts (for example `temperature` is a number from 0 to 2). The settings panel builds its form from it, and the importer uses it to check files. We use a small, documented subset of **JSON Schema**, a standard way to describe JSON. (The checker for that subset is built and tested, Lesson L6; the editor itself still runs the older checks until task T5b switches it over.)
 
 **Workflow JSON.** The file format. A minimal real example (a trigger connected to an output):
 
@@ -165,8 +165,8 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 | Kind | Tool | What it does | Command |
 |---|---|---|---|
-| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, and the shared fixtures in `contracts/`). 707 today. | `npm test` |
-| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 29 today. | `npm run test:e2e` |
+| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, and the shared fixtures in `contracts/`). 905 at commit `a009b20`. | `npm test` |
+| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 30 today. | `npm run test:e2e` |
 | **Type check** | TypeScript | Catches mismatched data shapes before running | part of `npm run build` |
 | **Lint** | Oxlint | Catches suspicious code patterns | `npm run lint` |
 | **Everything** | | All of the above, in order | `npm run verify` |
@@ -219,7 +219,7 @@ npm run dev              # open http://localhost:5173
 
 ## 10. What happens next
 
-Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5** better settings schemas and the Groq provider; **T6** upgrading old files; **T8** the branch rules written down; **T7** warnings in the editor; **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
+Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6; nothing uses the validator yet); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider; **T6** upgrading old files; **T8** the branch rules written down; **T7** warnings in the editor; **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
 
 ## 11. Glossary, quick reference
 
@@ -253,6 +253,7 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | **L3** | Phase 1.1 T3: shared JSON fixtures and the TypeScript runner | 1, 3, 12 | 2026-11-03 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L4** | Phase 1.1 T4a: strict JSON parsing and the policy limits | 3 (main), 12, 1 | 2026-11-04 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L5** | Phase 1.1 T4b (commits `dd33e84`, `d2ef493`): canonical compact JSON, pretty export JSON and the export guard | 3 (main), 1, 12 | 2026-11-04 | 6 (answered at the end of the project) | Explained; evaluation pending |
+| **L6** | Phase 1.1 T5a (commits `96cc80d`, `a009b20`): the JSON Schema subset validator, explicit `applyDefaults` and the `schema` fixtures | 3 (main), 7, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
 
 ## Concept index
 
@@ -309,6 +310,14 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | Independent re-implementation by a reviewer as an answer to circular tests | 12 | L5 | Explained (no evidence) |
 | A refactor can delete an implicit protection (projecting to known fields; catching writer failures) | 3, 12 | L5 | Explained (no evidence) |
 | Mutation testing of a writer (17 breaks) and an equivalent mutant (`JSON.stringify(n)` versus `String(n)`) | 12 | L5 | Explained (no evidence) |
+| A documented subset of JSON Schema (draft 2020-12) as a contract two languages implement; the deliberate non-goals (`$ref`, `anyOf`, `pattern`) and why (Pydantic output, regex dialects) | 1, 3, 7 | L6 | Explained (no evidence) |
+| `validateAgainstSchema`: recursive walk, `{code, path}` errors, the early return after `schema.type`, own-property lookups | 3, 7 | L6 | Explained (no evidence) |
+| A mandatory option as design (`checkRequired`), the C1 draft-versus-execution split (wiring is planned for T5b) | 3, 7 | L6 | Explained (no evidence) |
+| Explicit versus implicit defaults (`applyDefaults`: no recursion, deep copy, never called by validators) | 3, 7 | L6 | Explained (no evidence) |
+| A schema about schemas (`checkSchemaSubset`) and total functions on untrusted input; the uniform default rule | 3, 12 | L6 | Explained (no evidence) |
+| Rules two languages must agree on: code-point string length, safe integers, enum equality (`true` versus `1`, JavaScript versus Python) | 3, 7, 12 | L6 | Explained (no evidence) |
+| A temporary, named exemption list for codes no workflow can produce yet (`SCHEMA_ONLY_CODES`) and a no-production-import guard test | 12 | L6 | Explained (no evidence) |
+| The three fixture case kinds (validation, defaults, schema check); a property test against an independent reference; a soundness corollary; a reviewer's independent validator and mutation-found fixture gaps (reports) | 12 | L6 | Explained (no evidence) |
 | Primer concepts (workflow, node, port, edge, catalog, config schema, `schemaVersion` vs `typeVersion`, validation vs warnings, DAG, credentials) | 1, 2, 3, 6, 7 | Primer (Part 1) | Explained as reference (no evidence, no lesson) |
 
 ---
@@ -1117,3 +1126,157 @@ Notes on the diagram, so it can be explained in an interview. The solid path is 
 4. `exportWorkflowText` runs the value policy and a size check before writing. What promise does it protect, and why is the size measured on the **written text in UTF-8 bytes** instead of the object or the character count? Then use the review of `dd33e84` and its fix `d2ef493` to explain two ways a refactor of the exporter broke that promise (one involving a value that is not JSON data, one involving an extra field on an in-memory object), what `exportWorkflowText` does about each now (why does it project to the known fields **before** the policy check, and why is `serializeWorkflow` still allowed to throw while `exportWorkflowText` never is?), and which tests would fail if each protection were deleted again. Finally, name the soft spot in how the `value.not-json-data` path is obtained and what you would change.
 5. The fixtures' expected text is written by hand, the property test has a reference writer, and the independent reviewer wrote a third writer. Explain how these together answer "are the expected values just a copy of the code?" Then identify one thing the in-repo reference writer does **not** check independently (read it), and say what protects that area instead.
 6. The implementer made 17 deliberate breaks of the writer. Explain what a mutation test proves and what it cannot. Why did "number text via `JSON.stringify`" survive without that being a test gap, while `toFixed` did not survive? In Phase 2 a Python implementer writes `1e-07` for the number 0.0000001: which fixture fails, when, and why can we not say today that TypeScript and Python agree?
+
+---
+
+## Lesson L6: Describing a node's settings with a small, shared rulebook (the JSON Schema subset validator)
+
+**Task:** Phase 1.1 T5a (the pure JSON Schema subset validator, explicit `applyDefaults`, the `schema` fixture family and `contracts/CONFIG_SCHEMA.md`), commit `96cc80d`, plus its review-fix commit `a009b20`. **Modules:** 3 (Workflow JSON and State Management: schemas, defaults, validation at the import boundary), 7 (Node Registry and Data Propagation: the catalog's configuration contract), 12 (Security, Testing and Deployment: reference implementations, property tests, mutation testing, fixtures as the cross-language contract).
+
+*Status of the code described here.* This lesson describes the code as of commit `a009b20`. **T5a builds the validator and nothing uses it yet.** The catalog, the editor store, the config panel and the importer still use the older `validateConfig` in `frontend/src/workflow/configSchema.ts`; **T5b wires the new validator in** (catalog conversion, store defaults, config panel, importer behaviour, the Groq provider) and deletes the old code. A test in `frontend/src/contracts/fixtures.test.ts` ("only test files import it") checks that, at this commit, no production file imports `jsonSchema.ts`. **What I verified myself:** I read `jsonSchema.ts`, `jsonSchema.test.ts`, the `schema` runner in `fixtures.test.ts`, `contracts/CONFIG_SCHEMA.md`, `git show 96cc80d --stat`, the full `jsonSchema.ts` diff of `a009b20`, counted the files in `contracts/fixtures/schema/` (148), and ran `npm test` in `frontend/` (905 tests passed, at `a009b20`). **What I did not run:** the Playwright tests, the mutation checks, the reviewer's 120,000-case comparison (those are reports from the implementer and the reviewer, labelled as reports below), and the old, pre-fix code (I read the diff that fixed it).
+
+### 1. The problem
+
+Every node in AgentForge has *settings*: an LLM node has a provider, a temperature and a prompt; an agent node has a maximum number of iterations. Something has to say what a valid setting looks like, so that the settings form can be built, an imported file can be checked, and (later) the server can refuse bad input. That description is the node's `configSchema`.
+
+The `configSchema` we had was **home-made**. Reading the code (`frontend/src/workflow/types.ts` and `docs/PHASE1_1_PLAN.md` section 3.1) shows four weaknesses:
+
+- **It cannot say much.** `ConfigProperty` knows only `string`, `number`, `boolean` and `object`, plus `enum`, `minimum` and `maximum`. There is no `integer` (so `maxIterations` accepted `2.5`), no list, no nested object, no length limit.
+- **Presentation is mixed into validation.** `format: 'multiline'` is not about validity at all; it is the config panel's wish to draw a textarea.
+- **The starting values live somewhere else.** `NodeDefinition.defaults` is a separate object next to the schema, so the two can drift apart.
+- **It is a private language.** The backend (Phase 2, planned) will use Pydantic, and Pydantic describes models with the standard **JSON Schema**. Two private languages for the same idea means two places to disagree.
+
+The fix has to be a *contract that two programming languages can implement identically*, which is the theme that started in Lesson L3.
+
+### 2. The concept
+
+**JSON Schema** is a standard way to describe JSON data with JSON itself: `{ "type": "integer", "minimum": 1 }` means "a whole number, at least 1". **A subset** means we support a small, chosen part of the standard and say clearly what we leave out. Our subset uses **draft 2020-12** keywords: `type` (string, number, integer, boolean, array, object), `title`, `description`, `default`, `enum`, `minLength`, `maxLength`, `minimum`, `maximum`, `items`, `minItems`, `maxItems`, `properties`, `required`, `additionalProperties`. The full table, with which differences from plain JSON Schema are AgentForge policy, is in `contracts/CONFIG_SCHEMA.md`.
+
+Three ideas make up the task:
+
+1. **Validating a value against a schema** (`validateAgainstSchema`): walk the value and the schema together, and report every mismatch as an error with a machine-readable **code** (such as `schema.type`) and a **path** (a JSON Pointer such as `/options/0/name`, Lesson L2).
+2. **Defaults as an explicit act** (`applyDefaults`): "the initial value of a setting" is a *schema annotation* (`default`), but **nothing fills it in automatically**. A function you call on purpose does it, when a node is created.
+3. **A schema about schemas** (`checkSchemaSubset`): before a schema is trusted, check that it is itself inside the subset. This is how you reject the keywords you decided not to support (for example `$ref`) instead of silently ignoring them.
+
+### 3. Why we selected this approach
+
+1. **A deliberately small subset, written down.** The subset is what the editor and the settings form can actually render and what we can implement twice (TypeScript now, Python later) and prove identical. `CONFIG_SCHEMA.md` lists the **deliberate non-goals**: `$ref`, `$defs`, `anyOf`, `oneOf`, `allOf`, `not`, `if`, `then`, `else`, `patternProperties`, `format`, `pattern`. Two reasons stand out. **Pydantic emits `$ref`, `$defs` and `anyOf` by default** (for nested models and optional fields), so the Phase 2 backend will have to *flatten* its output into this subset; supporting composition would multiply the validator and the config panel for no current need. And **`pattern` is a regular expression, and regular-expression dialects differ between JavaScript and Python**, so the same pattern could accept different text in the two runtimes, which breaks the whole point of a shared contract.
+2. **`checkRequired` is a mandatory option, not a default.** The signature is `validateAgainstSchema(schema, value, { checkRequired })`. The reason is decision C1 in the plan: the editor must be able to hold and export an *incomplete draft* (D-017), so **importing a file must not reject a document just because a required setting is still empty**. Execution (Phase 3, planned) will use `checkRequired: true`. A boolean with a default would let a caller get it wrong by accident; making it mandatory forces every caller to decide. It is mandatory **at run time too**: a missing or non-boolean option throws a `TypeError` (the review added this; the test "a missing or malformed options value throws a TypeError" tries nine bad values). Note that C1 is the *planned* importer behaviour: T5b wires it in.
+3. **Defaults are explicit, never implicit.** If a validator or the importer quietly filled in missing values, then *importing a file would change its data*, and exporting it again would not give back what was imported. So validators never apply defaults and the importer never will; `applyDefaults(schema)` is called **only** by node creation (and, later, by a migration that introduces a new property; both are T5b and later work, planned). Two further rules keep it predictable: **no recursion** (a nested object gets a value only from an explicit `default` on that property; nothing is invented), and the result is a **deep copy** (`structuredClone`), so editing a new node's config can never edit the schema's own default object.
+4. **`checkSchemaSubset` exists so the validator can stay small.** The validator itself does not defend against a malformed schema (its doc comment says so). The contract is: *check the schema once, when it is loaded, then validate many values against it*.
+5. **Our own validator, no library.** It is one pure file, `frontend/src/workflow/jsonSchema.ts` (about 320 lines including comments, most of it `checkSchemaSubset`), with no React and no dependency. `CLAUDE.md` section 4 requires approval for a new major dependency, and a library would still not give us the AgentForge-specific rules (code-point length, safe integers, own-property lookups, error codes and paths we control). The recommendation is recorded as D-022-a in the plan.
+6. **Code points, safe integers, own keys: three AgentForge rules chosen so two languages agree.** String length counts **code points**: the emoji U+1F600 has length 1, although JavaScript's `text.length` says 2 (it counts UTF-16 units) and Python's `len` says 1; the code uses `[...text].length`. An `integer` must be a **safe integer** (at most 2^53 - 1), the same document-wide rule as Lesson L4. And a key of the *validated value* is matched against `properties` only if `properties` **owns** it (`Object.hasOwn`), so a hostile file with a key named `constructor` or `__proto__` is just an unknown key.
+
+### 4. How it works internally
+
+**`validateAgainstSchema`** (in `frontend/src/workflow/jsonSchema.ts`) checks its options, then calls a private recursive function `validate(schema, value, path, checkRequired, errors)` that appends to one `errors` list. For each node of the value:
+
+1. **Check the type first.** `typeProblem` decides whether the value has the schema's `type`. If not, it reports `schema.type` and **returns at once**: every other keyword is skipped for that node (a number given where an object was expected has no keys worth checking). This early return is a documented rule and a fixture family pins it (`sch-type-error-skips-object-keywords` and its string, number and array siblings; the object one uses `checkRequired: true` and still expects only `schema.type`).
+2. **Check `enum`** if present. It compares with `enumEquals`, which is just `a === b`, so the **same JSON type and value** are required. This was pulled out into a named exported function by the review (story 2 below).
+3. **Then the keywords of that type.** A string: `minLength` and `maxLength`, counting code points. A number or integer: `minimum` and `maximum`. An array: `minItems`, `maxItems`, then **recurse into every element** with the path extended by `/<index>`. An object: if `checkRequired`, every required key that is absent (not an own property, or an own property whose value is `undefined`) gives `schema.required` at `/<key>`; then **for each own key of the value**, recurse into the matching `properties` entry, or else apply `additionalProperties` (`false` gives `schema.additionalProperties`; a schema is validated against; `true` or absent accepts). A boolean has no further keywords.
+
+```mermaid
+flowchart TD
+  IN["Inputs: schema, value, options { checkRequired }"] --> OPT{"options is an object whose<br/>checkRequired is a boolean?"}
+  OPT -- "no" --> TE["throws TypeError (a programming error, loud)"]
+  OPT -- "yes" --> V["validate(schema, value, path, ...)"]
+  V --> TY{"value has the schema's type?"}
+  TY -- "no" --> E1["error schema.type at this path<br/>EARLY RETURN: no other keyword is checked for this node"]
+  TY -- "yes" --> EN{"enum present and no entry equal<br/>(same type and value)?"}
+  EN -- "yes" --> E2["error schema.enum (checking continues)"]
+  EN -- "no" --> KW{"type of the node"}
+  E2 --> KW
+  KW -- "string" --> S["minLength / maxLength, counted in code points<br/>schema.minLength, schema.maxLength"]
+  KW -- "number or integer" --> N["minimum / maximum<br/>schema.minimum, schema.maximum"]
+  KW -- "array" --> A["minItems / maxItems, then for each element:<br/>validate(items, element, path + /index)"]
+  KW -- "object" --> O["if checkRequired: absent required key gives schema.required at /key<br/>for each OWN key of the value:<br/>known property: validate(property schema, child, path + /key)<br/>unknown, additionalProperties false: schema.additionalProperties<br/>unknown, additionalProperties a schema: validate against it"]
+  KW -- "boolean" --> B["nothing more"]
+  S --> OUT["errors: a list of { code, path, message }"]
+  N --> OUT
+  A --> OUT
+  O --> OUT
+  B --> OUT
+  E1 --> OUT
+```
+
+Reading the diagram aloud, for an interview: the same `errors` list is passed down the recursion, so one call reports **every** problem, not only the first (the fixture `sch-multiple-errors` covers it). The **code and path are the contract**; the message is for people and is never compared by a fixture. Order is stable but not part of the contract (`required` errors first, then the value's keys in key order, then array elements by index), so fixtures compare as **multisets**, as in Lesson L3.
+
+**`applyDefaults`** is a few lines: take `schema.properties` in order, keep those with a `default` other than `undefined` (so `0`, `false` and the empty string count), and build an object from `[key, structuredClone(default)]` pairs. It uses `Object.fromEntries`, which *defines* own properties, so a schema property named `__proto__` cannot reach the prototype. A required property without a default stays **absent**: that is exactly the incomplete-draft situation `checkRequired: false` exists to allow.
+
+**`checkSchemaSubset(schema: unknown)`** takes *any* value and returns a list of `{ path, message }` problems (paths point into the schema, for example `/properties/a/pattern`). Per schema node it reports, among others: unknown keywords (naming the non-goals specially), a wrong or missing `type`, a keyword on the wrong type (`minLength` on a number, `enum` on an array), `required` names that are not keys of `properties` or are listed twice, an empty `enum` or an entry not of the schema's type, a negative or fractional `minLength`, an unsatisfiable range (`minimum` greater than `maximum`, reported at the max keyword), nesting deeper than `MAX_SCHEMA_DEPTH` (16), and a `default` that does not validate against its own schema (using `validateAgainstSchema` with `checkRequired: false`). **The default rule** is uniform: a `default` is checked only if *that node and every node beneath it have no problem of their own*; otherwise the default is skipped and never reported. So a broken schema reports its real problem, not a second derived one, and the validator only ever runs on a sound schema.
+
+**The three kinds of fixture** (one JSON file per case in `contracts/fixtures/schema/`: 148 files at `a009b20`, 75 validation, 8 defaults and 65 schema check, counted by file name prefix and by the runner's floor in `fixtures.test.ts`):
+
+| Kind | What the file holds | What the runner does (the `schema` describe in `fixtures.test.ts`) | Example |
+|---|---|---|---|
+| **Validation** | `schema`, `value`, `options: { checkRequired }`, `expect: [{ code, path }]` | requires the case's own schema to pass `checkSchemaSubset`; runs `validateAgainstSchema`; compares `{code, path}` as multisets | `sch-string-emoji-minlength`: `minLength: 2` and one emoji gives `schema.minLength` at the empty path |
+| **Defaults** | `schema`, `applyDefaults: true`, `expect: { value }` | checks the schema is in the subset; runs `applyDefaults`; requires the result to validate with `checkRequired: false`; compares `JSON.stringify` of result and expectation, so **key order counts** | `sch-defaults-basic`: properties `a` and `b` have defaults, `c` has none, so the result holds `a` and `b` only |
+| **Schema check** | `schema` (possibly malformed on purpose), `checkSchema: true`, `expect: [{ path }]` | runs `checkSchemaSubset`; compares the sorted problem paths | `sch-check-nongoal-ref`: a property with `$ref` gives one problem at `/properties/a/$ref` |
+
+### 5. How it communicates with other components
+
+- **`errors.ts`.** T5a added four codes to `ERROR_CODES` in `frontend/src/workflow/errors.ts`: `schema.minLength`, `schema.maxLength`, `schema.minItems`, `schema.maxItems` (ten `schema.*` codes now). Because no catalog schema uses those four keywords yet, no imported workflow can produce them, so the guards that say "every code has a workflow fixture" would fail. The answer is the same pattern as `EXPORT_ONLY_CODES` in Lesson L5: **one named, temporary exemption list**, `SCHEMA_ONLY_CODES`, exported from `jsonSchema.ts` and imported by both `errors.test.ts` and `fixtures.test.ts` (the review made it one definition instead of two copies). Its comment says T5b removes entries as workflow fixtures start covering them. The validator also reuses `jsonPointer` from `errors.ts` for paths.
+- **The existing code is untouched.** `configSchema.ts` (`validateConfig`, `parseConfigInput`), the catalog, the store and the config panel still run the old checks. Two validators coexist between T5a and T5b on purpose (D-032), and the no-import guard test makes "nothing uses the new one yet" a checked fact instead of a claim. The guard regex catches static, side-effect and dynamic imports, with or without a file extension, and is itself tested against eight positive and five negative strings (the review found the first regex could be bypassed).
+- **The fixtures.** The `schema` runner shares the corpus loader and the shape checker (`checkShape`, with a `schema` entry in `FAMILY_FIELDS`) with the other families, so a malformed schema fixture is itself reported. `contracts/README.md` documents the format.
+- **Planned, not built.** **T5b** converts the six catalog node definitions to JSON Schema, replaces `NodeDefinition.defaults` with schema `default`s applied through `applyDefaults`, makes the config panel render from the schema, and has the importer call `validateAgainstSchema` with `checkRequired: false` (all described in `docs/PHASE1_1_PLAN.md` section 3.1; none of it is done in the code this lesson covers). **Phase 2** adds the Python runner for the same 148 files and a Pydantic-to-subset flattening step. **Until the Python runner exists and passes, nothing says the two languages agree**; `CONFIG_SCHEMA.md` says exactly that ("TypeScript only. No Python parity is claimed").
+
+### 6. Important code paths
+
+| Where | What it does |
+|---|---|
+| `frontend/src/workflow/jsonSchema.ts`: `validateAgainstSchema`, private `validate`, `typeProblem` | The validator: type first with an early return, then enum, then the keywords of the type, recursing into items and properties |
+| same file: `enumEquals` | Enum equality (same JSON type and value; a one-line `===` that is exported so a test can pin it) |
+| same file: `applyDefaults` | Explicit, non-recursive, copying defaults; never called by a validator |
+| same file: `checkSchemaSubset`, private `checkNode`, `NON_GOAL_KEYWORDS`, `KEYWORDS_BY_TYPE`, `MAX_SCHEMA_DEPTH` | The schema-about-schemas check, total on any input |
+| same file: `SCHEMA_ONLY_CODES` | The temporary exemption list, shared by the two test runners |
+| `frontend/src/workflow/errors.ts` | `ERROR_CODES`, now with the four length and item codes |
+| `contracts/CONFIG_SCHEMA.md` | The specification: keywords, the AgentForge differences, non-goals and why, `checkRequired`, defaults, error codes and paths, the three fixture shapes |
+| `contracts/fixtures/schema/` | 148 hand-written cases (families by file name: `sch-string-*`, `sch-integer-*`, `sch-enum-*`, `sch-array-*`, `sch-object-*`, `sch-key-*`, `sch-defaults-*`, `sch-check-*`, `sch-type-error-skips-*`) |
+| `frontend/src/contracts/fixtures.test.ts`: the `schema` describe, `schemaKind`, the floor (`schema: 148`, `schemaValidation: 75`, `schemaDefaults: 8`, `schemaCheck: 65`), the no-production-import guard | The runner, the counts and the guard |
+| `frontend/src/workflow/jsonSchema.test.ts` | Unit tests; the seeded property test against an independent `reference` function (2000 schema and value pairs, each with both `checkRequired` values); the totality test (3000 seeded random and corrupted schemas never throw) |
+
+**How the tests are built** (Module 12):
+
+- **A property test against a reference written differently on purpose.** `reference` in `jsonSchema.test.ts` uses a per-type predicate table, errors as plain strings, `split` and `join` for escaping, `Array.from` for code points and `hasOwnProperty.call` for own keys, while the real code uses a `switch`, `Object.hasOwn`, spread and `jsonPointer`. A seeded generator (`rng`, a small mulberry32 function) makes the schemas and values; the test asserts that valid and invalid outcomes both occur in volume and that nearly every code is produced, so agreement proves something.
+- **A soundness corollary in the totality test.** For every random or corrupted schema that `checkSchemaSubset` calls clean, the test then runs the validator on random values and requires that it **does not throw**. That ties the two functions together: "clean" must mean "safe to use".
+- **Boundary pairs** in fixtures: `minItems` one short and exactly at the limit, `maxItems` one over and at the limit, `2^53` against `2^53 - 1`, `1.0` and `-0` as integers.
+
+### 7. Alternatives and trade-offs
+
+| Option | Good | Costs |
+|---|---|---|
+| **Our own validator for a documented subset (chosen)** | No dependency; exactly the rules we need; two implementations kept in step through shared fixtures; error codes and paths we control | We own the code and the tests; the subset must be policed (`checkSchemaSubset`); less than the standard |
+| **A JSON Schema library such as Ajv** (general knowledge, not evaluated here) | Full standard, mature, fast | A new dependency needing approval; we would still need our own mapping to `{code, path}`, our code-point and safe-integer policy, and a Python counterpart whose behaviour matches exactly; a bigger feature surface than the config panel can render |
+| **Zod or a similar TypeScript-first library** (general knowledge) | Pleasant for TypeScript types | The schema lives in TypeScript code, not as data, so it cannot be sent to a backend, stored as catalog JSON or shared with Python; not a standard |
+| **The home-made model we had** | Already worked | Cannot express integer, list, nested object, length; presentation mixed in; defaults separate; nothing to share with Pydantic |
+| **Derive the schema only from Pydantic (Phase 2)** | One source of truth later | The editor works today with no backend; the plan keeps TypeScript first and has Phase 2 generate and check against this contract. Pydantic's default output (`$ref`, `anyOf`) also falls outside the subset |
+| **Support full JSON Schema** (`$ref`, `anyOf`, `pattern`) | Maximum compatibility | A much bigger validator and config panel; regular-expression dialect differences between JavaScript and Python; nothing in the six node types needs it |
+| **Implicit defaults** (validator or importer fills them in) | Convenient | Importing changes the file's data, so a round trip is no longer identical; hides mistakes (a missing required value looks fine); recursion invents nested structure |
+
+### 8. Real-world applications
+
+*The following are from general knowledge, not from this repository.*
+
+- **JSON Schema in practice.** OpenAPI documents describe request and response bodies with it; many editors validate configuration files (for example `package.json`) against published schemas; form builders generate forms from schemas, the way our config panel will (the plan's separate `ui` block keeps presentation out of the schema, the same split as the `uiSchema` of React JSON Schema Form).
+- **Pydantic and FastAPI.** Pydantic models emit JSON Schema, and FastAPI uses it for validation and its generated API docs. This is the reason the subset leaves out `$ref` and `anyOf`: a flattening step is the price of sharing the contract.
+- **LLM function calling and structured output.** The tool and structured-output features of LLM providers take a JSON Schema describing the arguments or the answer. A small, well-understood subset is what such features handle best, and it is the same kind of schema that AgentForge nodes and (Phase 5) generated workflows will need.
+- **Total functions on untrusted input.** Anything that validates user-supplied definitions (schema registries, API gateways, configuration loaders) must not crash on a malformed definition; it reports it.
+- **Reference implementations and differential testing.** Standards bodies keep language-neutral test suites (the JSON Schema project publishes one) so that many implementations can be checked against the same cases, which is the idea of our `contracts/` folder.
+- **Mutation testing** (tools such as Stryker) automates "break the code, see if a test notices", the technique used in this task's review.
+
+### Three lessons from our own review (real examples)
+
+1. **A checker must be built for the input it exists to reject (found by the reviewer, fixed in `a009b20`).** `checkSchemaSubset` is meant to receive *malformed* schemas, yet it could **crash** on one. Reading the diff: it remembered how many problems it had found (`before`) *after* it had already reported the node's own unknown or misplaced keywords, so a node with such a problem still had its `default` validated. The validator then ran on a schema such as `{ type: 'array', enum: 5, default: [] }` (an `enum` that is not a list, on a type that may not even have one) and tried to call a list method on `5`. The fix moves the `before` marker to the start of the node and states **one uniform rule** for the default (see section 4). A second, linked gap: the rule for *when a default is checked* had not been written down at all, so each level could have done something different. The test "a default is validated only when its node and everything beneath it is sound" lists the reproducers (including `enum: 5` on an array and `enum: null` on an object) and the totality test runs 3000 seeded random and corrupted schemas. The general principle: a **total function** (defined for every input, never throwing) is the right shape for anything at a trust boundary, and the schema check is one, because a schema can come from a catalog file or, in Phase 5, from AI output. I read the diff and the tests; I did not run the pre-fix code.
+2. **A spec rule two languages must agree on has to be written down and fixture-tested.** Two examples from this task. **Enum equality:** in JavaScript `true === 1` is `false`, but in Python `True == 1` is `True`, so a port that compares loosely would accept `1` for an enum of `[true]`. The fix is both a sentence in `CONFIG_SCHEMA.md` ("the same JSON type and the same value") and fixtures (`sch-enum-boolean-rejects-number`, `sch-enum-integer-rejects-boolean`), and the comparison lives in its own exported function, `enumEquals`, with a unit test over eleven pairs, because *through* `validate` a loose `==` could not be told apart (the type check runs first, so both sides always have the same type by then). **String length:** the code-point rule has fixtures with an emoji (`sch-string-emoji-*`). The wider lesson: **a check that only a property test catches will be missing from the Python port**, because the Python implementer reads the spec and the fixtures, not the TypeScript test suite. If a rule matters, it needs a fixture.
+3. **Independent re-implementation and mutation testing found what the author's tests did not.** The Opus reviewer **wrote its own validator from the specification text and compared 120,000 generated cases against the implementation, with zero disagreements** (the reviewer's report, relayed to me by the Principal Architect; I did not repeat it). The same review reported **fixture gaps found by mutation testing**: a deliberate break of the code that survived every test, meaning the tests did not pin that behaviour (reported to me, not repeated by me; the review-fix commit message lists 23 new fixtures, for example `required` inside array items and under `additionalProperties`, an escaped key in a `required` path, and item-count boundaries). The review also found a duplicate `required` name accepted, `minimum` greater than `maximum` accepted, and the import-guard regex bypass (section 5). Why this is the right habit: a test suite is only as good as the bugs it can notice; breaking the code on purpose is the direct way to measure that, and a second author working from the spec is the best answer to "are the tests just a copy of the code?" (Lesson L5 made the same point for the writers).
+
+### Knowledge Check / Interview Questions
+
+*Answers are not given here. Study this lesson and `docs/LEARNING.md`, then answer all questions in the dedicated learning session at the end of the project.*
+
+1. `validateAgainstSchema` requires `{ checkRequired }` and has no default for it. A user drops an LLM node onto the canvas whose schema requires `provider` but gives it no `default`, exports the draft, and imports it later. What does `applyDefaults` put in the new node's config, what does import validation do with `checkRequired: false`, and what will execution do with `checkRequired: true` in Phase 3? Why is making the option mandatory (with a `TypeError` when it is missing) a better design than defaulting it to `true` or to `false`?
+2. Give two concrete harms of letting the importer fill in schema defaults silently, one about the round trip from Lesson L5 and one about hiding a user's mistake. Then explain the three rules that keep `applyDefaults` predictable (no recursion, a deep copy, only explicit calls) and what could go wrong with each rule broken.
+3. Explain what "a schema about schemas" is and why `checkSchemaSubset` must be a total function. Use the review finding: why did an `enum` that is not a list, on an array schema that also has a `default`, make the first version crash, what change in where the `before` marker is set fixes it, and what is the uniform default rule? What is the "soundness corollary" in the totality test, and why does it tie `checkSchemaSubset` to `validateAgainstSchema`?
+4. The subset excludes `$ref`, `anyOf` and `pattern` on purpose. Explain the reason for each in terms of Pydantic and of the two runtimes. What will the Phase 2 backend therefore have to do, and what does the statement "TypeScript only, no Python parity claimed" in `CONFIG_SCHEMA.md` mean for what we may say today in an interview?
+5. Name three places where JavaScript and Python would give different answers for a validator like this one (think about enum equality, string length and the integer range), say what AgentForge chose in each case, and explain why `enumEquals` is a separate exported function with its own unit test instead of being left inline in `validate`. Then explain the sentence "a check that only a property test catches will be missing from the Python port" and say what you would add so it is not missing.
+6. The tests for this task include language-neutral fixtures, a seeded property test against an independent reference, a totality test, and (from the review) an independent re-implementation and mutation testing. For each, say what kind of mistake it can catch that the others cannot. Why is the early return after `schema.type` pinned by a fixture that uses `checkRequired: true`, and what behaviour could a Python port silently get wrong if that fixture did not exist?

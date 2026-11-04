@@ -632,3 +632,40 @@ T4 (T4a and T4b) **accepted** by the Principal Architect. T5 is split like T4 (D
 
 **Next Task:**
 T5a review, then T5b, then T6 (node migrations); **MS-B report to the Product Owner after T6.**
+
+### Session: 11 / 2026-11-05
+
+**Phase:**
+Phase 1.1: T5a (pure JSON Schema subset validator) implemented, reviewed, fixed and accepted; T5b in progress
+
+**Product Owner decisions this session:** "continue" (after two subagent runs were stopped by an API rate limit; both were resumed or already committed, no work was lost: the T5a fix run had saved no change and was restarted from its brief; the L5 revision had already been committed in `3469ddc`). No other decision needed; the next PO review is MS-B (after T6).
+
+**T5a: JSON Schema subset validator (commits in order):**
+
+| Commit | What |
+|---|---|
+| `96cc80d` | Sonnet implementer: `workflow/jsonSchema.ts` (pure, no dependency): `validateAgainstSchema(schema, value, { checkRequired })` with a mandatory option, explicit `applyDefaults`, `checkSchemaSubset`; four new codes (`schema.minLength`, `schema.maxLength`, `schema.minItems`, `schema.maxItems`; 35 codes in total); the `schema` fixture family (three case kinds: validation, defaults, schema check; 125 files) and its runner; `contracts/CONFIG_SCHEMA.md`. Nothing existing changed behaviour; nothing in production imports the module yet. 874 unit tests, 30 e2e. |
+| `a009b20` | Sonnet implementer, review fixes (below). 905 unit tests, 30 e2e; 23 new and 2 renamed fixtures. |
+
+**Independent review (Opus 5.5, read-only) of `96cc80d`: PASS WITH FINDINGS, no blockers, one major.** The reviewer wrote its own validator from the spec text and compared it with the implementation on **120,000 generated schema/value pairs (3 seeds, both `checkRequired` modes): 0 disagreements** (reviewer's report, not repeated by Claude); it checked all 125 fixtures against the spec, found no prototype pollution through `applyDefaults`, and ran 32 mutants. Findings and triage (all fixed in `a009b20` except as noted):
+
+| # | Finding | Disposition |
+|---|---|---|
+| Major M-1 | `checkSchemaSubset` threw on malformed input (for example `enum: 5` with a `default`) although its job is to report malformed schemas; the rule for when a `default` is checked was unspecified and inconsistent | **Fixed**: total function (never throws), one documented rule: a `default` is validated only when its schema node and everything beneath it have no problem; 3,000 seeded corrupted schemas never throw; new fixtures |
+| m-1 | `enum` equality was under-specified in a cross-language contract (`True == 1` in Python); an enum entry could have the wrong type; the `==` mutant survived every test | **Fixed**: entries must have the schema's type, empty `enum` is a problem, spec wording "same JSON type and value; a boolean never equals a number"; equality in an exported `enumEquals`, pinned by a unit test (the mutant is equivalent through `validate` alone, so a direct test is the only way) |
+| m-2 | Fixture gaps found by mutation: `checkRequired` not passed through `additionalProperties` survived everything; other paths were caught only by the TypeScript property test, which a Python port will not have | **Fixed**: fixtures for required under `additionalProperties`, in array items, a key `a/b~c` (path `/a~1b~0c`), and `minItems`/`maxItems` boundaries; mutation proof that fixtures now catch these |
+| m-3 | Duplicate `required` names accepted (the 2020-12 metaschema forbids them) | **Fixed**: reported at `/required/<i>` |
+| m-4 | The "no production file imports `jsonSchema`" guard missed `from './jsonSchema.ts'` and dynamic `import()` | **Fixed** with one shared regex and negative tests |
+| Nits | runtime enforcement of the mandatory option (TypeError), unsatisfiable schemas (`minLength` above `maxLength`, `enum: []`), one shared exemption list, documented precondition, defaults cases also validated, two fixture descriptions that over-promised | **Fixed**; the `Date`-accepted-as-object nit was skipped (moot for JSON data) |
+
+**Deviation (accepted, to be tidied in T5b):** the implementer placed the temporary `SCHEMA_ONLY_CODES` list in `jsonSchema.ts` (a test-only constant in a production module) because importing one test file from another re-runs its tests. T5b moves both exemption lists into one test-support file.
+
+**Process note:** the implementer ran one forbidden bare `npx tsc -b` during T5a (it timed out and was killed); the reviewer confirmed no repository or package change resulted. The implementer also discarded one of its own uncommitted edits with `git checkout` and re-applied it; the final commit is correct.
+
+**Verification by the Principal Architect (commands actually run, `frontend/`):** at `a009b20`: `npm run verify` **exit 0, 14 test files, 905 unit tests, 30 e2e passed**; `git show --stat`; the `jsonSchema.ts` diff read. The implementer's mutation proofs (seven, including the fixture-level ones) were not repeated by Claude. Only the reviewer's own-validator comparison and the implementer's mutation results rest on subagent reports.
+
+**Status:**
+T5a **accepted**. T5b (catalog conversion to the subset, `ui` block, `defaults` removed, importer C1, config panel from schema, `groq`, deleting the old validator) is with the implementer; Lesson L6 (T5a) with the tutor.
+
+**Next Task:**
+T5b review, then T6 (node migrations; `agent.autonomous` v2); **MS-B report to the PO after T6.**
