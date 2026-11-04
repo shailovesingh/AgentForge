@@ -3,5 +3,6 @@
   "description": "A key the schema does not declare is schema.additionalProperties.",
   "nodeType": "llm.prompt",
   "config": { "provider": "ollama", "prompt": "hi", "extra": 1 },
+  "checkRequired": false,
   "expect": [{ "code": "schema.additionalProperties", "path": "/extra" }]
 }

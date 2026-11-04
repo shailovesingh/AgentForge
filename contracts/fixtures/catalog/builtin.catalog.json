@@ -20,12 +20,11 @@
         "payload": {
           "type": "object",
           "title": "Initial payload",
-          "description": "JSON passed to the next node."
+          "description": "JSON passed to the next node.",
+          "default": {}
         }
-      }
-    },
-    "defaults": {
-      "payload": {}
+      },
+      "additionalProperties": false
     }
   },
   {
@@ -58,41 +57,51 @@
           "enum": [
             "ollama",
             "openai",
-            "anthropic"
-          ]
+            "anthropic",
+            "groq"
+          ],
+          "default": "ollama"
         },
         "model": {
           "type": "string",
-          "title": "Model"
+          "title": "Model",
+          "default": ""
         },
         "systemPrompt": {
           "type": "string",
           "title": "System prompt",
-          "format": "multiline"
+          "default": ""
         },
         "prompt": {
           "type": "string",
           "title": "Prompt",
-          "format": "multiline"
+          "default": ""
         },
         "temperature": {
           "type": "number",
           "title": "Temperature",
           "minimum": 0,
-          "maximum": 2
+          "maximum": 2,
+          "default": 0.7
         }
       },
       "required": [
         "provider",
         "prompt"
-      ]
+      ],
+      "additionalProperties": false
     },
-    "defaults": {
-      "provider": "ollama",
-      "model": "",
-      "systemPrompt": "",
-      "prompt": "",
-      "temperature": 0.7
+    "ui": {
+      "fields": {
+        "systemPrompt": {
+          "widget": "textarea",
+          "rows": 4
+        },
+        "prompt": {
+          "widget": "textarea",
+          "rows": 4
+        }
+      }
     }
   },
   {
@@ -133,33 +142,39 @@
             "PUT",
             "PATCH",
             "DELETE"
-          ]
+          ],
+          "default": "GET"
         },
         "url": {
           "type": "string",
-          "title": "URL"
+          "title": "URL",
+          "default": ""
         },
         "headers": {
           "type": "object",
           "title": "Headers",
-          "description": "Do not put secrets here."
+          "description": "Do not put secrets here.",
+          "default": {}
         },
         "body": {
           "type": "string",
           "title": "Body",
-          "format": "multiline"
+          "default": ""
         }
       },
       "required": [
         "method",
         "url"
-      ]
+      ],
+      "additionalProperties": false
     },
-    "defaults": {
-      "method": "GET",
-      "url": "",
-      "headers": {},
-      "body": ""
+    "ui": {
+      "fields": {
+        "body": {
+          "widget": "textarea",
+          "rows": 4
+        }
+      }
     }
   },
   {
@@ -195,7 +210,8 @@
         "field": {
           "type": "string",
           "title": "Field path",
-          "description": "Path into the input, e.g. \"status\"."
+          "description": "Path into the input, e.g. \"status\".",
+          "default": ""
         },
         "operator": {
           "type": "string",
@@ -207,21 +223,19 @@
             "greater_than",
             "less_than",
             "is_empty"
-          ]
+          ],
+          "default": "equals"
         },
         "value": {
           "type": "string",
-          "title": "Compare to"
+          "title": "Compare to",
+          "default": ""
         }
       },
       "required": [
         "operator"
-      ]
-    },
-    "defaults": {
-      "field": "",
-      "operator": "equals",
-      "value": ""
+      ],
+      "additionalProperties": false
     }
   },
   {
@@ -266,34 +280,41 @@
           "enum": [
             "ollama",
             "openai",
-            "anthropic"
-          ]
+            "anthropic",
+            "groq"
+          ],
+          "default": "ollama"
         },
         "model": {
           "type": "string",
-          "title": "Model"
+          "title": "Model",
+          "default": ""
         },
         "instructions": {
           "type": "string",
           "title": "Instructions",
-          "format": "multiline"
+          "default": ""
         },
         "maxIterations": {
           "type": "number",
           "title": "Max iterations",
           "minimum": 1,
-          "maximum": 50
+          "maximum": 50,
+          "default": 10
         }
       },
       "required": [
         "provider"
-      ]
+      ],
+      "additionalProperties": false
     },
-    "defaults": {
-      "provider": "ollama",
-      "model": "",
-      "instructions": "",
-      "maxIterations": 10
+    "ui": {
+      "fields": {
+        "instructions": {
+          "widget": "textarea",
+          "rows": 4
+        }
+      }
     }
   },
   {
@@ -321,12 +342,11 @@
           "enum": [
             "text",
             "json"
-          ]
+          ],
+          "default": "text"
         }
-      }
-    },
-    "defaults": {
-      "format": "text"
+      },
+      "additionalProperties": false
     }
   }
 ]

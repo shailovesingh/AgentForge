@@ -2,8 +2,16 @@ import { useId, useState } from 'react'
 import { getNodeDefinition } from '../catalog'
 import { useEditorStore } from '../store/editorStore'
 import { parseConfigInput } from '../workflow/configSchema'
-import type { ConfigProperty } from '../workflow/types'
+import type { JsonSchema } from '../workflow/jsonSchema'
+import type { NodeDefinition, NodeUi } from '../workflow/types'
 import styles from './ConfigPanel.module.css'
+
+/** Property names in display order: `ui.order` first (existing names only), then every other property in schema order. */
+function propertyOrder(def: NodeDefinition): string[] {
+  const keys = Object.keys(def.configSchema.properties ?? {})
+  const ordered = (def.ui?.order ?? []).filter((key) => keys.includes(key))
+  return [...new Set([...ordered, ...keys])]
+}
 
 export function ConfigPanel() {
   const selectedId = useEditorStore((s) => (s.selectedNodeIds.length === 1 ? s.selectedNodeIds[0] : null))
@@ -35,8 +43,15 @@ export function ConfigPanel() {
       />
 
       {def &&
-        Object.entries(def.configSchema.properties).map(([key, prop]) => (
-          <ConfigField key={key} nodeId={node.id} name={key} prop={prop} value={node.config[key]} />
+        propertyOrder(def).map((key) => (
+          <ConfigField
+            key={key}
+            nodeId={node.id}
+            name={key}
+            prop={def.configSchema.properties![key]}
+            ui={def.ui?.fields?.[key]}
+            value={node.config[key]}
+          />
         ))}
     </aside>
   )
@@ -52,10 +67,25 @@ function TextField({ label, value, onCommit }: { label: string; value: string; o
   )
 }
 
-function ConfigField({ nodeId, name, prop, value }: { nodeId: string; name: string; prop: ConfigProperty; value: unknown }) {
+type FieldUi = NonNullable<NodeUi['fields']>[string]
+
+function ConfigField({
+  nodeId,
+  name,
+  prop,
+  ui,
+  value,
+}: {
+  nodeId: string
+  name: string
+  prop: JsonSchema
+  ui: FieldUi | undefined
+  value: unknown
+}) {
   const id = useId()
   const errorId = `${id}-error`
   const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig)
+  const title = prop.title ?? name
 
   // The draft is the text in the control. It is committed to the store only when it parses
   // and validates; otherwise the error is shown and the last valid value stays in the store.
@@ -79,6 +109,7 @@ function ConfigField({ nodeId, name, prop, value }: { nodeId: string; name: stri
     'aria-describedby': error ? errorId : undefined,
   }
 
+  const isJson = prop.type === 'object' || prop.type === 'array'
   let control
   if (prop.type === 'boolean') {
     control = (
@@ -93,18 +124,19 @@ function ConfigField({ nodeId, name, prop, value }: { nodeId: string; name: stri
     control = (
       <select {...common} value={draft} onChange={(e) => onText(e.target.value)}>
         {prop.enum.map((option) => (
-          <option key={option} value={option}>
-            {option}
+          <option key={String(option)} value={String(option)}>
+            {String(option)}
           </option>
         ))}
       </select>
     )
-  } else if (prop.type === 'object' || prop.format === 'multiline') {
+  } else if (isJson || (prop.type === 'string' && ui?.widget === 'textarea')) {
     control = (
       <textarea
         {...common}
-        rows={prop.type === 'object' ? 5 : 4}
-        spellCheck={prop.type !== 'object'}
+        rows={ui?.rows ?? (isJson ? 5 : 4)}
+        placeholder={ui?.placeholder}
+        spellCheck={!isJson}
         value={draft}
         onChange={(e) => onText(e.target.value)}
       />
@@ -114,7 +146,8 @@ function ConfigField({ nodeId, name, prop, value }: { nodeId: string; name: stri
       <input
         {...common}
         type="text"
-        inputMode={prop.type === 'number' ? 'decimal' : undefined}
+        inputMode={prop.type === 'number' ? 'decimal' : prop.type === 'integer' ? 'numeric' : undefined}
+        placeholder={ui?.placeholder}
         value={draft}
         onChange={(e) => onText(e.target.value)}
       />
@@ -123,20 +156,21 @@ function ConfigField({ nodeId, name, prop, value }: { nodeId: string; name: stri
 
   return (
     <div className={styles.field}>
-      <label htmlFor={id}>{prop.title}</label>
+      <label htmlFor={id}>{title}</label>
       {control}
       {prop.description && <small className={styles.hint}>{prop.description}</small>}
       {error && (
         <small id={errorId} className={styles.error} role="alert">
-          {prop.title} {error}
+          {title} {error}
         </small>
       )}
     </div>
   )
 }
 
-function toDraft(prop: ConfigProperty, value: unknown): string {
+function toDraft(prop: JsonSchema, value: unknown): string {
   if (prop.type === 'object') return JSON.stringify(value ?? {}, null, 2)
-  if (prop.type === 'number') return value === undefined ? '' : String(value)
+  if (prop.type === 'array') return JSON.stringify(value ?? [], null, 2)
+  if (prop.type === 'number' || prop.type === 'integer') return value === undefined ? '' : String(value)
   return typeof value === 'string' ? value : ''
 }

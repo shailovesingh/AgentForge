@@ -1,6 +1,6 @@
 // A small, pure validator for the AgentForge JSON Schema subset (plan section 3.1, contracts/CONFIG_SCHEMA.md).
-// No React, no dependency. Nothing imports this module yet: T5b switches the catalog, the store, the
-// config panel and the importer over to it.
+// No React, no dependency. The catalog types, the editor store (applyDefaults), the config panel and the
+// importer (validate.ts, checkRequired: false) all use it.
 //
 // Rules this module keeps on purpose:
 //  - every lookup keyed by untrusted data (a value's keys) is an own-property lookup (Object.hasOwn);
@@ -74,13 +74,6 @@ const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v ===
  */
 export const enumEquals = (a: unknown, b: unknown): boolean => a === b
 
-/**
- * TEMPORARY exemption list (T5a): codes of subset keywords that no catalog schema uses yet, so no imported
- * workflow can produce them. The test files share this one definition. T5b converts the catalog: remove an
- * entry as soon as a workflow/invalid fixture covers it, and delete the list when it is empty.
- */
-export const SCHEMA_ONLY_CODES = ['schema.minLength', 'schema.maxLength', 'schema.minItems', 'schema.maxItems'] as const
-
 function validate(schema: JsonSchema, value: unknown, path: string, checkRequired: boolean, errors: SchemaError[]): void {
   const add = (code: SchemaErrorCode, message: string): void => {
     errors.push({ code, path, message })
@@ -90,7 +83,7 @@ function validate(schema: JsonSchema, value: unknown, path: string, checkRequire
   if (wrongType) return add('schema.type', wrongType) // every other keyword is skipped for this node
 
   if (schema.enum !== undefined && !schema.enum.some((option) => enumEquals(option, value))) {
-    add('schema.enum', 'must be one of the allowed values')
+    add('schema.enum', `must be one of: ${schema.enum.join(', ')}`)
   }
 
   switch (schema.type) {

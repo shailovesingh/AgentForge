@@ -3,5 +3,6 @@
   "description": "An array where a JSON object is declared (trigger payload) is schema.type.",
   "nodeType": "trigger.manual",
   "config": { "payload": [] },
+  "checkRequired": false,
   "expect": [{ "code": "schema.type", "path": "/payload" }]
 }

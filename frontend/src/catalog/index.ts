@@ -1,7 +1,7 @@
 import type { NodeDefinition } from '../workflow/types'
-import { nodeDefinitions } from './nodes'
+import { PROVIDERS, nodeDefinitions } from './nodes'
 
-export { nodeDefinitions }
+export { PROVIDERS, nodeDefinitions }
 
 /** Looks up a catalog definition by exact type and version. */
 export function getNodeDefinition(type: string, version: number): NodeDefinition | undefined {

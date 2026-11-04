@@ -3,7 +3,8 @@ import { nodeDefinitions } from '../catalog'
 import { CONNECTION_ERROR_MESSAGES } from './connections'
 import { ERROR_CODES, jsonPointer } from './errors'
 import type { ErrorCode } from './errors'
-import { SCHEMA_ONLY_CODES, validateAgainstSchema } from './jsonSchema'
+import { EXPORT_ONLY_CODES, SCHEMA_ONLY_CODES } from './codeExemptions'
+import { validateAgainstSchema } from './jsonSchema'
 import type { SchemaError } from './jsonSchema'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importWorkflow } from './serialize'
 import type { Workflow } from './types'
@@ -50,14 +51,10 @@ const withPosition = (raw: string): string => JSON.stringify(base()).replace('"x
 /** The base workflow as text, with the raw text of "metadata" replaced (for duplicate keys, depth, numbers). */
 const withMetadata = (raw: string): string => JSON.stringify(base()).replace('"metadata":{}', `"metadata":${raw}`)
 
-// EXPLICIT EXEMPTION LIST: codes an imported file can never produce (parsed JSON is always data), so no
-// import case exists for them. They are produced by the export guard and tested through it below.
-// Every other code must keep an import case; do not add a code here to dodge that.
-const EXPORT_ONLY_CODES = ['value.not-json-data'] as const
+// The two EXPLICIT exemption lists (EXPORT_ONLY_CODES, SCHEMA_ONLY_CODES) live in codeExemptions.ts, shared with
+// fixtures.test.ts. Codes in them cannot be produced by an import, so no import case exists for them; each is tested
+// through the export guard or validateAgainstSchema below. Every other code must keep an import case.
 type ExportOnlyCode = (typeof EXPORT_ONLY_CODES)[number]
-// SECOND EXPLICIT EXEMPTION LIST (temporary): SCHEMA_ONLY_CODES, the one shared definition in jsonSchema.ts
-// (also used by fixtures.test.ts): subset keywords no catalog schema uses yet, so no workflow import can produce
-// them. They are tested through validateAgainstSchema below. T5b converts the catalog; delete the list then.
 type SchemaOnlyCode = (typeof SCHEMA_ONLY_CODES)[number]
 type NotImportable = ExportOnlyCode | SchemaOnlyCode
 const NOT_IMPORTABLE: readonly string[] = [...EXPORT_ONLY_CODES, ...SCHEMA_ONLY_CODES]
@@ -125,7 +122,6 @@ const CASES: Record<Exclude<ErrorCode, NotImportable>, { path: string; input: ()
   },
   'schema.type': { path: '/nodes/1/config/prompt', input: () => edited((w) => (w.nodes[1].config.prompt = 3)) },
   'schema.enum': { path: '/nodes/1/config/provider', input: () => edited((w) => (w.nodes[1].config.provider = 'nope')) },
-  'schema.required': { path: '/nodes/1/config/provider', input: () => edited((w) => (w.nodes[1].config = { prompt: 'hi' })) },
   'schema.additionalProperties': {
     path: '/nodes/1/config/extra',
     input: () => edited((w) => (w.nodes[1].config.extra = 1)),
@@ -159,6 +155,7 @@ describe('error codes', () => {
 
   test('each schema-only code is produced by validateAgainstSchema with its JSON Pointer path', () => {
     const produced: Record<SchemaOnlyCode, SchemaError[]> = {
+      'schema.required': validateAgainstSchema({ type: 'object', properties: { s: { type: 'string' } }, required: ['s'] }, {}, { checkRequired: true }),
       'schema.minLength': validateAgainstSchema({ type: 'object', properties: { s: { type: 'string', minLength: 2 } } }, { s: 'a' }, { checkRequired: false }),
       'schema.maxLength': validateAgainstSchema({ type: 'object', properties: { s: { type: 'string', maxLength: 1 } } }, { s: 'ab' }, { checkRequired: false }),
       'schema.minItems': validateAgainstSchema({ type: 'object', properties: { l: { type: 'array', minItems: 1 } } }, { l: [] }, { checkRequired: false }),
@@ -166,8 +163,16 @@ describe('error codes', () => {
     }
     expect(Object.keys(produced).sort()).toEqual([...SCHEMA_ONLY_CODES].sort())
     for (const code of SCHEMA_ONLY_CODES) {
-      expect(produced[code], code).toEqual([{ code, path: code.endsWith('Length') ? '/s' : '/l', message: expect.any(String) }])
+      expect(produced[code], code).toEqual([{ code, path: code.endsWith('Items') ? '/l' : '/s', message: expect.any(String) }])
     }
+  })
+
+  test('an absent required config key is NOT a structural import error (C1); the same config fails with checkRequired true', () => {
+    const wf = base()
+    wf.nodes[1].config = {} // llm.prompt without provider and prompt
+    expect(importWorkflow(JSON.stringify(wf), nodeDefinitions).ok).toBe(true)
+    const llm = nodeDefinitions.find((d) => d.type === 'llm.prompt')!
+    expect(validateAgainstSchema(llm.configSchema, {}, { checkRequired: true }).map((e) => e.code)).toEqual(['schema.required', 'schema.required'])
   })
 
   test('each export-only code is produced by the export guard', () => {

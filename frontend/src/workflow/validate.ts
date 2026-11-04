@@ -1,7 +1,7 @@
-import { validateConfig } from './configSchema'
 import { CONNECTION_ERROR_MESSAGES, checkConnection } from './connections'
 import { jsonPointer } from './errors'
 import type { ErrorCode, ValidationError } from './errors'
+import { validateAgainstSchema } from './jsonSchema'
 import type { NodeDefinition, Workflow, WorkflowEdge, WorkflowNode } from './types'
 
 export type ValidateResult = { ok: true; workflow: Workflow } | { ok: false; errors: ValidationError[] }
@@ -66,8 +66,11 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
         `${at} ("${raw.id}"): unknown node type ${raw.type}@${String(raw.typeVersion)}.`,
       )
     }
-    for (const { key, code, message } of validateConfig(def.configSchema, raw.config)) {
-      err(code, jsonPointer('nodes', i, 'config', key), `${at} ("${raw.id}"): config "${key}" ${message}.`)
+    // Decision C1: an absent required key is NOT a structural error, so an incomplete draft imports.
+    // Execution (Phase 3) will validate with checkRequired: true.
+    for (const { code, path, message } of validateAgainstSchema(def.configSchema, raw.config, { checkRequired: false })) {
+      // `path` is relative to the config object ("/provider"); the message names the setting without the leading slash.
+      err(code, jsonPointer('nodes', i, 'config') + path, `${at} ("${raw.id}"): config "${path.slice(1)}" ${message}.`)
     }
     nodes.push({
       id: raw.id,

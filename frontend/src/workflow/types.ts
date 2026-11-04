@@ -2,6 +2,8 @@
 // Hand-written in Phase 1; from Phase 2 these are generated from the backend's Pydantic models.
 // No React or React Flow imports here: this is the canonical, UI-independent contract.
 
+import type { ObjectSchema } from './jsonSchema'
+
 export const SCHEMA_VERSION = '1.0'
 
 export type DataType = 'any' | 'text' | 'json' | 'number' | 'boolean' | 'messages' | 'tool'
@@ -16,23 +18,14 @@ export interface PortDefinition {
   multiple?: boolean
 }
 
-/** Subset of JSON Schema that the config panel can render. */
-export interface ConfigProperty {
-  type: 'string' | 'number' | 'boolean' | 'object'
-  title: string
-  description?: string
-  /** string + enum renders a select. */
-  enum?: string[]
-  /** string + 'multiline' renders a textarea. */
-  format?: 'multiline'
-  minimum?: number
-  maximum?: number
-}
-
-export interface ConfigSchema {
-  type: 'object'
-  properties: Record<string, ConfigProperty>
-  required?: string[]
+/**
+ * Presentation hints for the config panel. They never affect validity (that is the schema's job): a
+ * validator ignores them, and a property without a hint is rendered from its schema type alone.
+ */
+export interface NodeUi {
+  /** Property names in display order; a property not listed still renders, after the listed ones, in schema order. */
+  order?: string[]
+  fields?: Record<string, { widget?: 'text' | 'textarea' | 'select' | 'json' | 'checkbox'; rows?: number; placeholder?: string }>
 }
 
 export type NodeCategory = 'Triggers' | 'AI' | 'Integrations' | 'Logic' | 'Output'
@@ -50,8 +43,10 @@ export interface NodeDefinition {
   icon: string
   inputs: PortDefinition[]
   outputs: PortDefinition[]
-  configSchema: ConfigSchema
-  defaults: Record<string, unknown>
+  /** JSON Schema subset (contracts/CONFIG_SCHEMA.md). Initial values are the schema `default`s. */
+  configSchema: ObjectSchema
+  /** Presentation only; see NodeUi. */
+  ui?: NodeUi
 }
 
 export interface Position {

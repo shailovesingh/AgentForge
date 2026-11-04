@@ -3,5 +3,6 @@
   "description": "A config key named after an inherited object member (hasOwnProperty) is an unknown key, not a schema property.",
   "nodeType": "output.result",
   "config": { "hasOwnProperty": true },
+  "checkRequired": false,
   "expect": [{ "code": "schema.additionalProperties", "path": "/hasOwnProperty" }]
 }

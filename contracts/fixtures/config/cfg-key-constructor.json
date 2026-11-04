@@ -3,5 +3,6 @@
   "description": "A config key named after an inherited object member (constructor) is an unknown key, not a schema property.",
   "nodeType": "output.result",
   "config": { "constructor": 1 },
+  "checkRequired": false,
   "expect": [{ "code": "schema.additionalProperties", "path": "/constructor" }]
 }

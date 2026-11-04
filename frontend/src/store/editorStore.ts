@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getLatestNodeDefinition, nodeDefinitions } from '../catalog'
 import { checkConnection } from '../workflow/connections'
+import { applyDefaults } from '../workflow/jsonSchema'
 import { SCHEMA_VERSION } from '../workflow/types'
 import type { PortRef, Position, Workflow, WorkflowEdge } from '../workflow/types'
 
@@ -61,7 +62,8 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
             type: def.type,
             typeVersion: def.version,
             label: def.label,
-            config: structuredClone(def.defaults),
+            // The ONE production call of applyDefaults: initial values come from the schema's `default`s.
+            config: applyDefaults(def.configSchema),
             position,
           },
         ],

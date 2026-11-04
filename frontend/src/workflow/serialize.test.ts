@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { nodeDefinitions } from '../catalog'
 import { parseConfigInput } from './configSchema'
 import { ERROR_CODES } from './errors'
+import type { JsonSchema } from './jsonSchema'
 import { MIGRATIONS, migrate } from './migrate'
 import { INTERNAL_PARSER_ERROR } from './strictJson'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importWorkflow, serializeWorkflow } from './serialize'
@@ -455,8 +456,8 @@ describe('migrate', () => {
 })
 
 describe('parseConfigInput', () => {
-  const llm = nodeDefinitions.find((d) => d.type === 'llm.prompt')!.configSchema.properties
-  const payload = nodeDefinitions.find((d) => d.type === 'trigger.manual')!.configSchema.properties.payload
+  const llm = nodeDefinitions.find((d) => d.type === 'llm.prompt')!.configSchema.properties!
+  const payload = nodeDefinitions.find((d) => d.type === 'trigger.manual')!.configSchema.properties!.payload
 
   test('numbers: parsed, range-checked, blank rejected', () => {
     expect(parseConfigInput(llm.temperature, '1.5')).toEqual({ ok: true, value: 1.5 })
@@ -506,5 +507,35 @@ describe('parseConfigInput', () => {
     expect(parseConfigInput(llm.prompt, 'hi')).toEqual({ ok: true, value: 'hi' })
     expect(parseConfigInput(llm.provider, 'openai')).toEqual({ ok: true, value: 'openai' })
     expect(parseConfigInput(llm.provider, 'x').ok).toBe(false)
+    expect(parseConfigInput(llm.provider, 'groq')).toEqual({ ok: true, value: 'groq' })
+  })
+
+  test('the messages users already see are unchanged', () => {
+    expect(parseConfigInput(llm.provider, 'x')).toEqual({ ok: false, error: 'must be one of: ollama, openai, anthropic, groq' })
+    expect(parseConfigInput(llm.temperature, '-1')).toEqual({ ok: false, error: 'must be at least 0' })
+    expect(parseConfigInput(llm.temperature, '3')).toEqual({ ok: false, error: 'must be at most 2' })
+    expect(parseConfigInput(llm.temperature, 'abc')).toEqual({ ok: false, error: 'must be a number' })
+    expect(parseConfigInput(llm.prompt, undefined as unknown as string)).toEqual({ ok: false, error: 'must be text' })
+    expect(parseConfigInput({ type: 'boolean' }, 'x')).toEqual({ ok: false, error: 'must be true or false' })
+    expect(parseConfigInput(payload, '[1]')).toEqual({ ok: false, error: 'must be a JSON object' })
+    expect(parseConfigInput(payload, '{a')).toEqual({ ok: false, error: 'must be valid JSON' })
+  })
+
+  test('integer, array and length properties (new wording allowed) are parsed and validated from the property schema', () => {
+    const integer: JsonSchema = { type: 'integer', minimum: 1 }
+    expect(parseConfigInput(integer, '3')).toEqual({ ok: true, value: 3 })
+    expect(parseConfigInput(integer, '2.5')).toEqual({ ok: false, error: 'must be an integer' })
+    expect(parseConfigInput(integer, '')).toEqual({ ok: false, error: 'must be an integer' })
+    expect(parseConfigInput(integer, '0')).toEqual({ ok: false, error: 'must be at least 1' })
+
+    const list: JsonSchema = { type: 'array', items: { type: 'string' }, maxItems: 2 }
+    expect(parseConfigInput(list, '["a","b"]')).toEqual({ ok: true, value: ['a', 'b'] })
+    expect(parseConfigInput(list, '["a",1]')).toEqual({ ok: false, error: 'must be text' })
+    expect(parseConfigInput(list, '["a","b","c"]')).toEqual({ ok: false, error: 'must have at most 2 items' })
+    expect(parseConfigInput(list, '{}')).toEqual({ ok: false, error: 'must be a list' })
+    expect(parseConfigInput(list, '[a')).toEqual({ ok: false, error: 'must be valid JSON' })
+
+    const short: JsonSchema = { type: 'string', minLength: 2 }
+    expect(parseConfigInput(short, 'a')).toEqual({ ok: false, error: 'must have at least 2 characters' })
   })
 })

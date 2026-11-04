@@ -1,0 +1,8 @@
+{
+  "name": "cfg-valid-provider-groq-agent",
+  "description": "groq is an accepted provider for agent.autonomous.",
+  "nodeType": "agent.autonomous",
+  "config": { "provider": "groq" },
+  "checkRequired": true,
+  "expect": []
+}

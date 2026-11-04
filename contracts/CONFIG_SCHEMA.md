@@ -4,11 +4,13 @@ AgentForge describes a node's configuration (`configSchema`) with a **small, doc
 draft 2020-12**, and checks a config against it with its own validator. This file is the specification of that
 subset. The code is `frontend/src/workflow/jsonSchema.ts`; the fixtures are in `contracts/fixtures/schema/`.
 
-## Status: TypeScript only, not yet wired in
+## Status: implemented in TypeScript, wired into the editor
 
-- The validator exists and is tested (fixtures, unit tests, a seeded property test against an independent
-  reference). **Nothing uses it yet.** The catalog, the editor store, the config panel and the importer still use
-  the older `validateConfig`. Converting them (task T5b) will delete the old code.
+- The validator is tested (fixtures, unit tests, a seeded property test against an independent reference) and is the
+  only config validator: the catalog (`NodeDefinition.configSchema` is an `ObjectSchema`), the editor store
+  (`applyDefaults` at node creation), the config panel and the importer (`checkRequired: false`, decision C1) all
+  use it. The older `validateConfig`, the `ConfigProperty` type, `format: 'multiline'` and `NodeDefinition.defaults`
+  are gone (task T5b).
 - **TypeScript only. No Python parity is claimed.** The fixtures are language-neutral so a Python runner can run
   them; that runner is **planned for Phase 2**. Until it exists and passes, nothing says the two languages agree.
 
@@ -51,7 +53,7 @@ copy them):
   properties if the schema names them), never inherited members. A JSON parser always makes `__proto__` an
   own key, so fixtures just contain it.
 - **Unknown keys.** The JSON Schema default (`additionalProperties` absent) accepts unknown keys. AgentForge catalog
-  schemas will state `additionalProperties: false` explicitly wherever they want the stricter behaviour.
+  schemas state `additionalProperties: false` explicitly (all six built-in nodes do), so an unknown setting is an error.
 
 ## Deliberate non-goals
 
@@ -105,9 +107,11 @@ it by accident.
   `undefined`. With `checkRequired: true`, each absent required key is `schema.required` at `/<key>`. The check
   applies at every nesting level.
 - With `checkRequired: false` the `required` keyword is ignored; every other rule still applies.
-- **Decision C1 (planned for T5b, not wired yet):** the editor must be able to hold and export incomplete drafts, so
-  the importer will use `checkRequired: false` (type, enum, range, length and unknown-key problems stay errors; a
-  missing required value is only an editor warning). Execution in Phase 3 will use `checkRequired: true`.
+- **Decision C1 (implemented in T5b):** the editor must be able to hold and export incomplete drafts, so the importer
+  uses `checkRequired: false` (type, enum, range, length and unknown-key problems stay errors; a missing required
+  value is not a structural error and, later, only an editor warning). **`schema.required` therefore cannot be
+  produced by an import.** It stays in `ERROR_CODES` as an execution-time code: Phase 3 execution will use
+  `checkRequired: true`. A `config` fixture states the mode it runs in (its mandatory `checkRequired` field).
 
 ## Defaults are explicit, never implicit
 
@@ -118,7 +122,25 @@ it by accident.
 - A required property without a default stays absent.
 - It never mutates the schema, and the result shares nothing with it.
 - **No validator calls it.** Validating never changes data; the importer never fills in values. Only node creation
-  (and a migration that introduces a property) calls it, deliberately.
+  (and a migration that introduces a property) calls it, deliberately. In the editor the only production caller is
+  `addNode` in `store/editorStore.ts` (a test checks this by source text).
+- The catalog carries every initial value as a schema `default` (for example `provider: 'ollama'`,
+  `temperature: 0.7`, `payload: {}`); `NodeDefinition.defaults` no longer exists. A required property needs no
+  default (see C1).
+
+## The `ui` block (presentation, never validation)
+
+A catalog definition may carry `ui` next to `configSchema`; a validator ignores it.
+
+```ts
+ui?: { order?: string[]; fields?: Record<string, { widget?: 'text' | 'textarea' | 'select' | 'json' | 'checkbox'; rows?: number; placeholder?: string }> }
+```
+
+- `order` lists property names; the panel shows them first, then any other property in schema order.
+- Without a hint the panel renders from the schema type: `string` a text input, `string` with `enum` a select,
+  `number` and `integer` a text input with a numeric keyboard hint, `boolean` a checkbox, `object` and `array` the
+  JSON editor. `widget: 'textarea'` (with `rows`) makes a string multiline; the four multiline settings use it.
+- The catalog tests check that `order` and `fields` name existing properties and that a widget fits its property type.
 
 ## Error codes and paths
 
@@ -130,9 +152,10 @@ never compared by a fixture.
 - Codes (all in `ERROR_CODES` in `frontend/src/workflow/errors.ts`): `schema.type`, `schema.enum`,
   `schema.required`, `schema.additionalProperties`, `schema.minimum`, `schema.maximum`, `schema.minLength`,
   `schema.maxLength`, `schema.minItems`, `schema.maxItems`.
-- The four length and item codes are produced by this validator but no catalog schema uses those keywords yet, so no
-  workflow import can produce them. They are covered by the `schema` fixture family (and listed in an explicit,
-  temporary exemption list, `SCHEMA_ONLY_CODES` in `jsonSchema.ts`, shared by both test runners, until T5b).
+- Codes that no imported workflow can produce are listed in an explicit exemption list (`SCHEMA_ONLY_CODES` in
+  `frontend/src/workflow/codeExemptions.ts`, imported by the tests only): `schema.required` (execution-only, C1) and
+  the four length and item codes (no catalog schema uses those keywords yet). They are covered by the `schema` and
+  `config` fixture families instead; a guard fails if a `workflow/invalid` fixture starts covering one.
 - Order is stable but not part of the contract: `required` errors first (in the order of the `required` list), then
   the value's own keys in key order, then array elements by index. Fixtures compare as multisets.
 

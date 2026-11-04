@@ -26,6 +26,17 @@ describe('editor store', () => {
     expect(wf().nodes.find((n) => n.id === id2)!.config.prompt).toBe('')
   })
 
+  test('applyDefaults is called by production code in exactly one place: addNode', () => {
+    // Source-text check over every non-test source file (eager ?raw glob, so no Node APIs are needed).
+    const sources = import.meta.glob<string>('/src/**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true })
+    const call = /\bapplyDefaults\s*\(/
+    const callers = Object.entries(sources)
+      .filter(([file]) => !/\.test\.tsx?$/.test(file) && !file.endsWith('/src/workflow/jsonSchema.ts'))
+      .flatMap(([file, text]) => (call.test(text) ? [file] : []))
+    expect(callers).toEqual(['/src/store/editorStore.ts'])
+    expect(sources['/src/store/editorStore.ts'].match(new RegExp(call, 'g'))).toHaveLength(1)
+  })
+
   test('addNode rejects unknown types', () => {
     expect(() => store().addNode('nope', { x: 0, y: 0 })).toThrow('Unknown node type')
   })

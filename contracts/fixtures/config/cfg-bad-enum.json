@@ -3,5 +3,6 @@
   "description": "A string outside the declared enum is schema.enum.",
   "nodeType": "llm.prompt",
   "config": { "provider": "nope", "prompt": "hi" },
+  "checkRequired": false,
   "expect": [{ "code": "schema.enum", "path": "/provider" }]
 }

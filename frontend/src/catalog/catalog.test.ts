@@ -1,6 +1,7 @@
-import { describe, expect, test } from 'vitest'
-import { validateConfig } from '../workflow/configSchema'
-import { getLatestNodeDefinition, getNodeDefinition, nodeDefinitions } from './index'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { useEditorStore } from '../store/editorStore'
+import { checkSchemaSubset, validateAgainstSchema } from '../workflow/jsonSchema'
+import { PROVIDERS, getLatestNodeDefinition, getNodeDefinition, nodeDefinitions } from './index'
 
 describe('node catalog', () => {
   test('type@version pairs are unique', () => {
@@ -9,7 +10,7 @@ describe('node catalog', () => {
   })
 
   test.each(nodeDefinitions.map((d) => [d.type, d] as const))(
-    '%s has valid ports and defaults',
+    '%s has valid ports and a configSchema inside the JSON Schema subset',
     (_type, def) => {
       // Handle ids equal port names, so names must be unique across inputs and outputs.
       const names = [...def.inputs, ...def.outputs].map((p) => p.name)
@@ -18,15 +19,60 @@ describe('node catalog', () => {
       // `multiple` only makes sense on inputs.
       expect(def.outputs.every((p) => p.multiple === undefined)).toBe(true)
 
-      // Defaults satisfy the config schema, including required properties.
-      expect(validateConfig(def.configSchema, def.defaults)).toEqual([])
-
-      // Every required property must have a default so new nodes start valid-shaped.
-      for (const key of def.configSchema.required ?? []) {
-        expect(def.defaults).toHaveProperty(key)
-      }
+      // No problems means the schema is well-formed AND every `default` is valid against its own schema.
+      expect(checkSchemaSubset(def.configSchema)).toEqual([])
+      // Catalog schemas are strict: an unknown setting is an error.
+      expect(def.configSchema.additionalProperties).toBe(false)
     },
   )
+
+  test('the old presentation and defaults fields are gone', () => {
+    for (const def of nodeDefinitions) {
+      expect(Object.hasOwn(def, 'defaults'), `${def.type}.defaults`).toBe(false)
+      for (const property of Object.values(def.configSchema.properties ?? {})) {
+        expect(Object.hasOwn(property, 'format'), `${def.type} format`).toBe(false)
+      }
+    }
+  })
+
+  test('both AI nodes take their provider enum from PROVIDERS, which includes groq', () => {
+    expect(PROVIDERS).toEqual(['ollama', 'openai', 'anthropic', 'groq'])
+    for (const type of ['llm.prompt', 'agent.autonomous']) {
+      const providers = getLatestNodeDefinition(type)!.configSchema.properties!.provider.enum
+      expect(providers, type).toEqual(PROVIDERS)
+      expect(providers, `${type}: derived from PROVIDERS itself, not a second copy of the list`).toBe(PROVIDERS)
+    }
+  })
+
+  describe('the ui block', () => {
+    const WIDGETS = {
+      text: ['string', 'number', 'integer'],
+      textarea: ['string', 'number', 'integer'],
+      select: ['string', 'number', 'integer', 'boolean'], // and the property must have an enum
+      json: ['object', 'array'],
+      checkbox: ['boolean'],
+    } as const
+
+    test.each(nodeDefinitions.map((d) => [d.type, d] as const))('%s: order and fields name existing properties; widgets fit their type', (_type, def) => {
+      const properties = def.configSchema.properties ?? {}
+      const order = def.ui?.order ?? []
+      for (const key of order) expect(Object.hasOwn(properties, key), `ui.order "${key}"`).toBe(true)
+      expect(new Set(order).size, 'ui.order lists a property twice').toBe(order.length)
+      for (const [key, field] of Object.entries(def.ui?.fields ?? {})) {
+        expect(Object.hasOwn(properties, key), `ui.fields "${key}"`).toBe(true)
+        if (field.widget === undefined) continue
+        const property = properties[key]
+        expect(WIDGETS[field.widget] as readonly string[], `${key}: widget ${field.widget} on type ${property.type}`).toContain(property.type)
+        if (field.widget === 'select') expect(property.enum, `${key}: select needs an enum`).toBeDefined()
+      }
+    })
+
+    test('the four multiline strings are textareas with 4 rows', () => {
+      for (const [type, key] of [['llm.prompt', 'systemPrompt'], ['llm.prompt', 'prompt'], ['http.request', 'body'], ['agent.autonomous', 'instructions']] as const) {
+        expect(getLatestNodeDefinition(type)!.ui?.fields?.[key], `${type}.${key}`).toEqual({ widget: 'textarea', rows: 4 })
+      }
+    })
+  })
 
   test('lookups', () => {
     expect(getNodeDefinition('llm.prompt', 1)?.label).toBe('LLM Prompt')
@@ -35,21 +81,67 @@ describe('node catalog', () => {
   })
 })
 
-describe('validateConfig', () => {
+describe('catalog config schemas validate configs', () => {
   const schema = nodeDefinitions.find((d) => d.type === 'llm.prompt')!.configSchema
 
-  test('flags wrong types, bad enums, out-of-range numbers, unknown and missing keys', () => {
-    expect(
-      validateConfig(schema, { provider: 'nope', temperature: 5, extra: 1, prompt: 3 }),
-    ).toEqual([
-      { key: 'provider', code: 'schema.enum', message: 'must be one of: ollama, openai, anthropic' },
-      { key: 'temperature', code: 'schema.maximum', message: 'must be at most 2' },
-      { key: 'extra', code: 'schema.additionalProperties', message: 'is not a known setting' },
-      { key: 'prompt', code: 'schema.type', message: 'must be text' },
+  test('flags wrong types, bad enums, out-of-range numbers and unknown keys; required only when asked', () => {
+    const config = { provider: 'nope', temperature: 5, extra: 1, prompt: 3 }
+    const codes = (checkRequired: boolean) =>
+      validateAgainstSchema(schema, config, { checkRequired }).map(({ code, path }) => ({ code, path }))
+    expect(codes(false)).toEqual([
+      { code: 'schema.enum', path: '/provider' },
+      { code: 'schema.maximum', path: '/temperature' },
+      { code: 'schema.additionalProperties', path: '/extra' },
+      { code: 'schema.type', path: '/prompt' },
     ])
-    expect(validateConfig(schema, {})).toEqual([
-      { key: 'provider', code: 'schema.required', message: 'is required' },
-      { key: 'prompt', code: 'schema.required', message: 'is required' },
+    expect(validateAgainstSchema(schema, {}, { checkRequired: false })).toEqual([])
+    expect(validateAgainstSchema(schema, {}, { checkRequired: true }).map(({ code, path }) => ({ code, path }))).toEqual([
+      { code: 'schema.required', path: '/provider' },
+      { code: 'schema.required', path: '/prompt' },
     ])
+  })
+
+  test('the user-visible enum message lists the allowed values', () => {
+    expect(validateAgainstSchema(schema, { provider: 'nope' }, { checkRequired: false })[0].message).toBe(
+      'must be one of: ollama, openai, anthropic, groq',
+    )
+  })
+})
+
+describe('initial values of a new node', () => {
+  beforeEach(() => useEditorStore.getState().reset())
+  const create = (type: string) => {
+    const id = useEditorStore.getState().addNode(type, { x: 0, y: 0 })
+    return useEditorStore.getState().workflow.nodes.find((n) => n.id === id)!.config
+  }
+
+  // Literal values (copied from the T5b brief, NOT computed from the catalog): any change here is a user-visible change.
+  test('addNode produces exactly the documented initial config for each of the six types', () => {
+    expect(create('trigger.manual')).toEqual({ payload: {} })
+    expect(create('llm.prompt')).toEqual({ provider: 'ollama', model: '', systemPrompt: '', prompt: '', temperature: 0.7 })
+    expect(create('http.request')).toEqual({ method: 'GET', url: '', headers: {}, body: '' })
+    expect(create('logic.condition')).toEqual({ field: '', operator: 'equals', value: '' })
+    expect(create('agent.autonomous')).toEqual({ provider: 'ollama', model: '', instructions: '', maxIterations: 10 })
+    expect(create('output.result')).toEqual({ format: 'text' })
+    expect(nodeDefinitions.map((d) => d.type).sort()).toEqual(
+      ['agent.autonomous', 'http.request', 'llm.prompt', 'logic.condition', 'output.result', 'trigger.manual'],
+    )
+  })
+
+  test('two nodes of the same type never share a nested object, and the catalog default is not touched', () => {
+    const a = create('http.request')
+    const b = create('http.request')
+    expect(a.headers).not.toBe(b.headers)
+    ;(a.headers as Record<string, unknown>).Accept = 'x'
+    expect(b.headers).toEqual({})
+    const catalogDefault = getLatestNodeDefinition('http.request')!.configSchema.properties!.headers.default
+    expect(catalogDefault).toEqual({})
+    expect(create('http.request').headers).toEqual({})
+
+    const t1 = create('trigger.manual')
+    const t2 = create('trigger.manual')
+    ;(t1.payload as Record<string, unknown>).k = 1
+    expect(t2.payload).toEqual({})
+    expect(getLatestNodeDefinition('trigger.manual')!.configSchema.properties!.payload.default).toEqual({})
   })
 })

@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { nodeDefinitions } from '../catalog'
 import { parseConfigInput } from './configSchema'
 import { importWorkflow, serializeWorkflow } from './serialize'
-import type { ConfigProperty, Workflow } from './types'
+import type { JsonSchema } from './jsonSchema'
+import type { Workflow } from './types'
 import { MAX_DEPTH, MAX_SAFE_MAGNITUDE, findPolicyViolations, stringProblem } from './valuePolicy'
 
 const nested = (levels: number): unknown => {
@@ -98,9 +99,9 @@ describe('findPolicyViolations', () => {
 })
 
 describe('the config panel path (parseConfigInput) never commits a value the importer would reject', () => {
-  const payload = nodeDefinitions.find((d) => d.type === 'trigger.manual')!.configSchema.properties.payload
-  const unbounded: ConfigProperty = { type: 'number', title: 'Count' }
-  const text: ConfigProperty = { type: 'string', title: 'Note' }
+  const payload = nodeDefinitions.find((d) => d.type === 'trigger.manual')!.configSchema.properties!.payload
+  const unbounded: JsonSchema = { type: 'number', title: 'Count' }
+  const text: JsonSchema = { type: 'string', title: 'Note' }
 
   test('a typed number above the magnitude limit is flagged with a clear message', () => {
     for (const raw of ['1e21', '9007199254740992', '-9007199254740993', '9007199254740991.7']) {
@@ -113,7 +114,7 @@ describe('the config panel path (parseConfigInput) never commits a value the imp
   })
 
   test('a bounded field keeps its existing message for out-of-range numbers', () => {
-    const llm = nodeDefinitions.find((d) => d.type === 'llm.prompt')!.configSchema.properties
+    const llm = nodeDefinitions.find((d) => d.type === 'llm.prompt')!.configSchema.properties!
     expect(parseConfigInput(llm.temperature, '1e21')).toEqual({ ok: false, error: 'must be at most 2' })
   })
 

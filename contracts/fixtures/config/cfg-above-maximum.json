@@ -3,5 +3,6 @@
   "description": "A number above the declared maximum is schema.maximum.",
   "nodeType": "agent.autonomous",
   "config": { "provider": "ollama", "maxIterations": 51 },
+  "checkRequired": false,
   "expect": [{ "code": "schema.maximum", "path": "/maxIterations" }]
 }

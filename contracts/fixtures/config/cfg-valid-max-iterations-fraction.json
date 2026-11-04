@@ -1,0 +1,8 @@
+{
+  "name": "cfg-valid-max-iterations-fraction",
+  "description": "maxIterations is still a plain number in this version, so an old-style document value of 2.5 is valid (task T6 turns it into an integer with a node migration).",
+  "nodeType": "agent.autonomous",
+  "config": { "provider": "ollama", "maxIterations": 2.5 },
+  "checkRequired": true,
+  "expect": []
+}

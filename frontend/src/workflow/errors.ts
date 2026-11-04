@@ -1,6 +1,6 @@
 // Structured validation errors for the import path. Codes are stable and namespaced; the
 // message is the human-readable text shown to the user. See docs/PHASE1_1_PLAN.md section 3.2.
-// Only codes that are actually produced belong here; later tasks add their own.
+// Only codes that are actually produced belong here (by import, export, or the schema validator); later tasks add their own.
 
 export const ERROR_CODES = [
   'doc.not-json',
@@ -25,12 +25,14 @@ export const ERROR_CODES = [
   'connection.cycle',
   'schema.type',
   'schema.enum',
+  // EXECUTION-ONLY: produced by validateAgainstSchema with checkRequired: true (Phase 3 execution). Import
+  // validates with checkRequired: false (decision C1, D-025), so an imported file never produces it.
   'schema.required',
   'schema.additionalProperties',
   'schema.minimum',
   'schema.maximum',
-  // The next four exist in the JSON Schema subset validator (jsonSchema.ts) but no catalog schema uses
-  // those keywords yet, so no workflow import can produce them until T5b converts the catalog.
+  // The next four are produced by the JSON Schema subset validator (jsonSchema.ts), but no catalog schema uses
+  // those keywords yet, so no workflow import can produce them either.
   'schema.minLength',
   'schema.maxLength',
   'schema.minItems',

@@ -1,0 +1,8 @@
+{
+  "name": "cfg-missing-required-unchecked",
+  "description": "With checkRequired false (import, decision C1), the same empty config for llm.prompt is valid: an absent required key is not a structural error.",
+  "nodeType": "llm.prompt",
+  "config": {},
+  "checkRequired": false,
+  "expect": []
+}

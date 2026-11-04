@@ -3,5 +3,6 @@
   "description": "The catalog default config of llm.prompt is valid.",
   "nodeType": "llm.prompt",
   "config": { "provider": "ollama", "model": "", "systemPrompt": "", "prompt": "", "temperature": 0.7 },
+  "checkRequired": true,
   "expect": []
 }

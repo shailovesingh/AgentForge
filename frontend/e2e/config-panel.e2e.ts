@@ -44,6 +44,27 @@ test.describe('config panel', () => {
     await expect(editor.settings.getByRole('alert')).toHaveCount(0)
   })
 
+  test('the provider select of an LLM Prompt node offers groq', async ({ editor }) => {
+    await editor.drop('LLM Prompt', 400, 200)
+    const options = editor.settings.getByLabel('Provider').locator('option')
+    await expect(options).toHaveText(['ollama', 'openai', 'anthropic', 'groq'])
+    await editor.settings.getByLabel('Provider').selectOption('groq')
+    const llm = nodesOf((await editor.exportWorkflow()).text).find((n) => n.type === 'llm.prompt')!
+    expect(llm.config.provider).toBe('groq')
+  })
+
+  test('a new LLM Prompt node starts with the default provider and temperature', async ({ editor }) => {
+    await editor.drop('LLM Prompt', 400, 200)
+    await expect(editor.settings.getByLabel('Provider')).toHaveValue('ollama')
+    await expect(editor.settings.getByLabel('Temperature')).toHaveValue('0.7')
+  })
+
+  test('a multiline setting (System prompt) is still a textarea', async ({ editor }) => {
+    await editor.drop('LLM Prompt', 400, 200)
+    await expect(editor.settings.getByLabel('System prompt')).toHaveJSProperty('tagName', 'TEXTAREA')
+    await expect(editor.settings.getByLabel('Model')).toHaveJSProperty('tagName', 'INPUT')
+  })
+
   test('commits valid edits and never commits invalid input', async ({ editor }) => {
     await editor.drop('LLM Prompt', 400, 200)
     await editor.settings.getByLabel('Prompt', { exact: true }).fill('Summarize the input')

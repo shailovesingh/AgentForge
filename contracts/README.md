@@ -197,13 +197,16 @@ exist in the right direction: the source among the node's outputs, the target am
 ### `config/*.json`
 
 ```json
-{ "name": "...", "description": "...", "nodeType": "llm.prompt", "config": { ... },
+{ "name": "...", "description": "...", "nodeType": "llm.prompt", "config": { ... }, "checkRequired": true,
   "expect": [ { "code": "schema.required", "path": "/provider" } ] }
 ```
 
-Validates `config` against the `configSchema` of the latest catalog definition of `nodeType`. `path` is
-a JSON Pointer **relative to the config object** (`/provider`). `expect` may be empty (the config is
-valid). Use `configText` (raw JSON text) instead of `config` when the exact text should be explicit, for
+Validates `config` against the `configSchema` (a JSON Schema subset, see `CONFIG_SCHEMA.md`) of the latest catalog
+definition of `nodeType`, by calling `validateAgainstSchema(configSchema, config, { checkRequired })`. `checkRequired`
+is a **mandatory boolean**: `true` is execution-time validation (an absent required key is `schema.required`),
+`false` is what import does (decision C1: an absent required key is not an error, so `schema.required` can never come
+from an import). `path` is a JSON Pointer **relative to the config object** (`/provider`). `expect` may be empty (the
+config is valid). Use `configText` (raw JSON text) instead of `config` when the exact text should be explicit, for
 example in the `__proto__` fixture: a JSON parser always creates an **own** `__proto__` key, whereas an
 object literal in JavaScript or Python would not, so `configText` makes that intent visible. Give exactly
 one of `config` / `configText`.
@@ -258,12 +261,13 @@ the independent statement of what the code must do.
    currently prints.
 3. Run `npm test` in `frontend/`. The runner names the file if it is malformed or fails.
 4. Raise `MIN_COUNTS` in the runner to the new totals. The floors make deleting fixtures fail the run and
-   are never lowered.
-5. Every error code (except the export-only exemption list in the runner) must stay covered by at least one
+   are never lowered (the one exception so far: T5b moved the `schema.required` rejection from `workflow/invalid`
+   to `workflow/valid`, because of decision C1, so the invalid floor went down by one and the valid floor up).
+5. Every error code (except the two exemption lists in `frontend/src/workflow/codeExemptions.ts`) must stay covered by at least one
    `workflow/invalid` case, every `connection.*` code by at least one `connection` case, and the `serialization`
    family must keep covering its own rejection codes; the runner enforces all three. Every `schema.*` code must also
-   appear in a `schema` or `config` case (the four length and item codes are exempt from the `workflow/invalid`
-   requirement through an explicit, temporary list (`SCHEMA_ONLY_CODES` in `jsonSchema.ts`, shared by the runners) until the catalog uses those keywords).
+   appear in a `schema` or `config` case (`schema.required`, which import can no longer produce (C1), and the four length and item codes
+   are exempt from the `workflow/invalid` requirement through the explicit list `SCHEMA_ONLY_CODES`, shared by the runners).
 
 ## Never edit expected values just to make a test pass
 

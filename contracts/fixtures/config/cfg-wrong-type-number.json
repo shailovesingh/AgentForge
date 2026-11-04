@@ -3,5 +3,6 @@
   "description": "A string where a number is declared is schema.type.",
   "nodeType": "llm.prompt",
   "config": { "provider": "ollama", "prompt": "hi", "temperature": "hot" },
+  "checkRequired": false,
   "expect": [{ "code": "schema.type", "path": "/temperature" }]
 }

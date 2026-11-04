@@ -1,0 +1,8 @@
+{
+  "name": "cfg-valid-provider-groq-llm-prompt",
+  "description": "groq is an accepted provider for llm.prompt.",
+  "nodeType": "llm.prompt",
+  "config": { "provider": "groq", "prompt": "hi" },
+  "checkRequired": true,
+  "expect": []
+}

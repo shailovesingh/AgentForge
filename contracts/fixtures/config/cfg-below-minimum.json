@@ -3,5 +3,6 @@
   "description": "A number below the declared minimum is schema.minimum.",
   "nodeType": "llm.prompt",
   "config": { "provider": "ollama", "prompt": "hi", "temperature": -0.5 },
+  "checkRequired": false,
   "expect": [{ "code": "schema.minimum", "path": "/temperature" }]
 }

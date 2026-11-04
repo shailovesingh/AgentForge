@@ -1,0 +1,16 @@
+{
+  "name": "wf-valid-incomplete-required-key-absent",
+  "description": "Decision C1: an llm.prompt node whose config lacks the required key provider imports successfully; an absent required key is a completeness concern (a warning in the editor, an error only at execution), not a structural error.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Sample",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": { "prompt": "hi" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": true }
+}

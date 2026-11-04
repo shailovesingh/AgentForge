@@ -3,5 +3,6 @@
   "description": "A config key named after an inherited object member (toString) is an unknown key, not a schema property.",
   "nodeType": "output.result",
   "config": { "toString": "x" },
+  "checkRequired": false,
   "expect": [{ "code": "schema.additionalProperties", "path": "/toString" }]
 }

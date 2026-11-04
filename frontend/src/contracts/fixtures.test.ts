@@ -6,10 +6,10 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { getLatestNodeDefinition, nodeDefinitions } from '../catalog'
 import { canonicalCompact, exportPretty } from '../workflow/canonicalJson'
-import { validateConfig } from '../workflow/configSchema'
 import { checkConnection } from '../workflow/connections'
-import { ERROR_CODES, jsonPointer } from '../workflow/errors'
-import { SCHEMA_ONLY_CODES, applyDefaults, checkSchemaSubset, validateAgainstSchema } from '../workflow/jsonSchema'
+import { EXPORT_ONLY_CODES, SCHEMA_ONLY_CODES } from '../workflow/codeExemptions'
+import { ERROR_CODES } from '../workflow/errors'
+import { applyDefaults, checkSchemaSubset, validateAgainstSchema } from '../workflow/jsonSchema'
 import type { JsonSchema, ObjectSchema } from '../workflow/jsonSchema'
 import { importWorkflow, serializeWorkflow } from '../workflow/serialize'
 import { strictParse } from '../workflow/strictJson'
@@ -25,27 +25,21 @@ const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   'workflow/valid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
   'workflow/invalid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
   connection: ['nodes', 'edges', 'source', 'target', 'expect'],
-  config: ['nodeType', 'config', 'configText', 'expect'],
+  config: ['nodeType', 'config', 'configText', 'checkRequired', 'expect'],
   serialization: ['inputText', 'inputBytesBase64', 'expect'],
   schema: ['schema', 'value', 'options', 'applyDefaults', 'checkSchema', 'expect'],
 }
 
 const isBase64 = (b: unknown): boolean => typeof b === 'string' && b.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(b)
 
-// EXPLICIT EXEMPTION LIST: codes that only the export guard produces (an imported file can never give
-// them), so no fixture may expect them and no workflow/invalid fixture is required for them. They are
-// tested in errors.test.ts and serialize.test.ts. Every other code stays strictly covered.
-export const EXPORT_ONLY_CODES: readonly string[] = ['value.not-json-data']
-
-// SECOND EXPLICIT EXEMPTION LIST (temporary, T5a): SCHEMA_ONLY_CODES, imported from jsonSchema.ts (one
-// definition, shared with errors.test.ts): codes of JSON Schema subset keywords that no catalog schema uses
-// yet, so no workflow/invalid fixture can produce them. They are covered by the `schema` family instead
-// (guard below). T5b converts the catalog: remove an entry as soon as a workflow/invalid fixture covers it,
-// and delete the list when it is empty.
+// The two EXPLICIT exemption lists live in workflow/codeExemptions.ts (EXPORT_ONLY_CODES, SCHEMA_ONLY_CODES), shared with
+// errors.test.ts. EXPORT-ONLY codes cannot be produced by an import, so no fixture may expect them. SCHEMA-ONLY codes are
+// covered by the schema and config families instead of workflow/invalid (guard below). Every other code stays strictly covered.
+const EXPORT_ONLY: readonly string[] = EXPORT_ONLY_CODES
 const SCHEMA_ONLY: readonly string[] = SCHEMA_ONLY_CODES
 
 // What a fixture may expect: every code except the export-only ones.
-const KNOWN_CODES: readonly string[] = ERROR_CODES.filter((c) => !EXPORT_ONLY_CODES.includes(c))
+const KNOWN_CODES: readonly string[] = ERROR_CODES.filter((c) => !EXPORT_ONLY.includes(c))
 
 // A workflow case gives exactly one of these.
 const INPUT_FIELDS = ['input', 'inputText', 'inputRepeat', 'inputBytesBase64']
@@ -207,6 +201,8 @@ export function checkShape(file: string, value: unknown): string[] {
     case 'config':
       if (!isNonEmptyString(value.nodeType)) bad('nodeType must be a non-empty string')
       oneOf('config', isObject, 'a JSON object')
+      // Mandatory: whether a missing required key counts (true = execution, false = import, decision C1).
+      if (typeof value.checkRequired !== 'boolean') bad('checkRequired must be true or false (mandatory)')
       expectationList(expected, true)
       break
     case 'connection': {
@@ -285,6 +281,7 @@ interface ConfigCase extends CaseBase {
   nodeType: string
   config?: Record<string, unknown>
   configText?: string
+  checkRequired: boolean
   expect: Expected[]
 }
 
@@ -411,7 +408,8 @@ function connectionWorkflow(c: ConnectionCase): Workflow {
 }
 
 const MIN_COUNTS = {
-  total: 410, valid: 19, invalid: 97, connection: 22, config: 15, serialization: 109, serializationInvalid: 9,
+  // T5b (C1): the old schema.required rejection moved from invalid to valid (valid up, invalid down by one), config grew.
+  total: 415, valid: 21, invalid: 96, connection: 22, config: 19, serialization: 109, serializationInvalid: 9,
   schema: 148, schemaValidation: 75, schemaDefaults: 8, schemaCheck: 65,
 }
 
@@ -436,7 +434,7 @@ describe('fixture corpus', () => {
   test('every error code is expected by at least one workflow/invalid fixture', () => {
     const covered = new Set(corpus.invalid.flatMap((c) => c.expect.errors ?? []).map((e) => e.code))
     expect(
-      ERROR_CODES.filter((code) => !EXPORT_ONLY_CODES.includes(code) && !SCHEMA_ONLY.includes(code) && !covered.has(code)),
+      ERROR_CODES.filter((code) => !EXPORT_ONLY.includes(code) && !SCHEMA_ONLY.includes(code) && !covered.has(code)),
       'codes with no workflow/invalid fixture',
     ).toEqual([])
   })
@@ -461,7 +459,7 @@ describe('fixture corpus', () => {
 
   test('the export-only exemption list names only real codes, and no fixture expects them', () => {
     for (const code of EXPORT_ONLY_CODES) expect(KNOWN_CODES, code).not.toContain(code)
-    expect(ERROR_CODES.filter((c) => EXPORT_ONLY_CODES.includes(c)).length).toBe(EXPORT_ONLY_CODES.length)
+    expect(ERROR_CODES.filter((c) => EXPORT_ONLY.includes(c)).length).toBe(EXPORT_ONLY_CODES.length)
     // a fixture that expects an export-only code is a shape problem
     const bad = { name: 'a', description: 'd', input: [], expect: { valid: false, errors: [{ code: EXPORT_ONLY_CODES[0], path: '' }] } }
     expect(checkShape('workflow/invalid/a.json', bad).join('|')).toContain('not a known error code')
@@ -633,45 +631,10 @@ describe('config fixtures', () => {
       expect(def, `${c.file}: unknown nodeType ${c.nodeType}`).toBeDefined()
       if (!def) return
       const config = (c.configText !== undefined ? JSON.parse(c.configText) : c.config) as Record<string, unknown>
-      const actual = validateConfig(def.configSchema, config).map(({ key, code }) => ({ code, path: jsonPointer(key) }))
+      const actual = validateAgainstSchema(def.configSchema, config, { checkRequired: c.checkRequired }).map(({ code, path }) => ({ code, path }))
       expect(asMultiset(actual), `${c.file}: config errors ({code, path}, order-insensitive)`).toEqual(asMultiset(c.expect))
     })
   }
-})
-
-// Static `from '...'`, side-effect `import '...'` and dynamic `import('...')`, with or without an extension;
-// the module name must be a whole path segment (jsonSchemaFoo and notjsonSchema are other modules).
-const IMPORTS_JSON_SCHEMA = /(?:\bfrom|\bimport)\s*\(?\s*['"](?:[^'"]*\/)?jsonSchema(?:\.[cm]?[jt]sx?)?['"]/
-
-describe('jsonSchema.ts is not used by production code yet (T5b switches the code over)', () => {
-  test('the guard regex catches every import form and ignores other module names', () => {
-    for (const text of [
-      "import { a } from './jsonSchema'",
-      'import { a } from "./jsonSchema"',
-      "import { a } from './jsonSchema.ts'",
-      "import type { J } from '../workflow/jsonSchema'",
-      "import './jsonSchema'",
-      "const m = await import('./jsonSchema')",
-      "const m = await import( './jsonSchema.ts' )",
-      "export { a } from './jsonSchema.js'",
-    ]) expect(IMPORTS_JSON_SCHEMA.test(text), text).toBe(true)
-    for (const text of [
-      "import { a } from './jsonSchemaFoo'",
-      "import { a } from './notjsonSchema'",
-      "import { a } from './errors'",
-      "const jsonSchema = 'x'",
-      "// see ./jsonSchema in the docs",
-    ]) expect(IMPORTS_JSON_SCHEMA.test(text), text).toBe(false)
-  })
-
-  test('only test files import it', () => {
-    const src = resolve(import.meta.dirname, '..')
-    const offenders = readdirSync(src, { recursive: true, withFileTypes: true })
-      .filter((d) => d.isFile() && /\.(ts|tsx)$/.test(d.name) && !d.name.endsWith('.test.ts') && d.name !== 'jsonSchema.ts')
-      .map((d) => relative(src, join(d.parentPath, d.name)).split(sep).join('/'))
-      .filter((file) => IMPORTS_JSON_SCHEMA.test(readFileSync(join(src, file), 'utf8')))
-    expect(offenders).toEqual([])
-  })
 })
 
 describe('schema fixtures (JSON Schema subset validator, explicit applyDefaults, schema check)', () => {
@@ -727,7 +690,7 @@ describe('checkShape', () => {
       target: ['x', 'input'],
       expect: 'connection.self-loop',
     },
-    config: { name: 'a', description: 'd', nodeType: 'llm.prompt', config: {}, expect: [{ code: 'schema.required', path: '/provider' }] },
+    config: { name: 'a', description: 'd', nodeType: 'llm.prompt', config: {}, checkRequired: true, expect: [{ code: 'schema.required', path: '/provider' }] },
     serialization: { name: 'a', description: 'd', inputText: '{"b":1,"a":[]}', expect: { valid: true, compact: '{"a":[],"b":1}', export: '{\n  "a": [],\n  "b": 1\n}\n' } },
     schema: {
       name: 'a',
@@ -954,6 +917,16 @@ describe('checkShape', () => {
     some(checkShape(files.invalid, { ...good.invalid, expect: { valid: false, errors: [] } }), 'non-empty array')
     some(checkShape(files.connection, { ...good.connection, source: ['x'] }), 'source must be')
     some(checkShape(files.config, { ...good.config, config: [] }), 'config must be a JSON object')
+  })
+
+  test('a config fixture needs a boolean checkRequired', () => {
+    const { checkRequired: _checkRequired, ...without } = good.config
+    some(checkShape(files.config, without), 'checkRequired must be true or false')
+    some(checkShape(files.config, { ...good.config, checkRequired: 'yes' }), 'checkRequired must be true or false')
+    some(checkShape(files.config, { ...good.config, checkRequired: 1 }), 'checkRequired must be true or false')
+    expect(checkShape(files.config, { ...good.config, checkRequired: false })).toEqual([])
+    // the field belongs to the config family only
+    some(checkShape(files.schema, { ...good.schema, checkRequired: true }), 'unknown field "checkRequired"')
   })
 
   test('file outside the known directories, or not an object', () => {

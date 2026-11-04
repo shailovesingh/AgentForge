@@ -1,0 +1,11 @@
+{
+  "name": "cfg-missing-required-checked",
+  "description": "With checkRequired true (execution), an empty config for llm.prompt reports both required keys (provider, prompt) as schema.required; the order of the two errors does not matter.",
+  "nodeType": "llm.prompt",
+  "config": {},
+  "checkRequired": true,
+  "expect": [
+    { "code": "schema.required", "path": "/provider" },
+    { "code": "schema.required", "path": "/prompt" }
+  ]
+}

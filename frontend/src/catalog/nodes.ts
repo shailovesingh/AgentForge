@@ -3,10 +3,13 @@ import type { NodeDefinition } from '../workflow/types'
 // Static node catalog (Phase 1). Shaped exactly like the future GET /api/catalog response,
 // so switching to the API later only changes where this array comes from.
 //
+// configSchema is the JSON Schema subset of contracts/CONFIG_SCHEMA.md. A property's initial value is its
+// schema `default`, applied only by applyDefaults when a node is created. `ui` holds presentation hints.
+//
 // ponytail: no credentialRef settings yet; they arrive with backend credential management.
-// ponytail: provider list is a placeholder pending the PO's decision on first-class LLM providers.
 
-const PROVIDERS = ['ollama', 'openai', 'anthropic']
+/** The one list of LLM providers; both AI nodes derive their enum from it. */
+export const PROVIDERS = ['ollama', 'openai', 'anthropic', 'groq']
 
 export const nodeDefinitions: NodeDefinition[] = [
   {
@@ -21,10 +24,10 @@ export const nodeDefinitions: NodeDefinition[] = [
     configSchema: {
       type: 'object',
       properties: {
-        payload: { type: 'object', title: 'Initial payload', description: 'JSON passed to the next node.' },
+        payload: { type: 'object', title: 'Initial payload', description: 'JSON passed to the next node.', default: {} },
       },
+      additionalProperties: false,
     },
-    defaults: { payload: {} },
   },
   {
     type: 'llm.prompt',
@@ -38,15 +41,21 @@ export const nodeDefinitions: NodeDefinition[] = [
     configSchema: {
       type: 'object',
       properties: {
-        provider: { type: 'string', title: 'Provider', enum: PROVIDERS },
-        model: { type: 'string', title: 'Model' },
-        systemPrompt: { type: 'string', title: 'System prompt', format: 'multiline' },
-        prompt: { type: 'string', title: 'Prompt', format: 'multiline' },
-        temperature: { type: 'number', title: 'Temperature', minimum: 0, maximum: 2 },
+        provider: { type: 'string', title: 'Provider', enum: PROVIDERS, default: 'ollama' },
+        model: { type: 'string', title: 'Model', default: '' },
+        systemPrompt: { type: 'string', title: 'System prompt', default: '' },
+        prompt: { type: 'string', title: 'Prompt', default: '' },
+        temperature: { type: 'number', title: 'Temperature', minimum: 0, maximum: 2, default: 0.7 },
       },
       required: ['provider', 'prompt'],
+      additionalProperties: false,
     },
-    defaults: { provider: 'ollama', model: '', systemPrompt: '', prompt: '', temperature: 0.7 },
+    ui: {
+      fields: {
+        systemPrompt: { widget: 'textarea', rows: 4 },
+        prompt: { widget: 'textarea', rows: 4 },
+      },
+    },
   },
   {
     type: 'http.request',
@@ -63,14 +72,15 @@ export const nodeDefinitions: NodeDefinition[] = [
     configSchema: {
       type: 'object',
       properties: {
-        method: { type: 'string', title: 'Method', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
-        url: { type: 'string', title: 'URL' },
-        headers: { type: 'object', title: 'Headers', description: 'Do not put secrets here.' },
-        body: { type: 'string', title: 'Body', format: 'multiline' },
+        method: { type: 'string', title: 'Method', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], default: 'GET' },
+        url: { type: 'string', title: 'URL', default: '' },
+        headers: { type: 'object', title: 'Headers', description: 'Do not put secrets here.', default: {} },
+        body: { type: 'string', title: 'Body', default: '' },
       },
       required: ['method', 'url'],
+      additionalProperties: false,
     },
-    defaults: { method: 'GET', url: '', headers: {}, body: '' },
+    ui: { fields: { body: { widget: 'textarea', rows: 4 } } },
   },
   {
     type: 'logic.condition',
@@ -87,17 +97,18 @@ export const nodeDefinitions: NodeDefinition[] = [
     configSchema: {
       type: 'object',
       properties: {
-        field: { type: 'string', title: 'Field path', description: 'Path into the input, e.g. "status".' },
+        field: { type: 'string', title: 'Field path', description: 'Path into the input, e.g. "status".', default: '' },
         operator: {
           type: 'string',
           title: 'Operator',
           enum: ['equals', 'not_equals', 'contains', 'greater_than', 'less_than', 'is_empty'],
+          default: 'equals',
         },
-        value: { type: 'string', title: 'Compare to' },
+        value: { type: 'string', title: 'Compare to', default: '' },
       },
       required: ['operator'],
+      additionalProperties: false,
     },
-    defaults: { field: '', operator: 'equals', value: '' },
   },
   {
     type: 'agent.autonomous',
@@ -117,14 +128,16 @@ export const nodeDefinitions: NodeDefinition[] = [
     configSchema: {
       type: 'object',
       properties: {
-        provider: { type: 'string', title: 'Provider', enum: PROVIDERS },
-        model: { type: 'string', title: 'Model' },
-        instructions: { type: 'string', title: 'Instructions', format: 'multiline' },
-        maxIterations: { type: 'number', title: 'Max iterations', minimum: 1, maximum: 50 },
+        provider: { type: 'string', title: 'Provider', enum: PROVIDERS, default: 'ollama' },
+        model: { type: 'string', title: 'Model', default: '' },
+        instructions: { type: 'string', title: 'Instructions', default: '' },
+        // ponytail: stays `number` until T6's node migration makes it an integer.
+        maxIterations: { type: 'number', title: 'Max iterations', minimum: 1, maximum: 50, default: 10 },
       },
       required: ['provider'],
+      additionalProperties: false,
     },
-    defaults: { provider: 'ollama', model: '', instructions: '', maxIterations: 10 },
+    ui: { fields: { instructions: { widget: 'textarea', rows: 4 } } },
   },
   {
     type: 'output.result',
@@ -138,9 +151,9 @@ export const nodeDefinitions: NodeDefinition[] = [
     configSchema: {
       type: 'object',
       properties: {
-        format: { type: 'string', title: 'Format', enum: ['text', 'json'] },
+        format: { type: 'string', title: 'Format', enum: ['text', 'json'], default: 'text' },
       },
+      additionalProperties: false,
     },
-    defaults: { format: 'text' },
   },
 ]

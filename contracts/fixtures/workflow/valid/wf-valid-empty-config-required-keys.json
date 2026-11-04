@@ -1,0 +1,17 @@
+{
+  "name": "wf-valid-empty-config-required-keys",
+  "description": "Decision C1: nodes with an EMPTY config object import successfully even though their schemas list required keys (llm.prompt: provider and prompt; http.request: method and url), and the document exports and re-imports byte-identically.",
+  "input": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Empty configs",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "l", "config": {}, "position": { "x": 0, "y": 0 } },
+      { "id": "h", "type": "http.request", "typeVersion": 1, "label": "h", "config": {}, "position": { "x": 300, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": { "valid": true }
+}
