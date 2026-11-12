@@ -2,6 +2,9 @@ import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
 import { getNodeDefinition } from '../catalog'
 import type { FlowNode } from '../canvas/flowMapping'
+import { TriangleAlert } from 'lucide-react'
+import { useWarnings } from '../store/useWarnings'
+import { warningCountText } from '../store/warnings'
 import { NodeIcon } from './NodeIcon'
 import styles from './WorkflowNode.module.css'
 
@@ -9,6 +12,7 @@ import styles from './WorkflowNode.module.css'
 export function WorkflowNodeView({ data, selected }: NodeProps<FlowNode>) {
   const { node } = data
   const def = getNodeDefinition(node.type, node.typeVersion)
+  const warnings = useWarnings().byNode.get(node.id) ?? []
 
   if (!def) {
     return (
@@ -23,6 +27,18 @@ export function WorkflowNodeView({ data, selected }: NodeProps<FlowNode>) {
       <div className={styles.header}>
         <NodeIcon name={def.icon} />
         <span className={styles.label}>{node.label}</span>
+        {warnings.length > 0 && (
+          // Subdued on purpose: a new node warns at once. Not a live region; the title lists the messages as plain text.
+          <span
+            className={styles.warning}
+            role="img"
+            aria-label={warningCountText(warnings.length)}
+            title={warnings.map((w) => w.message).join('\n')}
+          >
+            <TriangleAlert size={12} aria-hidden="true" />
+            {warnings.length}
+          </span>
+        )}
       </div>
       <div className={styles.ports}>
         <ul className={styles.column}>

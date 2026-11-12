@@ -9,6 +9,7 @@ import { MAX_IMPORT_BYTES, exportWorkflowText, importTooLarge, importWorkflow } 
 import { shorten } from './shorten'
 import { IMPORT_BUTTON_ID } from './importButton'
 import styles from './Toolbar.module.css'
+import { WarningsMenu } from './WarningsMenu'
 
 // A path or message longer than this is cut when shown, so a huge key cannot flood the alert panel.
 const MAX_SHOWN = 200
@@ -80,6 +81,7 @@ export function Toolbar() {
         onChange={(e) => setWorkflowName(e.target.value)}
       />
       <div className={styles.actions}>
+        <WarningsMenu />
         <button type="button" onClick={() => useEditorStore.getState().reset()}>
           <FilePlus size={14} aria-hidden="true" /> New
         </button>

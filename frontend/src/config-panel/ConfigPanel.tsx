@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { getNodeDefinition } from '../catalog'
 import { useEditorStore } from '../store/editorStore'
+import { useWarnings } from '../store/useWarnings'
 import { parseConfigInput } from '../workflow/configSchema'
 import type { JsonSchema } from '../workflow/jsonSchema'
 import type { NodeUi } from '../workflow/types'
@@ -12,6 +13,9 @@ export function ConfigPanel() {
   const node = useEditorStore((s) => s.workflow.nodes.find((n) => n.id === selectedId))
   const selectedCount = useEditorStore((s) => s.selectedNodeIds.length)
   const updateNodeLabel = useEditorStore((s) => s.updateNodeLabel)
+  const byNode = useWarnings().byNode
+  const warnings = (selectedId === null ? undefined : byNode.get(selectedId)) ?? []
+  const warningsHeading = useId()
 
   if (!node) {
     return (
@@ -47,6 +51,18 @@ export function ConfigPanel() {
             value={node.config[key]}
           />
         ))}
+
+      {warnings.length > 0 && (
+        // After the fields, so a warning appearing while the user types does not move the field being edited.
+        <section className={styles.warnings} aria-labelledby={warningsHeading}>
+          <h3 id={warningsHeading}>Warnings for this node</h3>
+          <ul>
+            {warnings.map((w, i) => (
+              <li key={i}>{w.message}</li>
+            ))}
+          </ul>
+        </section>
+      )}
     </aside>
   )
 }
