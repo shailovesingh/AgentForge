@@ -1,0 +1,21 @@
+{
+  "name": "warn-condition-no-branch-wired",
+  "description": "A condition fed by a trigger whose two branches both go nowhere has an unused result.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "No branch",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "c", "type": "logic.condition", "typeVersion": 1, "label": "Check", "config": { "operator": "equals", "field": "status", "value": "ok" }, "position": { "x": 150, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "c", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "result-unused", "nodeId": "c" }
+  ]
+}

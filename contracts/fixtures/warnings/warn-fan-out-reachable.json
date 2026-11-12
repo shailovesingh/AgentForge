@@ -1,0 +1,25 @@
+{
+  "name": "warn-fan-out-reachable",
+  "description": "One trigger output fanned out to two branches reaches both of them: no warnings.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Fan out",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "l1", "type": "llm.prompt", "typeVersion": 1, "label": "Short", "config": { "provider": "ollama", "prompt": "Summarize in one line." }, "position": { "x": 200, "y": -100 } },
+      { "id": "l2", "type": "llm.prompt", "typeVersion": 1, "label": "Long", "config": { "provider": "ollama", "prompt": "Summarize in a paragraph." }, "position": { "x": 200, "y": 100 } },
+      { "id": "o1", "type": "output.result", "typeVersion": 1, "label": "Short result", "config": { "format": "text" }, "position": { "x": 400, "y": -100 } },
+      { "id": "o2", "type": "output.result", "typeVersion": 1, "label": "Long result", "config": { "format": "text" }, "position": { "x": 400, "y": 100 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l1", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l2", "port": "input" } },
+      { "id": "e3", "source": { "nodeId": "l1", "port": "text" }, "target": { "nodeId": "o1", "port": "input" } },
+      { "id": "e4", "source": { "nodeId": "l2", "port": "text" }, "target": { "nodeId": "o2", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": []
+}

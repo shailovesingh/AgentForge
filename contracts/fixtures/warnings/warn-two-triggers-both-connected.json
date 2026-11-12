@@ -1,0 +1,27 @@
+{
+  "name": "warn-two-triggers-both-connected",
+  "description": "Two triggers each feeding their own branch to an output have no warnings.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Two triggers",
+    "description": "",
+    "nodes": [
+      { "id": "t1", "type": "trigger.manual", "typeVersion": 1, "label": "First", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "t2", "type": "trigger.manual", "typeVersion": 1, "label": "Second", "config": { "payload": {} }, "position": { "x": 0, "y": 200 } },
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "Summarize", "config": { "provider": "ollama", "prompt": "Summarize the input." }, "position": { "x": 200, "y": 0 } },
+      { "id": "h", "type": "http.request", "typeVersion": 1, "label": "Fetch", "config": { "method": "GET", "url": "https://example.com/items" }, "position": { "x": 200, "y": 200 } },
+      { "id": "o1", "type": "output.result", "typeVersion": 1, "label": "Summary", "config": { "format": "text" }, "position": { "x": 400, "y": 0 } },
+      { "id": "o2", "type": "output.result", "typeVersion": 1, "label": "Items", "config": { "format": "json" }, "position": { "x": 400, "y": 200 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t1", "port": "data" }, "target": { "nodeId": "l", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "o1", "port": "input" } },
+      { "id": "e3", "source": { "nodeId": "t2", "port": "data" }, "target": { "nodeId": "h", "port": "input" } },
+      { "id": "e4", "source": { "nodeId": "h", "port": "body" }, "target": { "nodeId": "o2", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "negativeFor": ["trigger-not-connected"],
+  "expect": []
+}

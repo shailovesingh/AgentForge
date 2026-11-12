@@ -1,0 +1,22 @@
+{
+  "name": "warn-two-triggers-one-isolated",
+  "description": "With two triggers, only the one whose output goes nowhere warns, and a trigger is never reported as unreachable.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Two triggers",
+    "description": "",
+    "nodes": [
+      { "id": "t1", "type": "trigger.manual", "typeVersion": 1, "label": "First", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "t2", "type": "trigger.manual", "typeVersion": 1, "label": "Second", "config": { "payload": {} }, "position": { "x": 0, "y": 200 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 300, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t1", "port": "data" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "trigger-not-connected", "nodeId": "t2" }
+  ]
+}

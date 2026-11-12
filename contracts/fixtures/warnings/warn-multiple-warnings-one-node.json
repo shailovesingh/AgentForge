@@ -1,0 +1,24 @@
+{
+  "name": "warn-multiple-warnings-one-node",
+  "description": "One agent with an empty config and no connections gets three warnings (task input, provider, unused result) and no unreachable warning.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Many warnings",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 300, "y": 0 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": {}, "position": { "x": 0, "y": 200 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "required-input-unconnected", "nodeId": "a", "port": "input" },
+    { "code": "required-field-empty", "nodeId": "a", "field": "provider" },
+    { "code": "result-unused", "nodeId": "a" }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "warn-condition-operator-absent",
+  "description": "A fully wired condition whose config lacks the required operator warns about that one property.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "No operator",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "c", "type": "logic.condition", "typeVersion": 1, "label": "Check", "config": {}, "position": { "x": 150, "y": 0 } },
+      { "id": "o1", "type": "output.result", "typeVersion": 1, "label": "Yes", "config": { "format": "json" }, "position": { "x": 300, "y": -100 } },
+      { "id": "o2", "type": "output.result", "typeVersion": 1, "label": "No", "config": { "format": "json" }, "position": { "x": 300, "y": 100 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "c", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "c", "port": "true" }, "target": { "nodeId": "o1", "port": "input" } },
+      { "id": "e3", "source": { "nodeId": "c", "port": "false" }, "target": { "nodeId": "o2", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "required-field-empty", "nodeId": "c", "field": "operator" }
+  ]
+}

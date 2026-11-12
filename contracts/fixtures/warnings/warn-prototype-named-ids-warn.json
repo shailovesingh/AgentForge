@@ -1,0 +1,26 @@
+{
+  "name": "warn-prototype-named-ids-warn",
+  "description": "Warnings are reported for nodes whose ids look like Object.prototype members, and an inherited name never counts as connected or reached.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Prototype names",
+    "description": "",
+    "nodes": [
+      { "id": "__proto__", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "constructor", "type": "llm.prompt", "typeVersion": 1, "label": "Summarize", "config": { "provider": "ollama", "prompt": "Summarize the input." }, "position": { "x": 200, "y": 0 } },
+      { "id": "toString", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 400, "y": 0 } },
+      { "id": "valueOf", "type": "llm.prompt", "typeVersion": 1, "label": "Orphan", "config": { "provider": "ollama", "prompt": "Say hello." }, "position": { "x": 200, "y": 200 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "__proto__", "port": "data" }, "target": { "nodeId": "constructor", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "result-unused", "nodeId": "constructor" },
+    { "code": "required-input-unconnected", "nodeId": "toString", "port": "input" },
+    { "code": "node-unreachable", "nodeId": "valueOf" },
+    { "code": "result-unused", "nodeId": "valueOf" }
+  ]
+}

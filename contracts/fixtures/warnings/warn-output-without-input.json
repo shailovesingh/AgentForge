@@ -1,0 +1,18 @@
+{
+  "name": "warn-output-without-input",
+  "description": "A lone output node has a required input with no connection, and nothing else to report (no trigger exists, so no reachability).",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Output only",
+    "description": "",
+    "nodes": [
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "required-input-unconnected", "nodeId": "o", "port": "input" }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "warn-agent-optional-tools-unconnected",
+  "description": "An agent whose required task input is connected has no warning even though its optional tools input is not.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Agent without tools",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "Draft task", "config": { "provider": "ollama", "prompt": "Write the task." }, "position": { "x": 150, "y": 0 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": { "provider": "ollama" }, "position": { "x": 300, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 450, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "a", "port": "input" } },
+      { "id": "e3", "source": { "nodeId": "a", "port": "output" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "negativeFor": ["required-input-unconnected"],
+  "expect": []
+}

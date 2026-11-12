@@ -4,7 +4,7 @@ Language-neutral test fixtures that describe the **expected outcome** of AgentFo
 (workflow import, connection rules, node config validation, the node catalog, and the exact JSON text
 written by the two serialization profiles). They are plain JSON data with no code in them.
 The serialization profiles are specified in `CANONICAL_JSON.md`; the config schema subset in `CONFIG_SCHEMA.md`.
-Node versions and migrations are specified in `MIGRATIONS.md`.
+Node versions and migrations are specified in `MIGRATIONS.md`; the editor warnings in `WARNINGS.md`.
 
 ## Status: tested in TypeScript only
 
@@ -31,6 +31,7 @@ contracts/
     serialization/*.json            arbitrary JSON text in, exact compact and export text out
     schema/*.json                   the JSON Schema subset: validation, applyDefaults and schema-check cases
     migration/*.json                node migrations: a version 1 document in, the upgrade reports and the migrated workflow out
+    warnings/*.json                 editor warnings: a workflow in, the expected warnings out (see WARNINGS.md)
 ```
 
 ## Common rules for every case file
@@ -267,6 +268,26 @@ is planned for Phase 2.**
   `node.version-newer` and `node.no-migration-path` like to any other code.
 - The `.5` cases (1.5, 2.5, 3.5, 48.5, 49.5) are there because Python's built-in `round()` rounds half to even
   (`round(2.5) == 2`, `round(48.5) == 48`); a Python port must round half up (`MIGRATIONS.md`).
+
+### `warnings/*.json`
+
+Cases for the editor warnings (`WARNINGS.md`): a workflow document in, the expected warnings out. **TypeScript only: no
+Python parity is claimed; the Python runner is planned for Phase 2.** Warnings are derived and never block anything, and
+this family does not use error codes or JSON Pointer paths.
+
+```json
+{ "name": "...", "description": "...", "workflow": { ...a workflow document... },
+  "negativeFor": ["result-unused"],
+  "expect": [ { "code": "required-input-unconnected", "nodeId": "o", "port": "input" } ] }
+```
+
+- `workflow` must import successfully (the runner imports `JSON.stringify(workflow)`; incomplete configs do, decision C1).
+  The runner then lints the imported workflow with the built-in catalog.
+- `expect` is a list of `{ code, nodeId }` plus `port` (only `required-input-unconnected`) or `field` (only
+  `required-field-empty`); empty means no warnings. Compared as a **multiset**; the message is never compared.
+- `negativeFor` (optional) lists codes whose rule applies to the workflow but must not fire; the runner enforces that the
+  case does not expect them and that the rule applies. Every warning code needs at least one expecting fixture and at least
+  one `negativeFor` fixture.
 
 ## Comparing errors: multisets, no messages
 

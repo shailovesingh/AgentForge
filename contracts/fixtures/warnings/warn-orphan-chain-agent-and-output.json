@@ -1,0 +1,27 @@
+{
+  "name": "warn-orphan-chain-agent-and-output",
+  "description": "An agent with an unconnected task input feeds an output: the agent warns once (suppression), the output it feeds is unreachable and warns.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Orphan agent",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "Summarize", "config": { "provider": "ollama", "prompt": "Summarize the input." }, "position": { "x": 200, "y": 0 } },
+      { "id": "o1", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 400, "y": 0 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": { "provider": "ollama" }, "position": { "x": 200, "y": 200 } },
+      { "id": "o2", "type": "output.result", "typeVersion": 1, "label": "Agent result", "config": { "format": "text" }, "position": { "x": 400, "y": 200 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "o1", "port": "input" } },
+      { "id": "e3", "source": { "nodeId": "a", "port": "output" }, "target": { "nodeId": "o2", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "required-input-unconnected", "nodeId": "a", "port": "input" },
+    { "code": "node-unreachable", "nodeId": "o2" }
+  ]
+}

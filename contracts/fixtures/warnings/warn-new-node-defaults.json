@@ -1,0 +1,23 @@
+{
+  "name": "warn-new-node-defaults",
+  "description": "An LLM prompt with its initial schema defaults (provider set, prompt empty) warns only about the empty prompt.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "New node",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "LLM Prompt", "config": { "provider": "ollama", "model": "", "systemPrompt": "", "prompt": "", "temperature": 0.7 }, "position": { "x": 200, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 400, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "required-field-empty", "nodeId": "l", "field": "prompt" }
+  ]
+}

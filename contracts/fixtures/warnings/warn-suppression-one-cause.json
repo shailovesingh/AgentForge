@@ -1,0 +1,23 @@
+{
+  "name": "warn-suppression-one-cause",
+  "description": "An output with no edge at all in a graph that has a trigger warns only about its missing input, not also as unreachable (one cause, one warning).",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Suppression",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "o1", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 300, "y": 0 } },
+      { "id": "o2", "type": "output.result", "typeVersion": 1, "label": "Second result", "config": { "format": "text" }, "position": { "x": 300, "y": 200 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "o1", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "negativeFor": ["node-unreachable"],
+  "expect": [
+    { "code": "required-input-unconnected", "nodeId": "o2", "port": "input" }
+  ]
+}

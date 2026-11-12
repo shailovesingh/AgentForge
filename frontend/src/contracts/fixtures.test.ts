@@ -11,16 +11,18 @@ import { EXPORT_ONLY_CODES, SCHEMA_ONLY_CODES } from '../workflow/codeExemptions
 import { ERROR_CODES } from '../workflow/errors'
 import { applyDefaults, checkSchemaSubset, validateAgainstSchema } from '../workflow/jsonSchema'
 import type { JsonSchema, ObjectSchema } from '../workflow/jsonSchema'
+import { WARNING_CODES, lintWorkflow } from '../workflow/lint'
+import type { WarningCode } from '../workflow/lint'
 import type { UpgradeReport } from '../workflow/nodeMigrations'
 import { importWorkflow, serializeWorkflow } from '../workflow/serialize'
 import { strictParse } from '../workflow/strictJson'
-import type { Workflow } from '../workflow/types'
+import type { NodeDefinition, Workflow } from '../workflow/types'
 
 // ---------------------------------------------------------------------------
 // Shape checker (pure; unit-tested below with deliberately bad examples)
 // ---------------------------------------------------------------------------
 
-type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config' | 'serialization' | 'schema' | 'migration'
+type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config' | 'serialization' | 'schema' | 'migration' | 'warnings'
 
 const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   'workflow/valid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
@@ -30,6 +32,7 @@ const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   serialization: ['inputText', 'inputBytesBase64', 'expect'],
   schema: ['schema', 'value', 'options', 'applyDefaults', 'checkSchema', 'expect'],
   migration: ['input', 'expect'],
+  warnings: ['workflow', 'expect', 'negativeFor'],
 }
 
 const isBase64 = (b: unknown): boolean => typeof b === 'string' && b.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(b)
@@ -226,6 +229,32 @@ export function checkShape(file: string, value: unknown): string[] {
       }
       break
     }
+    case 'warnings': {
+      // A workflow document in, the expected editor warnings out (contracts/WARNINGS.md).
+      if (!isObject(value.workflow)) bad('workflow must be a JSON object (a workflow document)')
+      if (!Array.isArray(expected)) bad('expect must be an array of { code, nodeId, port?, field? } (empty = no warnings)')
+      else {
+        expected.forEach((e, i) => {
+          const where = `expect[${i}]`
+          if (!isObject(e) || Object.keys(e).some((k) => !['code', 'nodeId', 'port', 'field'].includes(k))) {
+            return bad(`${where} must be { code, nodeId, port?, field? } and nothing else`)
+          }
+          if (typeof e.code !== 'string' || !(WARNING_CODES as readonly string[]).includes(e.code)) bad(`${where}.code "${String(e.code)}" is not a known warning code`)
+          if (!isNonEmptyString(e.nodeId)) bad(`${where}.nodeId must be a non-empty string`)
+          for (const k of ['port', 'field']) if (Object.hasOwn(e, k) && !isNonEmptyString(e[k])) bad(`${where}.${k} must be a non-empty string`)
+          // port belongs to required-input-unconnected, field to required-field-empty, and each of those needs its own
+          if ((e.code === 'required-input-unconnected') !== Object.hasOwn(e, 'port')) bad(`${where}: port is required for required-input-unconnected and not allowed otherwise`)
+          if ((e.code === 'required-field-empty') !== Object.hasOwn(e, 'field')) bad(`${where}: field is required for required-field-empty and not allowed otherwise`)
+        })
+      }
+      if (Object.hasOwn(value, 'negativeFor')) {
+        const n = value.negativeFor
+        if (!Array.isArray(n) || n.length === 0 || n.some((c) => typeof c !== 'string' || !(WARNING_CODES as readonly string[]).includes(c)) || new Set(n).size !== n.length) {
+          bad('negativeFor must be a non-empty array of distinct known warning codes')
+        }
+      }
+      break
+    }
     case 'config':
       if (!isNonEmptyString(value.nodeType)) bad('nodeType must be a non-empty string')
       oneOf('config', isObject, 'a JSON object')
@@ -334,8 +363,16 @@ interface MigrationCase extends CaseBase {
   expect: { upgrades: UpgradeReport[]; workflow: unknown }
 }
 
+/** A workflow in, the editor warnings out; `negativeFor` lists codes whose rule applies to this workflow but must not fire. */
+interface WarningCase extends CaseBase {
+  workflow: unknown
+  expect: { code: WarningCode; nodeId: string; port?: string; field?: string }[]
+  negativeFor?: WarningCode[]
+}
+
 interface Corpus {
   problems: string[]
+  warnings: WarningCase[]
   migration: MigrationCase[]
   valid: WorkflowCase[]
   invalid: WorkflowCase[]
@@ -346,7 +383,7 @@ interface Corpus {
 }
 
 function loadCorpus(): Corpus {
-  const corpus: Corpus = { problems: [], migration: [], valid: [], invalid: [], connection: [], config: [], serialization: [], schema: [] }
+  const corpus: Corpus = { problems: [], warnings: [], migration: [], valid: [], invalid: [], connection: [], config: [], serialization: [], schema: [] }
   if (!existsSync(FIXTURES_DIR)) {
     corpus.problems.push('contracts/fixtures does not exist')
     return corpus
@@ -383,6 +420,7 @@ function loadCorpus(): Corpus {
     else if (family === 'serialization') corpus.serialization.push(withFile as SerializationCase)
     else if (family === 'schema') corpus.schema.push(withFile as SchemaCase)
     else if (family === 'migration') corpus.migration.push(withFile as MigrationCase)
+    else if (family === 'warnings') corpus.warnings.push(withFile as WarningCase)
     else corpus.config.push(withFile as ConfigCase)
   }
   corpus.problems.push(...checkUniqueNames(names))
@@ -447,6 +485,8 @@ const MIN_COUNTS = {
   // T6: 9 invalid cases (version errors, v1 maxIterations) and the new migration family (10); T6 review: 2 more invalid (the version phase).
   total: 436, valid: 21, invalid: 107, connection: 22, config: 19, serialization: 109, serializationInvalid: 9,
   schema: 148, schemaValidation: 75, schemaDefaults: 8, schemaCheck: 65, migration: 10,
+  // T7a: the warnings family. Not part of `total` (which keeps its earlier meaning); it has its own floor.
+  warnings: 31,
 }
 
 // Which kind a schema case is (the three shapes are told apart by `applyDefaults` / `checkSchema`).
@@ -528,9 +568,10 @@ describe('fixture corpus', () => {
       schemaDefaults: corpus.schema.filter((c) => schemaKind(c) === 'defaults').length,
       schemaCheck: corpus.schema.filter((c) => schemaKind(c) === 'check').length,
       migration: corpus.migration.length,
+      warnings: corpus.warnings.length,
     }
     expect(counts.total, 'total cases').toBeGreaterThanOrEqual(MIN_COUNTS.total)
-    for (const family of ['valid', 'invalid', 'connection', 'config', 'serialization', 'schema', 'schemaValidation', 'schemaDefaults', 'schemaCheck', 'migration'] as const) {
+    for (const family of ['valid', 'invalid', 'connection', 'config', 'serialization', 'schema', 'schemaValidation', 'schemaDefaults', 'schemaCheck', 'migration', 'warnings'] as const) {
       expect(counts[family], `${family} cases`).toBeGreaterThanOrEqual(MIN_COUNTS[family])
     }
   })
@@ -694,6 +735,55 @@ describe('config fixtures', () => {
       expect(asMultiset(actual), `${c.file}: config errors ({code, path}, order-insensitive)`).toEqual(asMultiset(c.expect))
     })
   }
+})
+
+/** A warning as the family compares it: code, node id and the optional port or field (never the message). */
+const warningKey = (w: { code: string; nodeId: string; port?: string; field?: string }): string => JSON.stringify([w.code, w.nodeId, w.port ?? null, w.field ?? null])
+const asWarningMultiset = (list: { code: string; nodeId: string; port?: string; field?: string }[]): string[] => list.map(warningKey).sort()
+
+// How a case proves "the rule applies but does not fire": `negativeFor` lists the code, and the runner checks that (1) the case
+// does not expect that code and (2) the workflow holds a node the rule is about (what the predicate below says). Because the
+// case's whole expectation must equal what lintWorkflow reports, "applies and was not expected" means "applies and did not fire".
+const RULE_APPLIES: Record<WarningCode, (defs: NodeDefinition[]) => boolean> = {
+  'required-input-unconnected': (defs) => defs.some((d) => d.inputs.some((p) => p.required === true)),
+  'required-field-empty': (defs) => defs.some((d) => (d.configSchema.required ?? []).length > 0),
+  'trigger-not-connected': (defs) => defs.some((d) => d.category === 'Triggers' && d.outputs.length > 0),
+  'node-unreachable': (defs) => defs.some((d) => d.category === 'Triggers') && defs.some((d) => d.category !== 'Triggers'),
+  'result-unused': (defs) => defs.some((d) => d.category !== 'Output' && d.category !== 'Triggers' && d.outputs.length > 0),
+}
+
+const definitionsOf = (workflow: Workflow): NodeDefinition[] =>
+  workflow.nodes.flatMap((n) => nodeDefinitions.filter((d) => d.type === n.type && d.version === n.typeVersion))
+
+describe('warnings fixtures (editor warnings, contracts/WARNINGS.md)', () => {
+  for (const c of corpus.warnings) {
+    test(c.name, () => {
+      // Warnings are derived from a workflow that imported: incomplete configs import (decision C1).
+      const imported = importWorkflow(JSON.stringify(c.workflow), nodeDefinitions)
+      expect(imported.ok, `${c.file}: the workflow must import, got ${JSON.stringify(imported.ok ? [] : imported.errors)}`).toBe(true)
+      if (!imported.ok) return
+      const warnings = lintWorkflow(imported.workflow, nodeDefinitions)
+      expect(asWarningMultiset(warnings), `${c.file}: warnings ({code, nodeId, port, field}, order-insensitive)`).toEqual(asWarningMultiset(c.expect))
+      for (const w of warnings) {
+        expect(w.severity, `${c.file}: severity`).toBe('warning')
+        expect(w.message.length, `${c.file}: a warning has a message`).toBeGreaterThan(0)
+      }
+      for (const code of c.negativeFor ?? []) {
+        expect(
+          c.expect.some((e) => e.code === code),
+          `${c.file}: negativeFor "${code}" but the case expects that warning`,
+        ).toBe(false)
+        expect(RULE_APPLIES[code](definitionsOf(imported.workflow)), `${c.file}: negativeFor "${code}" but the rule does not apply to this workflow`).toBe(true)
+      }
+    })
+  }
+
+  test('every warning code is expected by at least one fixture and is checked not to fire in at least one other', () => {
+    const expected = new Set(corpus.warnings.flatMap((c) => c.expect.map((e) => e.code)))
+    const negative = new Set(corpus.warnings.flatMap((c) => c.negativeFor ?? []))
+    expect(WARNING_CODES.filter((code) => !expected.has(code)), 'warning codes no fixture expects').toEqual([])
+    expect(WARNING_CODES.filter((code) => !negative.has(code)), 'warning codes with no negativeFor fixture').toEqual([])
+  })
 })
 
 describe('schema fixtures (JSON Schema subset validator, explicit applyDefaults, schema check)', () => {
@@ -939,6 +1029,38 @@ describe('checkShape', () => {
       some(checkShape(file, { ...check, applyDefaults: true }), 'use at most one')
       some(checkShape(file, { ...good.schema, extra: 1 }), 'unknown field "extra"')
       some(checkShape(file, { ...good.schema, nodeType: 'x' }), 'unknown field "nodeType"')
+    })
+  })
+
+  describe('warnings', () => {
+    const file = 'warnings/a.json'
+    const ok = { name: 'a', description: 'd', workflow: {}, expect: [{ code: 'result-unused', nodeId: 'n' }] }
+    const withExpect = (e: unknown) => ({ ...ok, expect: e })
+
+    test('well-formed cases have no problems (empty expectation, port, field, negativeFor)', () => {
+      expect(checkShape(file, ok)).toEqual([])
+      expect(checkShape(file, withExpect([]))).toEqual([])
+      expect(checkShape(file, withExpect([{ code: 'required-input-unconnected', nodeId: 'n', port: 'input' }, { code: 'required-field-empty', nodeId: 'n', field: 'prompt' }]))).toEqual([])
+      expect(checkShape(file, { ...ok, negativeFor: ['node-unreachable', 'result-unused'] })).toEqual([])
+    })
+    test('workflow must be an object and expect an array of known, well-formed entries', () => {
+      some(checkShape(file, { ...ok, workflow: [] }), 'workflow must be a JSON object')
+      some(checkShape(file, withExpect({})), 'expect must be an array')
+      some(checkShape(file, withExpect([{ code: 'nope', nodeId: 'n' }])), 'not a known warning code')
+      some(checkShape(file, withExpect([{ code: 'result-unused', nodeId: '' }])), 'nodeId must be a non-empty string')
+      some(checkShape(file, withExpect([{ code: 'result-unused', nodeId: 'n', message: 'm' }])), 'and nothing else')
+    })
+    test('port belongs to required-input-unconnected and field to required-field-empty', () => {
+      some(checkShape(file, withExpect([{ code: 'required-input-unconnected', nodeId: 'n' }])), 'port is required')
+      some(checkShape(file, withExpect([{ code: 'result-unused', nodeId: 'n', port: 'input' }])), 'port is required for required-input-unconnected and not allowed otherwise')
+      some(checkShape(file, withExpect([{ code: 'required-field-empty', nodeId: 'n' }])), 'field is required')
+      some(checkShape(file, withExpect([{ code: 'result-unused', nodeId: 'n', field: 'x' }])), 'not allowed otherwise')
+    })
+    test('negativeFor must be a non-empty list of distinct known codes', () => {
+      for (const n of [[], ['nope'], ['result-unused', 'result-unused'], 'result-unused']) some(checkShape(file, { ...ok, negativeFor: n }), 'negativeFor must be')
+    })
+    test('the family does not accept another family field', () => {
+      some(checkShape(file, { ...ok, input: {} }), 'unknown field "input"')
     })
   })
 

@@ -1,0 +1,20 @@
+{
+  "name": "warn-output-and-trigger-unconnected",
+  "description": "A trigger and an output with no edges: the trigger warns, the output warns once (its missing input), not also as unreachable.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Two loose nodes",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 300, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "trigger-not-connected", "nodeId": "t" },
+    { "code": "required-input-unconnected", "nodeId": "o", "port": "input" }
+  ]
+}

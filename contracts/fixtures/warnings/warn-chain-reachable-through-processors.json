@@ -1,0 +1,25 @@
+{
+  "name": "warn-chain-reachable-through-processors",
+  "description": "A trigger, two LLM prompts, an HTTP request and an output in one chain are all reachable and used: no warnings.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Long chain",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "l1", "type": "llm.prompt", "typeVersion": 1, "label": "Draft", "config": { "provider": "ollama", "prompt": "Draft a request." }, "position": { "x": 150, "y": 0 } },
+      { "id": "h", "type": "http.request", "typeVersion": 1, "label": "Fetch", "config": { "method": "POST", "url": "https://example.com/items" }, "position": { "x": 300, "y": 0 } },
+      { "id": "l2", "type": "llm.prompt", "typeVersion": 1, "label": "Explain", "config": { "provider": "ollama", "prompt": "Explain the response." }, "position": { "x": 450, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 600, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l1", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "l1", "port": "text" }, "target": { "nodeId": "h", "port": "input" } },
+      { "id": "e3", "source": { "nodeId": "h", "port": "body" }, "target": { "nodeId": "l2", "port": "input" } },
+      { "id": "e4", "source": { "nodeId": "l2", "port": "text" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": []
+}

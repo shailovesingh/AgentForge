@@ -1,0 +1,23 @@
+{
+  "name": "warn-http-url-empty",
+  "description": "An HTTP request with an empty URL warns about the url property; the method, present, does not.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Empty URL",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "h", "type": "http.request", "typeVersion": 1, "label": "Fetch", "config": { "method": "GET", "url": "", "headers": {}, "body": "" }, "position": { "x": 200, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "json" }, "position": { "x": 400, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "h", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "h", "port": "body" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "required-field-empty", "nodeId": "h", "field": "url" }
+  ]
+}

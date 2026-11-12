@@ -1,0 +1,22 @@
+{
+  "name": "warn-clean-chain",
+  "description": "A complete trigger, LLM and output chain has no warnings, so every rule applies and none fires.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Clean chain",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "Summarize", "config": { "provider": "ollama", "prompt": "Summarize the input." }, "position": { "x": 200, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 400, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "l", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "negativeFor": ["required-input-unconnected", "required-field-empty", "trigger-not-connected", "node-unreachable", "result-unused"],
+  "expect": []
+}

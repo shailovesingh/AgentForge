@@ -1,0 +1,24 @@
+{
+  "name": "warn-branch-path-reachable",
+  "description": "Nodes behind a condition's true branch are reachable from the trigger; the unwired false branch does not warn.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Branch path",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "c", "type": "logic.condition", "typeVersion": 1, "label": "Check", "config": { "operator": "is_empty", "field": "items" }, "position": { "x": 150, "y": 0 } },
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "Explain", "config": { "provider": "ollama", "prompt": "Explain why there are no items." }, "position": { "x": 300, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 450, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "c", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "c", "port": "true" }, "target": { "nodeId": "l", "port": "input" } },
+      { "id": "e3", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "negativeFor": ["node-unreachable", "result-unused"],
+  "expect": []
+}

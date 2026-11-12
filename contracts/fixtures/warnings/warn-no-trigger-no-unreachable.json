@@ -1,0 +1,19 @@
+{
+  "name": "warn-no-trigger-no-unreachable",
+  "description": "A graph with no trigger at all gets no unreachable warnings: reachability is judged only when there is something to start from.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "No trigger",
+    "description": "",
+    "nodes": [
+      { "id": "l", "type": "llm.prompt", "typeVersion": 1, "label": "Summarize", "config": { "provider": "ollama", "prompt": "Summarize the input." }, "position": { "x": 0, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 200, "y": 0 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "l", "port": "text" }, "target": { "nodeId": "o", "port": "input" } }
+    ],
+    "metadata": {}
+  },
+  "expect": []
+}

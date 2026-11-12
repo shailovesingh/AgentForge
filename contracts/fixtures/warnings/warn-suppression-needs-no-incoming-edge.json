@@ -1,0 +1,27 @@
+{
+  "name": "warn-suppression-needs-no-incoming-edge",
+  "description": "An agent with an unconnected required task input but another incoming edge (tools, from an orphan condition) still warns as unreachable: suppression applies only to a node with no incoming edge at all.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Suppression limit",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } },
+      { "id": "o", "type": "output.result", "typeVersion": 1, "label": "Result", "config": { "format": "text" }, "position": { "x": 300, "y": 0 } },
+      { "id": "c", "type": "logic.condition", "typeVersion": 1, "label": "Check", "config": { "operator": "equals" }, "position": { "x": 0, "y": 200 } },
+      { "id": "a", "type": "agent.autonomous", "typeVersion": 2, "label": "Agent", "config": { "provider": "ollama" }, "position": { "x": 300, "y": 200 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "t", "port": "data" }, "target": { "nodeId": "o", "port": "input" } },
+      { "id": "e2", "source": { "nodeId": "c", "port": "true" }, "target": { "nodeId": "a", "port": "tools" } }
+    ],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "required-input-unconnected", "nodeId": "c", "port": "input" },
+    { "code": "required-input-unconnected", "nodeId": "a", "port": "input" },
+    { "code": "node-unreachable", "nodeId": "a" },
+    { "code": "result-unused", "nodeId": "a" }
+  ]
+}

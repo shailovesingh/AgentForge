@@ -1,0 +1,18 @@
+{
+  "name": "warn-isolated-trigger",
+  "description": "A lone trigger with nothing connected to its output warns that it is not connected.",
+  "workflow": {
+    "schemaVersion": "1.0",
+    "id": "wf_1",
+    "name": "Isolated trigger",
+    "description": "",
+    "nodes": [
+      { "id": "t", "type": "trigger.manual", "typeVersion": 1, "label": "Start", "config": { "payload": {} }, "position": { "x": 0, "y": 0 } }
+    ],
+    "edges": [],
+    "metadata": {}
+  },
+  "expect": [
+    { "code": "trigger-not-connected", "nodeId": "t" }
+  ]
+}
