@@ -45,24 +45,38 @@ describe('node catalog', () => {
       expect(branchOutputs).toEqual(['logic.condition.true', 'logic.condition.false'])
     })
 
-    test('a branch value, when present, is the boolean true', () => {
+    test('an output branch value, when present, is the boolean true (inputs are covered by the test above)', () => {
       for (const def of nodeDefinitions) {
-        for (const port of [...def.inputs, ...def.outputs]) {
+        for (const port of def.outputs) {
           if (Object.hasOwn(port, 'branch')) expect(port.branch, `${def.type}.${port.name}`).toBe(true)
         }
       }
     })
 
-    test('a document and its export never contain branch (it is catalog metadata only)', () => {
+    test('a node with a branch output has ONLY branch outputs (the warnings rule result-unused relies on it)', () => {
+      for (const def of nodeDefinitions) {
+        if (!def.outputs.some((p) => Object.hasOwn(p, 'branch'))) continue
+        for (const port of def.outputs) expect(port.branch, `${def.type}.${port.name}`).toBe(true)
+      }
+    })
+
+    test('the workflow in the store and its parsed export have no key named branch at any depth (it is catalog metadata only)', () => {
+      const hasKey = (value: unknown, name: string): boolean =>
+        typeof value === 'object' && value !== null && (Object.hasOwn(value, name) || Object.values(value).some((v) => hasKey(v, name)))
+      // the checker itself must see a key at depth and not mistake a value for a key
+      expect(hasKey({ a: [{ b: { branch: true } }] }, 'branch')).toBe(true)
+      expect(hasKey({ a: 'branch' }, 'branch')).toBe(false)
+
       const store = useEditorStore.getState()
       store.reset()
       store.addNode('logic.condition', { x: 0, y: 0 })
-      const exported = exportWorkflowText(useEditorStore.getState().workflow)
+      const { workflow } = useEditorStore.getState()
+      expect(workflow.nodes.map((n) => n.type)).toEqual(['logic.condition'])
+      const exported = exportWorkflowText(workflow)
       expect(exported.ok).toBe(true)
-      if (exported.ok) {
-        expect(exported.text).toContain('logic.condition')
-        expect(exported.text).not.toContain('branch')
-      }
+      if (exported.ok) expect(hasKey(JSON.parse(exported.text), 'branch'), 'a key named branch in the export').toBe(false)
+      expect(hasKey(workflow, 'branch'), 'a key named branch in the store workflow').toBe(false)
+      useEditorStore.getState().reset()
     })
   })
 

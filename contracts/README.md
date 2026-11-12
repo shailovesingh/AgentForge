@@ -326,13 +326,17 @@ the independent statement of what the code must do.
    currently prints.
 3. Run `npm test` in `frontend/`. The runner names the file if it is malformed or fails.
 4. Raise `MIN_COUNTS` in the runner to the new totals. The floors make deleting fixtures fail the run and
-   are never lowered (the `migration` family has its own floor, `migration` in `MIN_COUNTS`; the one exception so far: T5b moved the `schema.required` rejection from `workflow/invalid`
+   are never lowered (the `migration` family has its own floor, `migration` in `MIN_COUNTS`, and so does the `warnings`
+   family, `warnings` in `MIN_COUNTS`, which is not part of `total`; the one exception so far: T5b moved the `schema.required` rejection from `workflow/invalid`
    to `workflow/valid`, because of decision C1, so the invalid floor went down by one and the valid floor up).
 5. Every error code (except the two exemption lists in `frontend/src/workflow/codeExemptions.ts`) must stay covered by at least one
    `workflow/invalid` case, every `connection.*` code by at least one `connection` case, and the `serialization`
    family must keep covering its own rejection codes; the runner enforces all three. Every `schema.*` code must also
    appear in a `schema` or `config` case (`schema.required`, which import can no longer produce (C1), and the four length and item codes
    are exempt from the `workflow/invalid` requirement through the explicit list `SCHEMA_ONLY_CODES`, shared by the runners).
+6. The `warnings` family has two coverage guards of its own: every code in `WARNING_CODES` must be **expected** by at
+   least one `warnings` case, and must be listed in the `negativeFor` of at least one case (the rule applies there and
+   does not fire). A new warning code therefore needs both kinds of case, and an applicability predicate in the runner.
 
 ## Never edit expected values just to make a test pass
 

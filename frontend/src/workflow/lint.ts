@@ -3,6 +3,7 @@ import type { NodeDefinition, PortDefinition, Workflow } from './types'
 // Editor warnings (decisions D-017, D-018; contracts/WARNINGS.md). Pure and total: derived from a workflow
 // and a catalog, never stored in the document, never blocking. `validateWorkflow` stays errors-only.
 // Everything keyed by an untrusted id, type, port or config key goes through a Map or Object.hasOwn.
+// Total for JSON-shaped input (own data properties): getters and proxies on the workflow are out of scope.
 
 // T9 adds the secret-detection codes later.
 export const WARNING_CODES = [
@@ -66,7 +67,12 @@ const add = (m: Map<string, Set<string>>, key: string, value: string) => {
 
 /**
  * The editor warnings for `workflow`, in a fixed order: node array order, then the rule order of
- * contracts/WARNINGS.md, then port or field in catalog order. Total: it never throws, whatever the object holds.
+ * contracts/WARNINGS.md, then port or field in catalog order. It never throws for any JSON-shaped value (own data
+ * properties only; getters and proxies are out of scope and are not guarded against).
+ *
+ * Facts about a node (its connections, its reachability) are keyed by the node id STRING. With duplicate ids, every node
+ * with that id therefore shares the first node's connections and reachability. Validation rejects duplicate ids before an
+ * import, so this cannot happen in the app; it is only defined so that the function stays deterministic.
  */
 export function lintWorkflow(workflow: Workflow, catalog: NodeDefinition[]): Warning[] {
   const doc: unknown = workflow
@@ -82,7 +88,7 @@ export function lintWorkflow(workflow: Workflow, catalog: NodeDefinition[]): War
   }
 
   const items: Item[] = []
-  const firstById = new Map<string, Item>() // with a duplicate id, the first node is the one edges refer to
+  const firstById = new Map<string, Item>() // with a duplicate id, the first node's definition decides which ports an edge may use
   for (const n of rawNodes) {
     if (!isRecord(n) || typeof n.id !== 'string') continue
     const def =

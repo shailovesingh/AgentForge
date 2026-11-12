@@ -31,6 +31,7 @@ const SYNTHETIC: NodeDefinition[] = [
   def('s.branch', 'Logic', [port('in', { required: true })], [port('yes', { branch: true }), port('no', { branch: true })]),
   def('s.mixed', 'Logic', [port('in')], [port('br', { branch: true }), port('plain')]),
   def('s.noout', 'AI', [port('in')], []),
+  def('s.sinkout', 'Output', [port('in', { required: true })], [port('out')]), // a sink WITH an output port: still never result-unused
   def('s.cfg', 'AI', [port('in')], [port('out')], ['a', 'b', 'c']),
 ]
 
@@ -128,9 +129,30 @@ describe('rule 2: required-field-empty', () => {
     ['tab and newline', '\t\n'],
     ['a carriage return and a no-break space', '\r' + String.fromCharCode(0xa0)],
     ['a byte order mark (JavaScript trim removes it)', String.fromCharCode(0xfeff)],
+    ['the line separator U+2028', String.fromCharCode(0x2028)],
+    ['the paragraph separator U+2029', String.fromCharCode(0x2029)],
+    ['the ideographic space U+3000', String.fromCharCode(0x3000)],
+    ['the ogham space mark U+1680', String.fromCharCode(0x1680)],
     ['an empty array', []],
   ])('%s counts as empty', (_label, value) => {
     expect(CFG({ a: value, b: 'x', c: 'x' })).toEqual(['required-field-empty|n|a'])
+  })
+  // Near misses that JavaScript trim does NOT remove (contracts/WARNINGS.md): they are text, so not empty.
+  test.each([
+    ['the next-line control U+0085', 0x85],
+    ['the Mongolian vowel separator U+180E', 0x180e],
+    ['the zero width space U+200B', 0x200b],
+    ['the control character U+001C', 0x1c],
+  ])('%s is not trimmed, so it is not empty', (_label, code) => {
+    expect(String.fromCharCode(code).trim(), 'the platform trim must agree with the contract').not.toBe('')
+    expect(CFG({ a: String.fromCharCode(code), b: 'x', c: 'x' })).toEqual([])
+  })
+  test('the contract set is exactly the 25 code points JavaScript trim removes', () => {
+    const set = [0x9, 0xa, 0xb, 0xc, 0xd, 0x20, 0xa0, 0x1680, ...Array.from({ length: 11 }, (_v, i) => 0x2000 + i), 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff]
+    expect(set.length).toBe(25)
+    const trimmed: number[] = []
+    for (let c = 0; c <= 0xffff; c++) if (String.fromCharCode(c).trim() === '' && (c < 0xd800 || c > 0xdfff)) trimmed.push(c)
+    expect(trimmed).toEqual(set)
   })
   test.each([
     ['the number 0', 0],
@@ -236,6 +258,11 @@ describe('rule 5: result-unused', () => {
       expect(lint(wf([node('x', type)])).some((w) => w.code === 'result-unused'), type).toBe(false)
     }
   })
+  test('never for an Output-category node, even one that has an unconnected output port', () => {
+    const w = wf([node('t', 's.trigger'), node('k', 's.sinkout')], [edge('e', 't', 'out', 'k', 'in')])
+    expect(lint(w)).toEqual([])
+    expect(keys(lint(wf([node('k', 's.sinkout')])))).toEqual(['required-input-unconnected|k|in'])
+  })
   test('one connected output of several is enough, branch or not', () => {
     const one = (o: string) => wf([node('m', 's.mixed'), node('k', 's.sink')], [edge('e', 'm', o, 'k', 'in')])
     expect(lint(one('br')).some((w) => w.code === 'result-unused')).toBe(false)
@@ -338,11 +365,24 @@ describe('totality', () => {
     const bad: unknown[] = [undefined, null, 'x', [null, 1, { type: 5 }, { type: 'x', version: 1, category: 'AI', inputs: 'x', outputs: null, configSchema: 5 }, { type: 'x', version: 1 }]]
     for (const c of bad) expect(() => lintWorkflow(w, c as NodeDefinition[])).not.toThrow()
   })
-  test('duplicate node ids do not crash, and edges refer to the first node with that id', () => {
+  test('duplicate node ids do not crash and are deterministic', () => {
     const w = wf([node('d', 's.trigger'), node('d', 's.sink'), node('d', 's.proc')], [edge('e', 'd', 'out', 'd', 'in')])
     const warnings = lint(w)
     expect(Array.isArray(warnings)).toBe(true)
     expect(lint(w)).toEqual(warnings)
+  })
+  // Facts are keyed by the node id string, so every node with a duplicated id shares the first node's connections and
+  // reachability (validation rejects duplicate ids before import, so the app never gets here; see lint.ts and WARNINGS.md).
+  test('duplicate ids: nodes with the same id share the connections and the reachability of that id', () => {
+    // an integration `d` and a trigger `d`, one edge out of `d`: the trigger roots reachability for the id, so neither is unreachable
+    const shared = wf([node('d', 's.integ'), node('d', 's.trigger'), node('o', 's.sink')], [edge('e', 'd', 'out', 'o', 'in')])
+    expect(lint(shared)).toEqual([])
+    // the same graph with a separate unconnected trigger shows what the sharing hides: the integration node IS unreachable then
+    const apart = wf([node('d', 's.integ'), node('t', 's.trigger'), node('o', 's.sink')], [edge('e', 'd', 'out', 'o', 'in')])
+    expect(keys(lint(apart))).toEqual(['node-unreachable|d', 'trigger-not-connected|t', 'node-unreachable|o'])
+    // two outputs with the id `o` and one edge into `o`: neither warns about a missing input
+    const twoSinks = wf([node('t', 's.trigger'), node('o', 's.sink'), node('o', 's.sink')], [edge('e', 't', 'out', 'o', 'in')])
+    expect(lint(twoSinks)).toEqual([])
   })
   test('ids named like Object.prototype members behave like ordinary ids', () => {
     const names = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf']
@@ -372,8 +412,7 @@ describe('totality', () => {
 })
 
 describe('performance', () => {
-  test('a 5,000-node chain is linted in about linear time', () => {
-    const n = 5000
+  const chain = (n: number): Workflow => {
     const nodes: WorkflowNode[] = [node('t', 'trigger.manual', { payload: {} })]
     const edges: WorkflowEdge[] = []
     let previous = 't'
@@ -387,12 +426,44 @@ describe('performance', () => {
     }
     nodes.push(node('o', 'output.result', { format: 'text' }))
     edges.push(edge('eo', previous, previousPort, 'o', 'input'))
-    const started = performance.now()
-    const warnings = lint(wf(nodes, edges), nodeDefinitions)
-    const elapsed = performance.now() - started
-    expect(warnings).toEqual([])
-    expect(elapsed, `took ${elapsed} ms`).toBeLessThan(3000) // generous: a quadratic version takes far longer
-  })
+    return wf(nodes, edges)
+  }
+  // A trigger fanned out to n processors: the BFS queue grows to n items (a chain keeps it at one), and n warnings are made.
+  const star = (n: number): Workflow => {
+    const nodes: WorkflowNode[] = [node('t', 'trigger.manual', { payload: {} })]
+    const edges: WorkflowEdge[] = []
+    for (let i = 0; i < n; i++) {
+      nodes.push(node(`l${i}`, 'llm.prompt', { provider: 'ollama', prompt: 'x' }))
+      edges.push(edge(`e${i}`, 't', 'data', `l${i}`, 'input'))
+    }
+    return wf(nodes, edges)
+  }
+  /** The best of three runs, in milliseconds (the minimum is the least noisy estimate of the cost). */
+  const best = (w: Workflow, warningCount: number): number => {
+    let min = Infinity
+    for (let i = 0; i < 3; i++) {
+      const started = performance.now()
+      const warnings = lint(w, nodeDefinitions)
+      min = Math.min(min, performance.now() - started)
+      expect(warnings.length).toBe(warningCount)
+    }
+    return min
+  }
+
+  // A quadratic version (a find per edge endpoint, a shift per queue item) costs about 100 times more for 10 times more
+  // nodes; a linear one about 10. The ratio is the signal, the absolute ceiling is only a generous backstop.
+  test.each([
+    ['chain', chain, () => 0],
+    ['star', star, (n: number) => n], // every processor of the star has an unused result
+  ] as const)('the cost scales about linearly on a %s: 50,000 nodes cost far less than 100 times 5,000 nodes', (_shape, build, count) => {
+    const small = build(5000)
+    const large = build(50_000)
+    best(small, count(5000)) // warm-up for the JIT, not measured
+    const t5 = best(small, count(5000))
+    const t50 = best(large, count(50_000))
+    expect(t50, `50,000 nodes took ${t50} ms`).toBeLessThan(5000)
+    expect(t50 / Math.max(t5, 1), `5,000 nodes took ${t5} ms, 50,000 took ${t50} ms`).toBeLessThan(40)
+  }, 120_000)
 })
 
 // ---------------------------------------------------------------------------

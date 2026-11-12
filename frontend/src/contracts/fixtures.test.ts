@@ -486,7 +486,8 @@ const MIN_COUNTS = {
   total: 436, valid: 21, invalid: 107, connection: 22, config: 19, serialization: 109, serializationInvalid: 9,
   schema: 148, schemaValidation: 75, schemaDefaults: 8, schemaCheck: 65, migration: 10,
   // T7a: the warnings family. Not part of `total` (which keeps its earlier meaning); it has its own floor.
-  warnings: 31,
+  // T7a review: +3 (the pinned whitespace set: U+00A0 U+FEFF U+2028 empty; U+0085 and U+001C not empty).
+  warnings: 34,
 }
 
 // Which kind a schema case is (the three shapes are told apart by `applyDefaults` / `checkSchema`).

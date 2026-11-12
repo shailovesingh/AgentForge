@@ -51,23 +51,50 @@ counts for reachability.
 
 ### `required-field-empty` and whitespace
 
-A string is blank when `value.trim() === ''` in **JavaScript**: `String.prototype.trim` removes white space and line
-terminators (space, tab, line feed, carriage return, vertical tab, form feed, no-break space, the other Unicode space
-separators, U+2028, U+2029 and the byte order mark U+FEFF). **That set is the contract.** Python's `str.strip()` and
-JavaScript `trim()` differ for a few characters (general knowledge, not run in this session): U+FEFF is trimmed by
-JavaScript but not by Python, and U+0085 is the other way round. A future port must therefore use this explicit set,
-not its language's default strip.
+A string is blank when `value.trim() === ''` in **JavaScript**. **The contract is this exact set of 25 code points**, the
+ones `String.prototype.trim` removes (checked with Node by enumerating every code point; the count is 25):
+
+- U+0009 to U+000D (tab, line feed, vertical tab, form feed, carriage return): 5
+- U+0020 (space): 1
+- U+00A0 (no-break space): 1
+- U+1680 (ogham space mark): 1
+- U+2000 to U+200A (the spaces from en quad to hair space): 11
+- U+2028 (line separator) and U+2029 (paragraph separator): 2
+- U+202F (narrow no-break space): 1
+- U+205F (medium mathematical space): 1
+- U+3000 (ideographic space): 1
+- U+FEFF (byte order mark, zero width no-break space): 1
+
+A string of any number of these (and only these) is blank. These near misses are **not** in the set, so a string made of
+them is text, not blank: **U+0085** (next line), **U+180E** (Mongolian vowel separator) and **U+200B** (zero width space);
+the control characters U+001C to U+001F are not in it either. Python's `str.strip()` and JavaScript `trim()` differ for a
+few characters (general knowledge, not run in this session): U+FEFF is trimmed by JavaScript but not by Python, and U+0085
+and U+001C to U+001F are the other way round. A future port must therefore use this explicit set, not its language's
+default strip. Fixtures pin both sides (`warn-unicode-spaces-only-prompt`, `warn-next-line-control-is-not-blank`,
+`warn-file-separator-control-is-not-blank`), and a unit test checks the set against the platform's `trim`.
 
 ## Order, determinism and comparison
 
 - The result order is **node array order, then rule order (1 to 5), then port or field in catalog order**. The same
   input always gives the same output; the order of the edge array does not matter.
-- The function is **pure** (it does not change its input; a deep-frozen workflow and catalog work) and **total** (it
-  never throws, whatever the workflow object holds: unknown types, edges to nowhere, duplicate node ids, ids such as
-  `__proto__`, malformed nodes and edges). With a duplicate node id, edges refer to the **first** node with that id.
-- It runs in about linear time in nodes plus edges.
+- The function is **pure** (it does not change its input; a deep-frozen workflow and catalog work) and **never throws for
+  any JSON-shaped value** (a workflow made of own data properties: unknown types, edges to nowhere, duplicate node ids,
+  ids such as `__proto__`, malformed nodes and edges). Getters and proxies on the workflow are **out of scope**: they are
+  not guarded against, and a getter that throws throws out of `lintWorkflow`.
+- **Duplicate node ids.** Facts about a node (its connections and its reachability) are keyed by the node id **string**.
+  With duplicate ids, every node with that id therefore **shares the first node's connections and reachability**: an edge
+  into one of two outputs with the id `o` counts for both (neither warns `required-input-unconnected`), and a trigger and
+  an integration node that share an id are both reached. The definition of the **first** node with that id decides which
+  ports an edge may use. Validation rejects duplicate ids before an import, so this is unreachable in the app; it is
+  defined only so that the function stays deterministic. No fixture covers it (a fixture must import); a unit test does.
+- It runs in about linear time in nodes plus edges (a unit test compares the cost of a 5,000-node and a 50,000-node chain).
 - Fixtures compare warnings as a **multiset** of `{ code, nodeId, port, field }` (order does not matter, duplicates
-  count, `message` is never compared), like the error families.
+  count, `message` is never compared), like the error families. **The order of the result is therefore a contract that
+  only the TypeScript unit tests check**: a port gets no fixture signal for it.
+- **Reachability is structural.** An edge counts whatever the node's behaviour, and every output port counts, selected or
+  not. It does not model the engine's rule 5(c) (`docs/ARCHITECTURE.md` section 6.1): a node can be reachable here and
+  still be skipped at run time because a required input has no active edge. That cause is reported once, as
+  `required-input-unconnected` on that node.
 
 ## Messages never include values
 
