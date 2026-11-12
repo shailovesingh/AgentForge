@@ -1,3 +1,4 @@
+import { detectNodeSecrets } from './secrets'
 import type { NodeDefinition, PortDefinition, Workflow } from './types'
 
 // Editor warnings (decisions D-017, D-018; contracts/WARNINGS.md). Pure and total: derived from a workflow
@@ -5,13 +6,14 @@ import type { NodeDefinition, PortDefinition, Workflow } from './types'
 // Everything keyed by an untrusted id, type, port or config key goes through a Map or Object.hasOwn.
 // Total for JSON-shaped input (own data properties): getters and proxies on the workflow are out of scope.
 
-// T9 adds the secret-detection codes later.
 export const WARNING_CODES = [
   'required-input-unconnected',
   'required-field-empty',
   'trigger-not-connected',
   'node-unreachable',
   'result-unused',
+  'secret-likely',
+  'secret-suspected',
 ] as const
 
 export type WarningCode = (typeof WARNING_CODES)[number]
@@ -22,7 +24,7 @@ export interface Warning {
   nodeId: string
   /** The input port, for `required-input-unconnected`. */
   port?: string
-  /** The config property, for `required-field-empty`. */
+  /** The config property for `required-field-empty`; the display path inside the config for `secret-likely` and `secret-suspected`. */
   field?: string
   /** Human text. It names the node label (or id) and the port or field, and never a config or metadata value. */
   message: string
@@ -152,41 +154,53 @@ export function lintWorkflow(workflow: Workflow, catalog: NodeDefinition[]): War
 
   for (const item of items) {
     const def = item.def
-    if (!def) continue
-    const inputs = portsOf(def, 'inputs')
-    const outputs = portsOf(def, 'outputs')
-    const connectedIn = incoming.get(item.id)
-    const connectedOut = outgoing.get(item.id)
+    if (def) {
+      const inputs = portsOf(def, 'inputs')
+      const outputs = portsOf(def, 'outputs')
+      const connectedIn = incoming.get(item.id)
+      const connectedOut = outgoing.get(item.id)
 
-    // 1. a required input without an incoming edge
-    let missingInput = false
-    for (const p of inputs) {
-      if (p.required === true && !connectedIn?.has(p.name)) {
-        missingInput = true
-        warn('required-input-unconnected', item, `needs a connection on its "${portText(p)}" input.`, { port: p.name })
+      // 1. a required input without an incoming edge
+      let missingInput = false
+      for (const p of inputs) {
+        if (p.required === true && !connectedIn?.has(p.name)) {
+          missingInput = true
+          warn('required-input-unconnected', item, `needs a connection on its "${portText(p)}" input.`, { port: p.name })
+        }
+      }
+
+      // 2. a required config property that is absent or blank
+      for (const field of requiredFields(def)) {
+        if (isEmptyValue(Object.hasOwn(item.config, field) ? item.config[field] : undefined)) {
+          warn('required-field-empty', item, `needs a value for "${field}".`, { field })
+        }
+      }
+
+      // 3. a Trigger none of whose outputs is connected
+      if (def.category === 'Triggers' && outputs.length > 0 && !outputs.some((p) => connectedOut?.has(p.name))) {
+        warn('trigger-not-connected', item, 'is a trigger but its output is not connected to anything.')
+      }
+
+      // 4. not reachable from any Trigger (one cause, one warning: an unconnected required input that has no edge at all is enough)
+      if (def.category !== 'Triggers' && hasTrigger && !reached.has(item.id) && !(missingInput && !connectedIn)) {
+        warn('node-unreachable', item, 'is not reachable from any trigger.')
+      }
+
+      // 5. a result nobody uses (Condition branches are outputs too, so wiring one of two is enough)
+      if (def.category !== 'Output' && def.category !== 'Triggers' && outputs.length > 0 && !outputs.some((p) => connectedOut?.has(p.name))) {
+        warn('result-unused', item, 'produces a result that no other node uses.')
       }
     }
 
-    // 2. a required config property that is absent or blank
-    for (const field of requiredFields(def)) {
-      if (isEmptyValue(Object.hasOwn(item.config, field) ? item.config[field] : undefined)) {
-        warn('required-field-empty', item, `needs a value for "${field}".`, { field })
-      }
+    // 6 and 7. a credential in the config (contracts/SECRETS.md): every node counts, known type or not, because it is exported
+    // either way. The message names the display path, which never holds a value or a credential-shaped key. Metadata findings
+    // are not warnings (no node): the UI reads detectSecrets for them.
+    const found = detectNodeSecrets(item.id, item.config)
+    for (const f of found.filter((s) => s.confidence === 'high')) {
+      warn('secret-likely', item, `may hold a credential at "${f.path}". Remove it from the workflow: anyone with the exported file could use it.`, { field: f.path })
     }
-
-    // 3. a Trigger none of whose outputs is connected
-    if (def.category === 'Triggers' && outputs.length > 0 && !outputs.some((p) => connectedOut?.has(p.name))) {
-      warn('trigger-not-connected', item, 'is a trigger but its output is not connected to anything.')
-    }
-
-    // 4. not reachable from any Trigger (one cause, one warning: an unconnected required input that has no edge at all is enough)
-    if (def.category !== 'Triggers' && hasTrigger && !reached.has(item.id) && !(missingInput && !connectedIn)) {
-      warn('node-unreachable', item, 'is not reachable from any trigger.')
-    }
-
-    // 5. a result nobody uses (Condition branches are outputs too, so wiring one of two is enough)
-    if (def.category !== 'Output' && def.category !== 'Triggers' && outputs.length > 0 && !outputs.some((p) => connectedOut?.has(p.name))) {
-      warn('result-unused', item, 'produces a result that no other node uses.')
+    for (const f of found.filter((s) => s.confidence === 'medium')) {
+      warn('secret-suspected', item, `has a setting at "${f.path}" that may hold a credential.`, { field: f.path })
     }
   }
   return warnings

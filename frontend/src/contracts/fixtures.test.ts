@@ -14,6 +14,8 @@ import type { JsonSchema, ObjectSchema } from '../workflow/jsonSchema'
 import { WARNING_CODES, lintWorkflow } from '../workflow/lint'
 import type { WarningCode } from '../workflow/lint'
 import type { UpgradeReport } from '../workflow/nodeMigrations'
+import { CREDENTIAL_SHAPES, HEADER_NAMES, KEY_WORDS, detectSecrets } from '../workflow/secrets'
+import type { SecretFinding } from '../workflow/secrets'
 import { importWorkflow, serializeWorkflow } from '../workflow/serialize'
 import { strictParse } from '../workflow/strictJson'
 import type { NodeDefinition, Workflow } from '../workflow/types'
@@ -22,7 +24,7 @@ import type { NodeDefinition, Workflow } from '../workflow/types'
 // Shape checker (pure; unit-tested below with deliberately bad examples)
 // ---------------------------------------------------------------------------
 
-type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config' | 'serialization' | 'schema' | 'migration' | 'warnings'
+type Family = 'workflow/valid' | 'workflow/invalid' | 'connection' | 'config' | 'serialization' | 'schema' | 'migration' | 'warnings' | 'secrets'
 
 const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   'workflow/valid': ['input', 'inputText', 'inputRepeat', 'inputBytesBase64', 'expect'],
@@ -33,7 +35,12 @@ const FAMILY_FIELDS: Record<Family, readonly string[]> = {
   schema: ['schema', 'value', 'options', 'applyDefaults', 'checkSchema', 'expect'],
   migration: ['input', 'expect'],
   warnings: ['workflow', 'expect', 'negativeFor'],
+  secrets: ['workflow', 'expect'],
 }
+
+// Which warning codes carry a `field` (the config property, or for the secret codes the display path inside the config).
+const FIELD_CODES: readonly string[] = ['required-field-empty', 'secret-likely', 'secret-suspected']
+const SECRET_REASONS: readonly unknown[] = ['header-name', 'credential-shape', 'key-name']
 
 const isBase64 = (b: unknown): boolean => typeof b === 'string' && b.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(b)
 
@@ -244,7 +251,7 @@ export function checkShape(file: string, value: unknown): string[] {
           for (const k of ['port', 'field']) if (Object.hasOwn(e, k) && !isNonEmptyString(e[k])) bad(`${where}.${k} must be a non-empty string`)
           // port belongs to required-input-unconnected, field to required-field-empty, and each of those needs its own
           if ((e.code === 'required-input-unconnected') !== Object.hasOwn(e, 'port')) bad(`${where}: port is required for required-input-unconnected and not allowed otherwise`)
-          if ((e.code === 'required-field-empty') !== Object.hasOwn(e, 'field')) bad(`${where}: field is required for required-field-empty and not allowed otherwise`)
+          if (FIELD_CODES.includes(e.code as string) !== Object.hasOwn(e, 'field')) bad(`${where}: field is required for ${FIELD_CODES.join(', ')} and not allowed otherwise`)
         })
       }
       if (Object.hasOwn(value, 'negativeFor')) {
@@ -252,6 +259,28 @@ export function checkShape(file: string, value: unknown): string[] {
         if (!Array.isArray(n) || n.length === 0 || n.some((c) => typeof c !== 'string' || !(WARNING_CODES as readonly string[]).includes(c)) || new Set(n).size !== n.length) {
           bad('negativeFor must be a non-empty array of distinct known warning codes')
         }
+      }
+      break
+    }
+    case 'secrets': {
+      // A workflow document in (placeholders for tokens, see contracts/SECRETS.md), the expected findings out.
+      if (!isObject(value.workflow)) bad('workflow must be a JSON object (a workflow document)')
+      if (!Array.isArray(expected)) bad('expect must be an array of { confidence, location, nodeId?, path, reason } (empty = no findings)')
+      else {
+        expected.forEach((e, i) => {
+          const where = `expect[${i}]`
+          if (!isObject(e) || Object.keys(e).some((k) => !['confidence', 'location', 'nodeId', 'path', 'reason'].includes(k))) {
+            return bad(`${where} must be { confidence, location, nodeId?, path, reason } and nothing else`)
+          }
+          if (e.confidence !== 'high' && e.confidence !== 'medium') bad(`${where}.confidence must be "high" or "medium"`)
+          if (e.location !== 'config' && e.location !== 'metadata') bad(`${where}.location must be "config" or "metadata"`)
+          if (typeof e.path !== 'string') bad(`${where}.path must be a string`)
+          if (!SECRET_REASONS.includes(e.reason)) bad(`${where}.reason must be one of ${SECRET_REASONS.join(', ')}`)
+          if ((e.location === 'config') !== Object.hasOwn(e, 'nodeId')) bad(`${where}: nodeId is required for location "config" and not allowed for "metadata"`)
+          else if (Object.hasOwn(e, 'nodeId') && !isNonEmptyString(e.nodeId)) bad(`${where}.nodeId must be a non-empty string`)
+          // key-name is the one medium reason; the other two are high
+          if ((e.reason === 'key-name') !== (e.confidence === 'medium')) bad(`${where}: reason key-name goes with confidence medium, the other reasons with high`)
+        })
       }
       break
     }
@@ -370,9 +399,16 @@ interface WarningCase extends CaseBase {
   negativeFor?: WarningCode[]
 }
 
+/** A workflow (with token placeholders) in, the expected secret findings out. */
+interface SecretCase extends CaseBase {
+  workflow: unknown
+  expect: SecretFinding[]
+}
+
 interface Corpus {
   problems: string[]
   warnings: WarningCase[]
+  secrets: SecretCase[]
   migration: MigrationCase[]
   valid: WorkflowCase[]
   invalid: WorkflowCase[]
@@ -383,7 +419,7 @@ interface Corpus {
 }
 
 function loadCorpus(): Corpus {
-  const corpus: Corpus = { problems: [], warnings: [], migration: [], valid: [], invalid: [], connection: [], config: [], serialization: [], schema: [] }
+  const corpus: Corpus = { problems: [], warnings: [], secrets: [], migration: [], valid: [], invalid: [], connection: [], config: [], serialization: [], schema: [] }
   if (!existsSync(FIXTURES_DIR)) {
     corpus.problems.push('contracts/fixtures does not exist')
     return corpus
@@ -421,6 +457,7 @@ function loadCorpus(): Corpus {
     else if (family === 'schema') corpus.schema.push(withFile as SchemaCase)
     else if (family === 'migration') corpus.migration.push(withFile as MigrationCase)
     else if (family === 'warnings') corpus.warnings.push(withFile as WarningCase)
+    else if (family === 'secrets') corpus.secrets.push(withFile as SecretCase)
     else corpus.config.push(withFile as ConfigCase)
   }
   corpus.problems.push(...checkUniqueNames(names))
@@ -487,7 +524,10 @@ const MIN_COUNTS = {
   schema: 148, schemaValidation: 75, schemaDefaults: 8, schemaCheck: 65, migration: 10,
   // T7a: the warnings family. Not part of `total` (which keeps its earlier meaning); it has its own floor.
   // T7a review: +3 (the pinned whitespace set: U+00A0 U+FEFF U+2028 empty; U+0085 and U+001C not empty).
-  warnings: 34,
+  // T9a: +5 (the secret-likely and secret-suspected codes: positives, a clean case, a metadata case).
+  warnings: 39,
+  // T9a: the secrets family (contracts/SECRETS.md). Not part of `total` either; its own floor.
+  secrets: 67,
 }
 
 // Which kind a schema case is (the three shapes are told apart by `applyDefaults` / `checkSchema`).
@@ -570,9 +610,10 @@ describe('fixture corpus', () => {
       schemaCheck: corpus.schema.filter((c) => schemaKind(c) === 'check').length,
       migration: corpus.migration.length,
       warnings: corpus.warnings.length,
+      secrets: corpus.secrets.length,
     }
     expect(counts.total, 'total cases').toBeGreaterThanOrEqual(MIN_COUNTS.total)
-    for (const family of ['valid', 'invalid', 'connection', 'config', 'serialization', 'schema', 'schemaValidation', 'schemaDefaults', 'schemaCheck', 'migration', 'warnings'] as const) {
+    for (const family of ['valid', 'invalid', 'connection', 'config', 'serialization', 'schema', 'schemaValidation', 'schemaDefaults', 'schemaCheck', 'migration', 'warnings', 'secrets'] as const) {
       expect(counts[family], `${family} cases`).toBeGreaterThanOrEqual(MIN_COUNTS[family])
     }
   })
@@ -745,12 +786,18 @@ const asWarningMultiset = (list: { code: string; nodeId: string; port?: string; 
 // How a case proves "the rule applies but does not fire": `negativeFor` lists the code, and the runner checks that (1) the case
 // does not expect that code and (2) the workflow holds a node the rule is about (what the predicate below says). Because the
 // case's whole expectation must equal what lintWorkflow reports, "applies and was not expected" means "applies and did not fire".
-const RULE_APPLIES: Record<WarningCode, (defs: NodeDefinition[]) => boolean> = {
+// The two secret rules apply when some node config holds a non-empty string (a value or a key's value) there is to scan.
+const holdsText = (v: unknown): boolean =>
+  typeof v === 'string' ? v.trim() !== '' : Array.isArray(v) ? v.some(holdsText) : isObject(v) && Object.values(v).some(holdsText)
+
+const RULE_APPLIES: Record<WarningCode, (defs: NodeDefinition[], workflow: Workflow) => boolean> = {
   'required-input-unconnected': (defs) => defs.some((d) => d.inputs.some((p) => p.required === true)),
   'required-field-empty': (defs) => defs.some((d) => (d.configSchema.required ?? []).length > 0),
   'trigger-not-connected': (defs) => defs.some((d) => d.category === 'Triggers' && d.outputs.length > 0),
   'node-unreachable': (defs) => defs.some((d) => d.category === 'Triggers') && defs.some((d) => d.category !== 'Triggers'),
   'result-unused': (defs) => defs.some((d) => d.category !== 'Output' && d.category !== 'Triggers' && d.outputs.length > 0),
+  'secret-likely': (_defs, workflow) => workflow.nodes.some((n) => holdsText(n.config)),
+  'secret-suspected': (_defs, workflow) => workflow.nodes.some((n) => holdsText(n.config)),
 }
 
 const definitionsOf = (workflow: Workflow): NodeDefinition[] =>
@@ -774,7 +821,7 @@ describe('warnings fixtures (editor warnings, contracts/WARNINGS.md)', () => {
           c.expect.some((e) => e.code === code),
           `${c.file}: negativeFor "${code}" but the case expects that warning`,
         ).toBe(false)
-        expect(RULE_APPLIES[code](definitionsOf(imported.workflow)), `${c.file}: negativeFor "${code}" but the rule does not apply to this workflow`).toBe(true)
+        expect(RULE_APPLIES[code](definitionsOf(imported.workflow), imported.workflow), `${c.file}: negativeFor "${code}" but the rule does not apply to this workflow`).toBe(true)
       }
     })
   }
@@ -784,6 +831,149 @@ describe('warnings fixtures (editor warnings, contracts/WARNINGS.md)', () => {
     const negative = new Set(corpus.warnings.flatMap((c) => c.negativeFor ?? []))
     expect(WARNING_CODES.filter((code) => !expected.has(code)), 'warning codes no fixture expects').toEqual([])
     expect(WARNING_CODES.filter((code) => !negative.has(code)), 'warning codes with no negativeFor fixture').toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Secrets fixtures (contracts/SECRETS.md) and the token placeholders
+// ---------------------------------------------------------------------------
+
+// The repository is pushed to GitHub, whose secret scanning and push protection reject token-shaped strings. A fixture
+// therefore NEVER holds a token: it holds a placeholder such as @@GHP@@, and this table builds the token at run time, from
+// parts, so that no token-shaped literal stands in this source file either. `@@NAME@@` gives the default size, `@@NAME:n@@`
+// the size n (the length of the part that the shape counts). The table is documented in contracts/SECRETS.md.
+const TOKEN_BUILDERS: Record<string, { size: number; build: (n: number) => string }> = {
+  SK: { size: 24, build: (n) => 'sk' + '-' + 'x'.repeat(n) },
+  SKANT: { size: 30, build: (n) => 'sk' + '-ant-' + 'api03-' + 'x'.repeat(n) },
+  GSK: { size: 24, build: (n) => 'gs' + 'k_' + 'x'.repeat(n) },
+  GHP: { size: 36, build: (n) => 'gh' + 'p_' + 'A'.repeat(n) },
+  GHPAT: { size: 30, build: (n) => 'github' + '_pat_' + 'A'.repeat(n) },
+  AKIA: { size: 16, build: (n) => 'AK' + 'IA' + 'Q'.repeat(n) },
+  ...Object.fromEntries(['A', 'B', 'P', 'R', 'S', 'Z'].map((l) => ['XOX' + l, { size: 12, build: (n: number) => 'xo' + 'x' + l.toLowerCase() + '-' + '1'.repeat(n) }])),
+  JWT: { size: 10, build: (n) => 'ey' + 'J' + 'a'.repeat(n) + '.' + 'b'.repeat(n) + '.' + 'c'.repeat(n) },
+  JWT2: { size: 10, build: (n) => 'ey' + 'J' + 'a'.repeat(n) + '.' + 'b'.repeat(n) },
+  PEM: { size: 0, build: () => '-----' + 'BEGIN ' + 'PRIVATE KEY' + '-----' },
+  PEMRSA: { size: 0, build: () => '-----' + 'BEGIN ' + 'RSA ' + 'PRIVATE KEY' + '-----' },
+  PEMPUBLIC: { size: 0, build: () => '-----' + 'BEGIN ' + 'PUBLIC KEY' + '-----' },
+  BEARER: { size: 24, build: (n) => 'Bea' + 'rer ' + 't'.repeat(n) },
+}
+const PLACEHOLDER = /@@([A-Z0-9]+)(?::([0-9]+))?@@/g
+
+export function fillPlaceholders(text: string): string {
+  return text.replace(PLACEHOLDER, (_all, name: string, size?: string) => {
+    if (!Object.hasOwn(TOKEN_BUILDERS, name)) throw new Error(`unknown placeholder @@${name}@@`)
+    const { size: dflt, build } = TOKEN_BUILDERS[name]
+    return build(size === undefined ? dflt : Number(size))
+  })
+}
+
+/** Placeholders replaced in every string AND every object key. */
+function fillDeep(v: unknown): unknown {
+  if (typeof v === 'string') return fillPlaceholders(v)
+  if (Array.isArray(v)) return v.map(fillDeep)
+  if (isObject(v)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [fillPlaceholders(k), fillDeep(x)]))
+  return v
+}
+
+/** Every string value and every key in the configs and the metadata of a workflow document. */
+function scannedTexts(workflow: unknown): { values: string[]; keys: string[] } {
+  const out = { values: [] as string[], keys: [] as string[] }
+  const walk = (v: unknown) => {
+    if (typeof v === 'string') out.values.push(v)
+    else if (Array.isArray(v)) v.forEach(walk)
+    else if (isObject(v)) {
+      for (const [k, x] of Object.entries(v)) {
+        out.keys.push(k)
+        walk(x)
+      }
+    }
+  }
+  if (isObject(workflow)) {
+    if (Array.isArray(workflow.nodes)) for (const n of workflow.nodes) if (isObject(n)) walk(n.config)
+    walk(workflow.metadata)
+  }
+  return out
+}
+
+const asSecretMultiset = (list: SecretFinding[]): string[] =>
+  list.map((f) => JSON.stringify([f.confidence, f.location, f.nodeId ?? null, f.path, f.reason])).sort()
+
+describe('secrets fixtures (secret detector, contracts/SECRETS.md)', () => {
+  for (const c of corpus.secrets) {
+    test(c.name, () => {
+      // Placeholders become tokens here, in memory; the workflow then goes through the real importer like any other.
+      const imported = importWorkflow(JSON.stringify(fillDeep(c.workflow)), nodeDefinitions)
+      expect(imported.ok, `${c.file}: the workflow must import, got ${JSON.stringify(imported.ok ? [] : imported.errors)}`).toBe(true)
+      if (!imported.ok) return
+      const findings = detectSecrets(imported.workflow)
+      expect(asSecretMultiset(findings), `${c.file}: findings ({confidence, location, nodeId, path, reason}, order-insensitive)`).toEqual(asSecretMultiset(c.expect))
+    })
+  }
+
+  const positives = corpus.secrets.filter((c) => c.expect.length > 0)
+  const texts = (c: SecretCase) => scannedTexts(fillDeep(c.workflow))
+
+  test('every credential shape is found by at least one positive fixture', () => {
+    const covered = CREDENTIAL_SHAPES.filter(({ pattern }) =>
+      positives.some((c) => {
+        const t = texts(c)
+        return c.expect.some((e) => e.reason === 'credential-shape') && [...t.values, ...t.keys].some((s) => pattern.test(s))
+      }),
+    ).map((s) => s.name)
+    expect(CREDENTIAL_SHAPES.map((s) => s.name).filter((n) => !covered.includes(n)), 'shapes with no positive fixture').toEqual([])
+  })
+
+  test('every header name has a positive fixture', () => {
+    const covered = HEADER_NAMES.filter((name) => positives.some((c) => c.expect.some((e) => e.reason === 'header-name') && texts(c).keys.some((k) => k.trim().toLowerCase() === name)))
+    expect(HEADER_NAMES.filter((n) => !covered.includes(n)), 'header names with no positive fixture').toEqual([])
+  })
+
+  test('every medium key word has a positive fixture', () => {
+    const covered = KEY_WORDS.filter((word) => positives.some((c) => c.expect.some((e) => e.reason === 'key-name') && texts(c).keys.some((k) => k.toLowerCase().includes(word))))
+    expect(KEY_WORDS.filter((w) => !covered.includes(w)), 'key words with no positive fixture').toEqual([])
+  })
+
+  test('every reason, both confidences and both locations are expected somewhere, and there are at least 12 negative fixtures', () => {
+    const all = corpus.secrets.flatMap((c) => c.expect)
+    for (const reason of SECRET_REASONS) expect(all.some((e) => e.reason === reason), `reason ${String(reason)}`).toBe(true)
+    for (const confidence of ['high', 'medium']) expect(all.some((e) => e.confidence === confidence), `confidence ${confidence}`).toBe(true)
+    for (const location of ['config', 'metadata']) expect(all.some((e) => e.location === location), `location ${location}`).toBe(true)
+    expect(corpus.secrets.filter((c) => c.expect.length === 0).length, 'negative fixtures (no finding expected)').toBeGreaterThanOrEqual(12)
+  })
+
+  test('every placeholder in the table is used by at least one fixture, and every placeholder a fixture uses exists', () => {
+    const used = new Set<string>()
+    for (const c of corpus.secrets) for (const m of JSON.stringify(c.workflow).matchAll(PLACEHOLDER)) used.add(m[1])
+    expect([...used].filter((n) => !Object.hasOwn(TOKEN_BUILDERS, n)), 'unknown placeholders').toEqual([])
+    expect(Object.keys(TOKEN_BUILDERS).filter((n) => !used.has(n)), 'placeholders no fixture uses').toEqual([])
+    expect(() => fillPlaceholders('@@NOPE@@')).toThrow('unknown placeholder')
+  })
+
+  test('the placeholders build tokens the detector recognises, and a fixture in memory holds one', () => {
+    for (const name of ['SK', 'SKANT', 'GSK', 'GHP', 'GHPAT', 'AKIA', 'XOXB', 'JWT', 'PEM', 'PEMRSA', 'BEARER']) {
+      expect(detectSecrets({ nodes: [{ id: 'n', config: { t: fillPlaceholders(`x @@${name}@@ y`) } }], metadata: {} } as unknown as Workflow).length, name).toBe(1)
+    }
+    for (const name of ['PEMPUBLIC', 'JWT2', 'XOXZ']) {
+      expect(detectSecrets({ nodes: [{ id: 'n', config: { t: fillPlaceholders(`x @@${name}@@ y`) } }], metadata: {} } as unknown as Workflow), name).toEqual([])
+    }
+  })
+
+  // Push protection: no fixture file and no source file of the detector holds a literal token. The check uses the detector
+  // itself on the raw text (a whole file is one string, and a shape is found anywhere inside a string).
+  const holdsToken = (raw: string): boolean => detectSecrets({ nodes: [{ id: 'f', config: { text: raw } }], metadata: {} } as unknown as Workflow).length > 0
+
+  test('no fixture file holds a literal token-shaped string (only placeholders)', () => {
+    const files = readdirSync(FIXTURES_DIR, { withFileTypes: true, recursive: true }).filter((d) => d.isFile())
+    expect(files.length).toBeGreaterThan(100)
+    const offenders = files.map((d) => join(d.parentPath, d.name)).filter((p) => holdsToken(readFileSync(p, 'utf8'))).map((p) => relative(FIXTURES_DIR, p))
+    expect(offenders, 'fixture files with a literal token (use a placeholder, see contracts/SECRETS.md)').toEqual([])
+  })
+
+  test('no source file of the detector, its tests or the runner holds a literal token-shaped string', () => {
+    for (const rel of ['../workflow/secrets.ts', '../workflow/secrets.test.ts', '../workflow/lint.ts', '../workflow/lint.test.ts', './fixtures.test.ts']) {
+      expect(holdsToken(readFileSync(resolve(import.meta.dirname, rel), 'utf8')), `${rel} holds a literal token`).toBe(false)
+    }
+    expect(holdsToken('see ' + fillPlaceholders('@@GHP@@')), 'the check itself works').toBe(true)
   })
 })
 
@@ -1062,6 +1252,45 @@ describe('checkShape', () => {
     })
     test('the family does not accept another family field', () => {
       some(checkShape(file, { ...ok, input: {} }), 'unknown field "input"')
+    })
+    test('the secret codes carry a field (the display path) and no port', () => {
+      expect(checkShape(file, withExpect([{ code: 'secret-likely', nodeId: 'n', field: 'headers.Authorization' }, { code: 'secret-suspected', nodeId: 'n', field: 'token' }]))).toEqual([])
+      some(checkShape(file, withExpect([{ code: 'secret-likely', nodeId: 'n' }])), 'field is required')
+      some(checkShape(file, withExpect([{ code: 'secret-suspected', nodeId: 'n', port: 'p', field: 'x' }])), 'port is required for required-input-unconnected and not allowed otherwise')
+    })
+  })
+
+  describe('secrets', () => {
+    const file = 'secrets/a.json'
+    const finding = { confidence: 'high', location: 'config', nodeId: 'n', path: 'headers.Authorization', reason: 'header-name' }
+    const ok = { name: 'a', description: 'd', workflow: {}, expect: [finding] }
+    const withExpect = (e: unknown) => ({ ...ok, expect: e })
+
+    test('well-formed cases have no problems (a finding, a metadata finding, a medium finding, an empty expectation)', () => {
+      expect(checkShape(file, ok)).toEqual([])
+      expect(checkShape(file, withExpect([]))).toEqual([])
+      expect(checkShape(file, withExpect([{ confidence: 'high', location: 'metadata', path: 'note', reason: 'credential-shape' }]))).toEqual([])
+      expect(checkShape(file, withExpect([{ confidence: 'medium', location: 'config', nodeId: 'n', path: 'token', reason: 'key-name' }]))).toEqual([])
+    })
+    test('workflow must be an object and expect an array of exact, known entries', () => {
+      some(checkShape(file, { ...ok, workflow: [] }), 'workflow must be a JSON object')
+      some(checkShape(file, withExpect({})), 'expect must be an array')
+      some(checkShape(file, withExpect([{ ...finding, message: 'm' }])), 'and nothing else')
+      some(checkShape(file, withExpect([{ ...finding, confidence: 'low' }])), 'confidence must be')
+      some(checkShape(file, withExpect([{ ...finding, location: 'label' }])), 'location must be')
+      some(checkShape(file, withExpect([{ ...finding, path: 3 }])), 'path must be a string')
+      some(checkShape(file, withExpect([{ ...finding, reason: 'nope' }])), 'reason must be one of')
+    })
+    test('nodeId goes with location config only, and key-name goes with medium only', () => {
+      const { nodeId: _nodeId, ...noNode } = finding
+      some(checkShape(file, withExpect([noNode])), 'nodeId is required for location "config"')
+      some(checkShape(file, withExpect([{ ...finding, location: 'metadata' }])), 'not allowed for "metadata"')
+      some(checkShape(file, withExpect([{ ...finding, nodeId: '' }])), 'nodeId must be a non-empty string')
+      some(checkShape(file, withExpect([{ ...finding, reason: 'key-name' }])), 'key-name goes with confidence medium')
+      some(checkShape(file, withExpect([{ ...finding, confidence: 'medium' }])), 'key-name goes with confidence medium')
+    })
+    test('the family does not accept another family field', () => {
+      some(checkShape(file, { ...ok, negativeFor: ['secret-likely'] }), 'unknown field "negativeFor"')
     })
   })
 

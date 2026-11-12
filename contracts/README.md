@@ -4,7 +4,7 @@ Language-neutral test fixtures that describe the **expected outcome** of AgentFo
 (workflow import, connection rules, node config validation, the node catalog, and the exact JSON text
 written by the two serialization profiles). They are plain JSON data with no code in them.
 The serialization profiles are specified in `CANONICAL_JSON.md`; the config schema subset in `CONFIG_SCHEMA.md`.
-Node versions and migrations are specified in `MIGRATIONS.md`; the editor warnings in `WARNINGS.md`.
+Node versions and migrations are specified in `MIGRATIONS.md`; the editor warnings in `WARNINGS.md`; the secret detector in `SECRETS.md`.
 
 ## Status: tested in TypeScript only
 
@@ -32,6 +32,7 @@ contracts/
     schema/*.json                   the JSON Schema subset: validation, applyDefaults and schema-check cases
     migration/*.json                node migrations: a version 1 document in, the upgrade reports and the migrated workflow out
     warnings/*.json                 editor warnings: a workflow in, the expected warnings out (see WARNINGS.md)
+    secrets/*.json                  secret detector: a workflow with token placeholders in, the expected findings out (see SECRETS.md)
 ```
 
 ## Common rules for every case file
@@ -284,10 +285,34 @@ this family does not use error codes or JSON Pointer paths.
 - `workflow` must import successfully (the runner imports `JSON.stringify(workflow)`; incomplete configs do, decision C1).
   The runner then lints the imported workflow with the built-in catalog.
 - `expect` is a list of `{ code, nodeId }` plus `port` (only `required-input-unconnected`) or `field` (only
-  `required-field-empty`); empty means no warnings. Compared as a **multiset**; the message is never compared.
+  `required-field-empty`, `secret-likely` and `secret-suspected`; for the secret codes it is the display path, see
+  `SECRETS.md`); empty means no warnings. Compared as a **multiset**; the message is never compared.
 - `negativeFor` (optional) lists codes whose rule applies to the workflow but must not fire; the runner enforces that the
   case does not expect them and that the rule applies. Every warning code needs at least one expecting fixture and at least
   one `negativeFor` fixture.
+
+### `secrets/*.json`
+
+Cases for the secret detector (`SECRETS.md`): a workflow document in, the expected findings out. **TypeScript only: no
+Python parity is claimed; the Python runner is planned for Phase 2.** Backend enforcement is separate (Phase 2, decision
+X10) and is not implemented. This family uses neither error codes nor JSON Pointer paths: a finding has a display path.
+
+```json
+{ "name": "...", "description": "...", "workflow": { ...a workflow document, with placeholders... },
+  "expect": [ { "confidence": "high", "location": "config", "nodeId": "p", "path": "headers.Authorization", "reason": "header-name" } ] }
+```
+
+- `expect` is a list of `{ confidence, location, nodeId?, path, reason }` (`nodeId` only for `location: "config"`;
+  `reason: "key-name"` only with `confidence: "medium"`); empty means no finding. Compared as a **multiset**.
+- `workflow` must import successfully (the runner imports it with `importWorkflow`), then the runner runs `detectSecrets`.
+- **Push protection (IMPORTANT): a fixture never contains a literal token-shaped string.** The repository is pushed to
+  GitHub, whose secret scanning rejects token-shaped strings. A fixture holds a **placeholder** such as `@@GHP@@` or
+  `@@SK:19@@` (the part the shape counts has 19 characters), and the runner replaces every placeholder, in every string
+  **and every object key** of the workflow, with a synthetic token built from parts at run time. The placeholder table is
+  in `SECRETS.md` ("Fixtures and the placeholder method"); an unknown name fails the run. A test scans every fixture file and
+  every detector source file and fails if one holds a literal token.
+- Guards: every credential shape, every header name and every key word has a positive fixture; every reason, both
+  confidences and both locations are expected somewhere; at least 12 negative fixtures; a minimum count (`MIN_COUNTS.secrets`).
 
 ## Comparing errors: multisets, no messages
 
@@ -337,6 +362,9 @@ the independent statement of what the code must do.
 6. The `warnings` family has two coverage guards of its own: every code in `WARNING_CODES` must be **expected** by at
    least one `warnings` case, and must be listed in the `negativeFor` of at least one case (the rule applies there and
    does not fire). A new warning code therefore needs both kinds of case, and an applicability predicate in the runner.
+7. The `secrets` family has its own guards (see its section above and `SECRETS.md`), its own floor `MIN_COUNTS.secrets`
+   (not part of `total`), and **its fixtures use placeholders for every token**: never write a token-shaped string in a
+   fixture or in a test source.
 
 ## Never edit expected values just to make a test pass
 

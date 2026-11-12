@@ -81,7 +81,15 @@ describe('lintWorkflow: empty inputs', () => {
     expect(lint(wf([node('a', 's.proc')]), [])).toEqual([])
   })
   test('the code list has the five T7a codes', () => {
-    expect([...WARNING_CODES]).toEqual(['required-input-unconnected', 'required-field-empty', 'trigger-not-connected', 'node-unreachable', 'result-unused'])
+    expect([...WARNING_CODES]).toEqual([
+      'required-input-unconnected',
+      'required-field-empty',
+      'trigger-not-connected',
+      'node-unreachable',
+      'result-unused',
+      'secret-likely',
+      'secret-suspected',
+    ])
   })
 })
 
@@ -305,6 +313,71 @@ describe('messages', () => {
   })
 })
 
+describe('rules 6 and 7: secret-likely and secret-suspected (contracts/SECRETS.md)', () => {
+  // Built at run time: no token-shaped literal may stand in a source file (push protection).
+  const SK = 'sk' + '-' + 'x'.repeat(24)
+  const http = (id: string, headers: Record<string, unknown>) => node(id, 'http.request', { method: 'GET', url: 'https://example.test', headers, body: '' })
+
+  test('a header name gives secret-likely with the display path in field, a key word gives secret-suspected', () => {
+    const w = wf([node('h', 's.integ', { headers: { Authorization: 'anything', 'X-Trace': 'ok' }, db_password: 'p', note: '' })])
+    expect(lint(w).map((x) => [x.code, x.nodeId, x.field])).toEqual([
+      ['result-unused', 'h', undefined],
+      ['secret-likely', 'h', 'headers.Authorization'],
+      ['secret-suspected', 'h', 'db_password'],
+    ])
+  })
+
+  test('they come after the five rules of the same node; likely before suspected; then path order; then the next node', () => {
+    const w = wf([
+      node('a', 's.cfg', { password: 'x', headers: { Cookie: 'c' }, token: 'y', Authorization: 'z' }),
+      node('b', 's.cfg', { a: '1', b: '2', c: '3', secret: 's' }),
+    ])
+    expect(keys(lint(w))).toEqual([
+      'required-field-empty|a|a',
+      'required-field-empty|a|b',
+      'required-field-empty|a|c',
+      'result-unused|a',
+      'secret-likely|a|headers.Cookie',
+      'secret-likely|a|Authorization',
+      'secret-suspected|a|password',
+      'secret-suspected|a|token',
+      'result-unused|b',
+      'secret-suspected|b|secret',
+    ])
+  })
+
+  test('a node of an unknown type is scanned too (it is exported all the same)', () => {
+    const w = wf([{ ...node('g', 'ghost.type', { token: 'x' }), typeVersion: 9 }])
+    expect(lint(w).map((x) => [x.code, x.nodeId, x.field])).toEqual([['secret-suspected', 'g', 'token']])
+  })
+
+  test('metadata findings are not warnings (no node): the UI reads detectSecrets for them', () => {
+    expect(lint(wf([], [], { metadata: { Authorization: 'x', password: 'y' } }))).toEqual([])
+  })
+
+  test('a credential-shaped key is redacted in field and in the message; the value never appears', () => {
+    const w = wf([http('h', { [SK]: 'value-1', ['pre' + 'x'.repeat(41)]: 'value-2' })])
+    const secret = lint(w, nodeDefinitions).filter((x) => x.code.startsWith('secret'))
+    expect(secret.map((x) => [x.code, x.field])).toEqual([['secret-likely', 'headers.[redacted key]']])
+    expect(JSON.stringify(lint(w, nodeDefinitions))).not.toContain(SK)
+    expect(JSON.stringify(lint(w, nodeDefinitions))).not.toContain('value-')
+  })
+
+  test('a credential value in a prompt is found, and the message does not repeat it', () => {
+    const w = wf([node('l', 'llm.prompt', { provider: 'ollama', model: 'm', systemPrompt: '', prompt: `use ${SK} for the call`, temperature: 0.5 })])
+    const secret = lint(w, nodeDefinitions).filter((x) => x.code === 'secret-likely')
+    expect(secret.map((x) => x.field)).toEqual(['prompt'])
+    expect(secret[0].message).not.toContain(SK)
+    expect(secret[0].message).not.toContain(SK.slice(0, 8))
+    expect(secret[0].message).toContain('"l"')
+  })
+
+  test('no secret warnings for a workflow without secret-like text', () => {
+    const w = wf([http('h', { 'Content-Type': 'application/json' })])
+    expect(lint(w, nodeDefinitions).filter((x) => x.code.startsWith('secret'))).toEqual([])
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Purity, totality, determinism, performance
 // ---------------------------------------------------------------------------
@@ -523,10 +596,22 @@ function reference(w: Record<string, unknown>, catalog: NodeDefinition[]): Plain
   const anyTrigger = nodes.some(isTrigger)
   const blank = (v: unknown) => v === undefined || (typeof v === 'string' && /^\s*$/.test(v)) || (Array.isArray(v) && v.length === 0)
 
+  // The secret rules, flat: only the top-level keys of a config (the generator makes nothing deeper that matters).
+  const secrets = (id: string, cfg: Record<string, unknown>): Plain[] => {
+    const filled = Object.keys(cfg).filter((k) => typeof cfg[k] === 'string' && /\S/.test(cfg[k] as string))
+    return [
+      ...filled.filter((k) => k.trim().toLowerCase() === 'authorization').map((k): Plain => ({ code: 'secret-likely', nodeId: id, field: k })),
+      ...filled.filter((k) => k.trim().toLowerCase() !== 'authorization' && /password/i.test(k)).map((k): Plain => ({ code: 'secret-suspected', nodeId: id, field: k })),
+    ]
+  }
+
   const out: Plain[] = []
   for (const n of nodes) {
     const d = defOf(n)
-    if (!d) continue
+    if (!d) {
+      out.push(...secrets(n.id as string, isObj(n.config) ? n.config : {}))
+      continue
+    }
     const id = n.id as string
     const cfg = isObj(n.config) ? n.config : {}
     const hasIn = table.some((r) => r.to === id)
@@ -542,6 +627,7 @@ function reference(w: Record<string, unknown>, catalog: NodeDefinition[]): Plain
       out.push({ code: 'node-unreachable', nodeId: id })
     }
     if (d.category !== 'Output' && d.category !== 'Triggers' && d.outputs.length > 0 && !outputsUsed) out.push({ code: 'result-unused', nodeId: id })
+    out.push(...secrets(id, cfg))
   }
   return out
 }
@@ -552,7 +638,7 @@ const strip = (ws: Warning[]): Plain[] =>
 describe('property test: lintWorkflow equals an independent reference', () => {
   const IDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', '__proto__', 'constructor', 'toString']
   const PORTS = ['data', 'text', 'body', 'status', 'true', 'false', 'output', 'messages', 'input', 'tools', 'nope', '__proto__']
-  const KEYS = ['provider', 'prompt', 'method', 'url', 'operator', 'format', 'payload', 'model', 'temperature', 'constructor']
+  const KEYS = ['provider', 'prompt', 'method', 'url', 'operator', 'format', 'payload', 'model', 'temperature', 'constructor', 'Authorization', 'db_password']
   const VALUES: unknown[] = ['', '  ', '\t', 'x', 'ollama', [], [1], 0, false, {}, null, 'GET']
   const TYPES = nodeDefinitions.map((d) => [d.type, d.version] as const)
 
