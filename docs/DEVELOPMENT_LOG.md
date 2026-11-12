@@ -736,8 +736,33 @@ Phase 1.1: MS-B approved; T8 (branch semantics) implemented, reviewed and accept
 
 **Verification by the Principal Architect (commands actually run, `frontend/`):** at `4c696b4` `npm run verify` **exit 0, 17 test files, 993 unit tests, 39 e2e**; `git show --stat` (5 files, +52/-5); the fixture, `nodes.ts` and `types.ts` diffs read line by line (two `branch: true` lines plus the type field). The implementer reported one bare `npx vitest` (local binary only, no repository change) and otherwise kept the Write/Edit-only tool rules for the first time in three tasks. The reviewer's mutation run (7 mutants: 6 killed, 1 survivor, the test-strength nit) and hand walk-through are the reviewer's report. No engine code exists; **the specification has been reviewed by analysis only, nothing executes it** until Phase 3.
 
+**T7a: the pure editor-warning function (commits in order):**
+
+| Commit | What |
+|---|---|
+| `62041bf` | Sonnet implementer: `workflow/lint.ts` (`lintWorkflow(workflow, catalog)`, five rules: `required-input-unconnected`, `required-field-empty`, `trigger-not-connected`, `node-unreachable`, `result-unused`; pure, deterministic order, Map/`hasOwn` lookups, iterative BFS, messages never contain config values); the `warnings` fixture family (31 cases, multiset comparison, `negativeFor` guards) and runner; `contracts/WARNINGS.md`; `lint.test.ts` with an independent reference property test (1,500 graphs). 1097 unit tests, 39 e2e. |
+| `b472579` | Sonnet implementer, review fixes (below). 1122 unit tests (includes T7b's pure helper tests present in the tree at that time). |
+
+**Independent review (Opus 5.5, read-only) of `62041bf`: PASS WITH FINDINGS, no blockers, no majors.** The reviewer wrote its own `lintWorkflow` from the spec text (index-based facts, adjacency matrix, Warshall transitive closure, an explicit code-point whitespace set) and compared it on 4 seeds of 20,000 generated graphs: **0 differences on every workflow without duplicate ids** (reviewer's report, not repeated by Claude); derived all 31 fixtures by hand (all correct); ran 36 mutants (all listed ones killed except four survivors, below); timed 5k, 50k and 100k node chains, a 1,001,000-edge bipartite graph and fan-in/fan-out hubs (all under about 330 ms). Findings and triage (all fixed in `b472579` unless stated):
+
+| # | Finding | Disposition |
+|---|---|---|
+| M1 | "Total: never throws" overclaimed (a throwing getter or a revoked proxy on the workflow throws out) | **Fixed by rewording**: "never throws for any JSON-shaped value (own data properties only)"; no try/catch added (input is always JSON or store data) |
+| M2 | Duplicate node ids do not behave as documented (facts are keyed by id string, so all nodes sharing an id share connections and reachability); the test named for "first node wins" asserted only no-crash | **Fixed by documenting the real behaviour** (unreachable in the app: validation rejects duplicate ids first) and a test that asserts both reviewer probes |
+| M3 | `ARCHITECTURE.md` 6.1 said a non-trigger root gets `node-unreachable`; with the approved suppression rule a root with a required input gets `required-input-unconnected` instead | **Fixed**: 6.1 rule 4 amended ("one cause, one warning"); WARNINGS.md states that reachability is structural and does not model the engine's rule 5(c) |
+| M4 | The whitespace contract was only half pinned: a regex missing U+2028 and U+3000 passed all tests and fixtures; a Python-like strip set passed all fixtures | **Fixed**: the 25 code points of JavaScript `trim` are enumerated (verified with Node), near misses named (U+0085, U+180E, U+200B, U+001C to U+001F), three new fixtures (NBSP+BOM+U+2028 warns; U+0085 and U+001C do not), unit tests; mutation proof fails both fixture and unit. The Python statements remain general knowledge, not run |
+| M5 | The performance test could not catch a quadratic implementation | **Fixed**: scaling test on a chain and a star at 5,000 and 50,000 nodes (best of 3, ratio below 40); the `items.find` mutant fails it; the `queue.shift()` mutant is caught only by the star shape (a chain keeps the queue tiny), which is why both shapes exist |
+| Nits | Output exclusion untested (equivalent mutant today); order only unit-tested (said so in WARNINGS.md); README steps stale; `negativeFor` guard coarse; labels echoed in messages | N1, N2, N4 **fixed**. *Accepted, not changed:* N3 (coarse `negativeFor` guard: the full multiset comparison already implies applicability); **N5 recorded for T9**: messages echo the node label and id; T9 scans config values and metadata, not labels; if T9 widens scanning to labels, the message format must change |
+| T8 carry-over | The catalog test "a document and its export never contain branch" checked only a substring of the export | **Fixed**: walks the parsed export and the store workflow for a key named `branch` at any depth; an outputs-only duplicate test narrowed; new test that a node with a branch output has only branch outputs |
+
+**Tool-hazard record:** the Write tool decoded a single backslash-u escape when the implementer first wrote the Unicode fixtures; the working method (write a placeholder `QAZ` after a backslash, then Edit the placeholder to `u00a0`) produced files that hold the six-character JSON escapes; the Principal Architect checked the three fixtures' bytes with `od -c` (pure ASCII, escapes intact).
+
+**Process notes:** the T7a fix round could not run a clean `npm run verify` of its own commit alone because T7b's files were in the shared tree (parallel work; one e2e run also hit port contention and a flaky download). The Principal Architect ran `npm run verify` on the finished tree. The T7a implementer kept the Write/Edit-only tool rules in both rounds.
+
+**Verification by the Principal Architect (commands actually run, `frontend/`):** at `62041bf` `npm run verify` exit 0 (18 files, 1097 unit, 39 e2e); at `eb166b1` (T7a fixes plus T7b) **exit 0, 19 files, 1122 unit tests, 51 e2e passed**; `git show --stat`; fixture byte check. The reviewer's own-reference differential, mutation run and timings are the reviewer's reports.
+
 **Status:**
-T8 **accepted** (code at `4c696b4`; specification corrected after review, to be committed with these records). T7a (pure lint function) is with the implementer.
+T8 **accepted** (code at `4c696b4`; specification corrected after review). T7a **accepted** (`62041bf` + `b472579`). T7b (UI: node badge, toolbar list, config-panel section; `eb166b1`) is committed and under Opus review.
 
 **Next Task:**
-T7a review, then T7b (UI), then T9 (secret detection), then T10; MS-C after T10.
+T7b review and acceptance, then T9 (secret detection and export confirmation), then T10; MS-C after T10.

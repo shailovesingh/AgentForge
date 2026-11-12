@@ -3,7 +3,7 @@
 > **For the Product Owner.** Part 1 is a plain-language **primer** (reference material: what we are building and how the code is organised). Part 2 is the **teaching record** (lessons actually taught and what you demonstrated).
 > The **curriculum and statuses** are in `docs/LEARNING.md`. Learning progress is tracked separately from implementation progress.
 > **Living document.** The Principal Architect updates it at the end of every task (D-028). The primer describes the project **as it is today**; where something is planned but not built, it says so.
-> Last updated: 2026-11-12, after Phase 1.1 T8, the branching specification and the `branch` marker (Lesson L9, code commit `4c696b4`, specification corrected in `32066b2`).
+> Last updated: 2026-11-12, after Phase 1.1 T7a, the pure editor-warning function `lintWorkflow` (Lesson L10, commits `62041bf` and `b472579`; the UI that shows the warnings, T7b, `eb166b1`, is under review and not yet taught). Before that: T8, the branching specification (Lesson L9).
 
 # Part 1: Primer
 
@@ -28,7 +28,8 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | A catalog of 6 node types | AI models, agents, tools (Phase 4) |
 | Old files keep working: a file saved with an older version of a node is upgraded in memory and the editor tells you (the original file is never rewritten) | Natural-language workflow generation (Phase 5) |
 | The rules for conditional branching, skipped nodes and joins are written down as a binding specification (`docs/ARCHITECTURE.md` section 6.1); the only code is a small marker on the Condition's output ports | |
-| 993 unit tests in 17 test files and 39 browser tests (at commit `4c696b4`) | |
+| The pure function that works out the editor warnings (an unconnected required input, an empty required setting, a trigger leading nowhere, a node nothing starts, a result nobody uses); it is built and tested (Lesson L10); showing it in the editor, T7b, is committed and still under review | |
+| 1122 unit tests in 19 test files and 51 browser tests (at commit `eb166b1`, which includes T7b's tests) | |
 | A CI workflow that runs the checks on GitHub | The backend server, database, saving to a server (Phase 2) |
 
 **Important:** today everything runs **in your browser only**. There is no server. Nothing runs a workflow yet. The editor produces a *description* of a workflow; later phases will execute it.
@@ -36,7 +37,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | Phase | What it delivers | Status |
 |---|---|---|
 | 1 | The visual editor | Done and accepted |
-| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 6 and T8 of 10 done, with task 5 in two halves, T5a and T5b; T6, upgrading old files, and T8, the branch rules, are done; T7, warnings in the editor, is next) |
+| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 6, T8 and T7a of 10 done, with task 5 in two halves, T5a and T5b; T6, upgrading old files, T8, the branch rules, and T7a, the warning function, are done; T7b, showing the warnings in the editor, is committed and under review) |
 | 2 | Backend server and database; save/load workflows | Planned, not approved |
 | 3 | Execution engine: actually run workflows | Planned |
 | 4 | AI runtime: LLM and Agent nodes | Planned |
@@ -103,7 +104,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **Migration.** Upgrading an old file to the current format *in memory*, without overwriting the original. Built in Phase 1.1 task T6 (Lesson L8): when you import a file, each node whose `typeVersion` is older than the catalog's is upgraded by a chain of small steps (`frontend/src/workflow/nodeMigrations.ts`); the Agent node's `maxIterations` became a whole number in version 2, so a version 1 value such as 2.5 is rounded half up to 3 with a note. A banner tells you what changed. A node *newer* than the editor, or older with no path, is an error (`node.version-newer`, `node.no-migration-path`). Writing the upgraded file to a server is planned (Phase 2), not built.
 
-**Validation (errors) vs warnings.** *Errors* mean the file is structurally wrong (unknown node type, impossible connection); it is rejected. *Warnings* mean "this looks incomplete" (an empty required setting, an unconnected node); they never stop you from working. We keep them strictly separate (decision D-018).
+**Validation (errors) vs warnings.** *Errors* mean the file is structurally wrong (unknown node type, impossible connection); it is rejected. *Warnings* mean "this looks incomplete" (an empty required setting, an unconnected node); they never stop you from working. We keep them strictly separate (decision D-018). The warnings come from a separate pure function, `lintWorkflow` in `frontend/src/workflow/lint.ts` (T7a, Lesson L10): they are worked out again from the workflow and the catalog whenever needed, never stored in the file, never blocking.
 
 **DAG and "no cycles".** A *directed acyclic graph*: arrows that never loop back. The workflow engine will run nodes in dependency order, which only works if there are no loops. Anything that needs looping (an agent thinking in steps) happens *inside* the Agent node using a library called LangGraph. The editor already refuses a connection that would create a cycle.
 
@@ -115,7 +116,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **Provider.** Which AI service a node uses: Ollama (local), OpenAI, Anthropic or Groq. We design so adding one does not change the file format. Groq was added in T5b; the one `PROVIDERS` list in `frontend/src/catalog/nodes.ts` feeds both the LLM Prompt and the Agent node.
 
-**Incomplete drafts (decision C1, built in T5b, Lesson L7).** A file whose node is missing a *required* setting (for example an LLM Prompt with no `provider`) still imports. The editor must be able to hold half-finished work. A wrong type, a value outside the allowed list or range, or an unknown setting are still errors. A missing required setting is meant to become a *warning* in the editor (planned, task T7) and an *error only when the workflow is run* (Phase 3, planned).
+**Incomplete drafts (decision C1, built in T5b, Lesson L7).** A file whose node is missing a *required* setting (for example an LLM Prompt with no `provider`) still imports. The editor must be able to hold half-finished work. A wrong type, a value outside the allowed list or range, or an unknown setting are still errors. A missing required setting is a *warning* in the editor (`required-field-empty`, computed by `lintWorkflow`, T7a, Lesson L10; showing it in the editor is T7b, under review) and an *error only when the workflow is run* (Phase 3, planned).
 
 **Strict parsing (built in task T4a, Lesson L4).** Reading an imported file with our own small parser instead of the browser's built-in one, so that problems the built-in parser hides (a repeated key, a number too big to store exactly, a file that is not valid UTF-8) become clear errors. It also enforces AgentForge's limits: numbers no larger than 2^53 - 1 in magnitude, nesting at most 64 levels, files at most 5,000,000 bytes. See `frontend/src/workflow/strictJson.ts` and `valuePolicy.ts`.
 
@@ -173,8 +174,8 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 | Kind | Tool | What it does | Command |
 |---|---|---|---|
-| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the catalog and the shared fixtures in `contracts/`). 993 in 17 test files at commit `4c696b4`. | `npm test` |
-| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 39 at commit `4c696b4`. | `npm run test:e2e` |
+| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the warning function, the catalog and the shared fixtures in `contracts/`). 1122 in 19 test files at commit `eb166b1` (the Principal Architect's `npm run verify`). | `npm test` |
+| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import (and, since T7b, the warnings). 51 at commit `eb166b1`. | `npm run test:e2e` |
 | **Type check** | TypeScript | Catches mismatched data shapes before running | part of `npm run build` |
 | **Lint** | Oxlint | Catches suspicious code patterns | `npm run lint` |
 | **Everything** | | All of the above, in order | `npm run verify` |
@@ -227,7 +228,7 @@ npm run dev              # open http://localhost:5173
 
 ## 10. What happens next
 
-Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (done, Lesson L8; its review fixes are committed); **T8** the branch rules written down (done, Lesson L9; the specification is in `docs/ARCHITECTURE.md` section 6.1, no engine); **T7** warnings in the editor (next); **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
+Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (done, Lesson L8; its review fixes are committed); **T8** the branch rules written down (done, Lesson L9; the specification is in `docs/ARCHITECTURE.md` section 6.1, no engine); **T7a** the pure warning function (done, Lesson L10); **T7b** showing the warnings in the editor (committed, under review); **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
 
 ## 11. Glossary, quick reference
 
@@ -265,6 +266,7 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | **L7** | Phase 1.1 T5b (commits `7b09662`, `44bd7f4`): the catalog, importer (decision C1) and settings panel move onto the JSON Schema subset | 7 (main), 3, 2, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L8** | Phase 1.1 T6 (commits `2baee23`, `be43319`): versioned node migrations, `agent.autonomous` version 2, the upgrade banner | 3 (main), 7, 2, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L9** | Phase 1.1 T8 (code `4c696b4`; specification `ARCHITECTURE.md` section 6.1 and D-034, corrected in `32066b2`): branching, skipping and joins; the `branch` marker; reviewing a specification | 6 and 5 (main, for the specification only: no engine exists), 7, 12, 3 | 2026-11-12 | 6 (answered at the end of the project) | Explained; evaluation pending |
+| **L10** | Phase 1.1 T7a (commits `62041bf`, `b472579`): editor warnings as a pure, derived function (`lintWorkflow`), the five rules, the whitespace contract and the review stories (the UI that shows them, T7b, is not covered) | 3 (main), 7, 6, 12 | 2026-11-12 | 6 (answered at the end of the project) | Explained; evaluation pending |
 
 ## Concept index
 
@@ -362,6 +364,20 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | Concurrency from independent ready nodes, termination because the graph has no cycles (D-006) | 6, 5 | L9 | Explained (no evidence) |
 | A specification is code you cannot run: review it by walking worked examples by hand; find contradictions before acceptance; examples as future tests (specification only, no engine; reports from the review) | 12 | L9 | Explained (no evidence) |
 | Alternatives rejected for branching (implicit skipping, skip token, evaluate both, scheduling marker, fail-fast) | 5, 6 | L9 | Explained (no evidence) |
+| Derived data versus stored data: a pure function recomputed after every edit, nothing kept in the document (`lintWorkflow`) | 3 | L10 | Explained (no evidence) |
+| Warnings versus errors in code: a separate function and type, never blocking; `validateWorkflow` stays errors-only (D-017, D-018); only workflows that import are linted | 3 | L10 | Explained (no evidence) |
+| Roles from the catalog (category: source, sink, processor; port direction) instead of a private list of node types | 7 | L10 | Explained (no evidence) |
+| The five rules (`required-input-unconnected`, `required-field-empty`, `trigger-not-connected`, `node-unreachable`, `result-unused`), "empty" for a setting, "only evaluated when a trigger exists" | 3, 7 | L10 | Explained (no evidence) |
+| One cause, one warning (the suppression rule) and its limit (an incoming edge on another port) | 3, 6 | L10 | Explained (no evidence) |
+| Reachability by breadth-first search; why iterative with a moving index; structural versus run-time reachability (the engine's rule 5(c)) | 6, 5 | L10 | Explained (no evidence) |
+| Defensive reading of untrusted-shaped data: Map and own-property lookups, ids such as `__proto__`, an edge table that ignores edges to nowhere | 3, 12 | L10 | Explained (no evidence) |
+| Messages never contain values (so a later secret detector cannot leak a secret into the UI) | 3, 12 | L10 | Explained (no evidence) |
+| The whitespace contract: the exact 25 code points of JavaScript `trim`, near misses, Python `strip` differing (general knowledge, not run); fixtures a port must run | 1, 3, 12 | L10 | Explained (no evidence) |
+| The `warnings` fixture family: multiset comparison, `negativeFor` ("the rule applies but does not fire"), coverage guards; order is unit-tested only | 12 | L10 | Explained (no evidence) |
+| Independent reference implementations (in-test `reference()` and a reviewer's own, a report), a generator that must exercise the rules, differential testing | 12 | L10 | Explained (no evidence) |
+| Scaling tests: compare 5,000 with 50,000 nodes, a ratio instead of milliseconds, two graph shapes (chain and star) because a test detects only what its input exercises | 12 | L10 | Explained (no evidence) |
+| Documenting a boundary honestly (never throws for JSON-shaped values; duplicate ids) instead of over-engineering for an unreachable case | 12, 3 | L10 | Explained (no evidence) |
+| A specification can contradict the code it describes (ARCHITECTURE 6.1 rule 4 versus the suppression rule); a file-tool hazard with Unicode escapes and the byte check | 12 | L10 | Explained (no evidence) |
 | Primer concepts (workflow, node, port, edge, catalog, config schema, `schemaVersion` vs `typeVersion`, validation vs warnings, DAG, credentials) | 1, 2, 3, 6, 7 | Primer (Part 1) | Explained as reference (no evidence, no lesson) |
 
 ---
@@ -1817,3 +1833,202 @@ These are reports from `docs/DEVELOPMENT_LOG.md` Session 12, except where I say 
 4. A node J has a `multiple` input fed by one failed edge and one active edge. What does the specification say happens, which rule decides, and why was this unclear in the first draft? Then argue for or against "no fail-fast": what are the costs of letting independent branches keep running after a failure, and what are the costs of stopping them?
 5. The reviewer found the code correct but the specification contradictory. What does that tell you about where bugs hide in a design? How did the reviewer find them without running anything, and what would you do to turn the seven worked examples into automatic tests once the engine exists?
 6. The `branch` marker is added to the catalog but not to saved workflow documents. Why does that mean no `schemaVersion` bump and no migration are needed, and which test checks it? What would break for old files if `branch` were stored in the document instead? Name one future component (planned, not built) that depends on `branch` appearing in the catalog fixture, and explain why.
+
+---
+
+## Lesson L10: Telling people what is unfinished without ever stopping them (editor warnings as a pure, derived function: `lintWorkflow`)
+
+**Task:** Phase 1.1 T7a (decisions D-017 and D-018; plan section 3.6), commits `62041bf` (the function, its fixtures and its tests) and `b472579` (the review fixes). **Modules:** 3 (Workflow JSON and State Management: derived data versus stored data, warnings versus errors), 7 (Node Registry and Data Propagation: the node contract as the source of roles: category, required ports), 6 (Graph Theory and DAG Execution: reachability, why the search is iterative), 12 (Security, Testing and Deployment: independent reference implementations, mutation testing, scaling tests, fixtures as the cross-language contract).
+
+*Status of what this lesson describes.* The **pure function exists and is tested**. **T7b, the part that shows the warnings in the editor (a badge on a node, a list in the toolbar, a section in the settings panel), is separate work: T7b shows them in the UI.** It is committed (`eb166b1`) and under review, and this lesson does not cover it. The secret-detection codes (`secret-likely`, `secret-suspected`) are planned for task T9 and do not exist. There is no Python version: `contracts/WARNINGS.md` says "TypeScript only. No Python parity is claimed; the Python runner is planned for Phase 2". **What I verified myself:** I read `frontend/src/workflow/lint.ts` and `frontend/src/workflow/lint.test.ts` in full, `contracts/WARNINGS.md`, the warnings runner in `frontend/src/contracts/fixtures.test.ts`, the fixtures `warn-orphan-chain`, `warn-llm-result-unused`, `warn-isolated-trigger`, `warn-output-without-input`, `warn-http-url-empty`, `warn-new-node-defaults`, `warn-no-trigger-no-unreachable`, `warn-condition-one-branch-wired`, both suppression fixtures and the three whitespace fixtures, `frontend/src/catalog/nodes.ts` (categories, required ports and required settings of all six node types), `docs/PHASE1_1_PLAN.md` section 3.6, `docs/DECISIONS.md` D-017 and D-018, and `docs/DEVELOPMENT_LOG.md` Session 12 (the review triage). `git show --stat` for both commits: `62041bf` is 36 files (+1675/-5) and `b472579` is 9 files (+222/-32). **What I ran myself:** (1) a Node program that enumerated every UTF-16 code unit outside the surrogate range and printed the ones whose `trim()` is empty: **25 of them, exactly the list in `contracts/WARNINGS.md`**; it also confirmed that U+0085, U+180E, U+200B and U+001C to U+001F are **not** trimmed to empty, and that the JavaScript regular-expression whitespace shorthand matches U+FEFF but not U+0085 or U+001C; (2) `npm test -- src/workflow/lint.test.ts` in `frontend/`: **1 file, 79 tests passed**. **What I did not run:** the full suite. The numbers **19 test files, 1122 unit tests and 51 end-to-end tests at `eb166b1`** are the Principal Architect's `npm run verify` result (exit 0), reported to me; the 51 includes T7b's browser tests, and the new tests that belong to this lesson's subject are the pure-function ones (`lint.test.ts`, the warnings fixture runner and the fixtures). **Reports, not repeated by me:** the Opus reviewer's own implementation and its comparison on 4 x 20,000 generated graphs, its 36 mutants, its timings and its hand derivation of the fixtures, as recorded in `docs/DEVELOPMENT_LOG.md` Session 12. **Python facts** (what `str.strip()` removes) are general knowledge, not run in this session. One more honest note: the corrected wording of `docs/ARCHITECTURE.md` section 6.1 rule 4 (finding 5 below) is in the Principal Architect's **uncommitted** working-tree edit at the time of writing; the committed (HEAD) text still has the old wording.
+
+### 1. The problem
+
+Think of a spell-checker in a word processor. It underlines a word in red, but it never stops you typing, never refuses to save the file, and the red lines are not part of the file. If you close and re-open the document, the underlines are worked out again from the text. Now imagine the opposite design: the word processor refuses to save a document that contains a typo, or writes the red lines into the file. That would be unusable for drafts.
+
+AgentForge's editor has the same need. A person drags an LLM Prompt node onto the canvas: its prompt is empty, nothing is connected. That is a perfectly normal moment in building a workflow, and the project already decided it must be allowed (decision D-017: warnings never block; decision C1 / D-025: an absent required setting is a completeness question, not an import error; Lesson L7). But the person should still be told what is unfinished. Five kinds of unfinished are worth reporting:
+
+| Code | Plain meaning |
+|---|---|
+| `required-input-unconnected` | A required input has no line going into it |
+| `required-field-empty` | A required setting is missing, blank or an empty list |
+| `trigger-not-connected` | A trigger (a starting point) has nothing connected to it |
+| `node-unreachable` | Nothing that starts a workflow can ever lead to this node |
+| `result-unused` | A node produces a result that nobody uses |
+
+Two design traps sit behind this list, and both were named in the decisions before any code existed:
+
+1. **Mixing hints into the validator** (D-018). `validateWorkflow` answers "is this file valid?". "This draft is unfinished" is a different question with a different consequence (a warning never blocks anything, an error rejects the file). Putting both in one list, even with a severity field, invites someone to later treat "any item in the list" as "reject".
+2. **Storing hints in the document.** A saved workflow must mean the same thing whoever opens it. If warnings lived inside it, the file would depend on UI state, would go stale the moment someone edited a node, and would travel to the backend, the engine and the AI generator as noise.
+
+### 2. The concept
+
+**Derived data versus stored data.** A value is *derived* when you can always work it out again from other data, so you do not keep a copy. The warnings are derived from two inputs only: the workflow document and the node catalog. The function `lintWorkflow(workflow, catalog)` is a **pure function** (same input, same output; it changes nothing; it has no memory between calls), so "ask again after every edit" is always correct and there is nothing to keep in sync.
+
+**Warnings versus errors (D-018).** Errors mean the file is structurally wrong (unknown type, impossible connection, wrong value type). They block import and, later, save. Warnings mean the file is fine but unfinished. They never block editing, saving, exporting, importing or running. They have their own type (`Warning`, with `severity: 'warning'`) and their own function, and `validateWorkflow` does not know they exist.
+
+**Roles from the contract, not from a private list.** A rule such as "a node nobody starts" needs to know which nodes *start* things and which *end* them. The function does not keep its own list of node types (the project rule is that the catalog is the single source of node types). It reads two facts from the catalog definition: the node's **category** and the **direction of each port**. `Triggers` are **sources** (they start things), `Output` is a **sink** (it ends things; its result is "used" by definition), and `AI`, `Integrations` and `Logic` are **processors**. Inputs receive; outputs emit. A new node type placed in the catalog with the right category gets the right warnings with no change to `lint.ts`.
+
+**Reachability.** A node is *reachable* when you can follow lines forward from some trigger and arrive at it. The function marks everything reachable with a **breadth-first search (BFS)**: start with all triggers, repeatedly visit the nodes their outgoing lines lead to, never visit a node twice. This is **structural** reachability: every line counts and every output port counts, whatever the node would do at run time. (The engine's rules in `docs/ARCHITECTURE.md` section 6.1 are about behaviour: a Condition node's untaken branch is *skipped at run time* although the line to it is drawn. The two ideas are deliberately different; see section 4.)
+
+**One cause, one warning.** If an Output node has nothing connected, it is true that it has an unconnected required input **and** that it is not reachable from a trigger. Two warnings about one mistake would be noise. The rule: when a node has an unconnected required input **and no incoming line at all**, report only the input.
+
+### 3. Why we selected this approach
+
+1. **A separate pure function.** It can be tested with plain data, no browser, no store, no React. It cannot block anything because nothing awaits it and it returns a list. It cannot corrupt the document because it never writes to it (a test deep-freezes the workflow and the catalog and checks they are unchanged).
+2. **Derived, never stored.** No synchronisation, no stale warnings, no change to the file format (so no `schemaVersion` bump and no migration, compare L9's `branch` marker).
+3. **Roles from the catalog.** One source of truth for node types; adding a node type needs no rule change.
+4. **Text-free comparison.** The `message` is for people and may be reworded at any time, so fixtures compare only `{code, nodeId, port, field}`, the same policy as the error fixtures (L2, L3).
+5. **Messages never contain values.** A message names the node (its label, or its id when the label is blank) and the port or field, never a setting's value. Reason: task T9 will detect secrets pasted into settings; a warning that quoted the value would copy the secret into the screen. A unit test plants a sentinel string in settings, workflow metadata, name and description and asserts it appears in no message (I read the test).
+6. **Written down as a contract** (`contracts/WARNINGS.md`) with a fixture family, so that the Phase 2 Python backend (planned) can implement the same function and be checked against the same files.
+
+### 4. How it works internally
+
+*(All of this is in `frontend/src/workflow/lint.ts`. The diagram follows the code.)*
+
+```mermaid
+flowchart TD
+  IN["Inputs: the workflow (nodes, edges) and the catalog (node definitions)"] --> ITEMS["Per-node facts (an Item): id, display name (label or id),<br/>definition found by the exact (type, typeVersion) pair, config<br/>an unknown type or version gives no definition"]
+  ITEMS --> TABLES["One pass over the edges builds three tables:<br/>incoming: node id to input ports that have an edge<br/>outgoing: node id to output ports that have an edge<br/>next: node id to target node ids<br/>An edge is ignored if a node is missing, or, for a node with a known definition, if its port is missing in that direction"]
+  TABLES --> SEED{"Is any node in category Triggers?"}
+  SEED -- "yes (hasTrigger)" --> BFS["Iterative BFS from every trigger along next<br/>result: the reached set"]
+  SEED -- "no" --> NOREACH["reached stays empty and rule 4 is never evaluated"]
+  BFS --> LOOP
+  NOREACH --> LOOP
+  LOOP["Then ONE loop over nodes in array order, rules 1 to 5 for each node (nodes without a definition are skipped)"]
+  LOOP --> R1["Rule 1 required-input-unconnected<br/>uses: incoming"]
+  LOOP --> R2["Rule 2 required-field-empty<br/>uses: config only, no edges"]
+  LOOP --> R3["Rule 3 trigger-not-connected<br/>uses: outgoing"]
+  LOOP --> R4["Rule 4 node-unreachable<br/>uses: reached"]
+  LOOP --> R5["Rule 5 result-unused<br/>uses: outgoing"]
+  R1 -. "suppression: rule 4 stays silent when the node has an unconnected required input and no incoming edge at all" .-> R4
+  R1 --> OUT
+  R2 --> OUT
+  R3 --> OUT
+  R4 --> OUT
+  R5 --> OUT
+  OUT["Warning list: node array order, then rule 1 to 5, then port or field in catalog order"]
+```
+
+**Step by step.**
+
+1. **Defensive reading.** The first lines treat the input as *untrusted-shaped*: `isRecord` and `list` accept anything and fall back to "nothing". Each node's definition is found with a `Map` keyed by type and then an exact `version` match, the same exact pair that `connections.ts` uses. A node with an unknown type or version simply has no definition: no rule that needs a definition fires for it, but it still carries edges, so a path through it still counts for reachability (a unit test checks this).
+2. **The edge tables.** Every lookup keyed by an id, port or config key that came from a file uses a `Map` or `Object.hasOwn`, never a plain object property read. Why: an id such as `__proto__`, `constructor` or `toString` would otherwise find something that was never put there (this is the lesson of L4 and L2 applied again, and two fixtures, `warn-prototype-named-ids-clean` and `warn-prototype-named-ids-warn`, pin it).
+3. **Reachability.** The queue is a plain array with a moving `head` index, and the loop is a `for`, not a recursive function and not `queue.shift()`. Why this matters is in the review stories (finding 4).
+4. **The five rules**, applied to each node in turn. Roles and an example of each:
+
+| # | Code | Which nodes | AgentForge example | Fixture that shows it |
+|---|---|---|---|---|
+| 1 | `required-input-unconnected` | Any category; every input with `required: true` and no incoming edge | The Output node's single `input` (required) with nothing connected; the Agent's `input` (Task); the Condition's `input` | `warn-output-without-input` |
+| 2 | `required-field-empty` | Any node with a catalog definition; each property in its `configSchema.required` that is absent, a blank string or an empty list | An LLM Prompt (required: `provider`, `prompt`) whose `prompt` is the empty string, which is what a freshly dropped node has; an HTTP Request whose `url` is empty | `warn-new-node-defaults`, `warn-http-url-empty` |
+| 3 | `trigger-not-connected` | Sources only: a `Triggers` node that has outputs and none of them has an outgoing edge | A Manual Trigger whose `data` port goes nowhere | `warn-isolated-trigger` |
+| 4 | `node-unreachable` | Everything except `Triggers`, **only if the graph contains a trigger**, and not reachable from any trigger | A second LLM Prompt wired to a second Output but not to the trigger: both warn | `warn-orphan-chain`, `warn-no-trigger-no-unreachable` (the case where it must not fire) |
+| 5 | `result-unused` | Processors only (not `Output`, not `Triggers`) that have outputs, none of which has an outgoing edge | An LLM Prompt fed by the trigger whose `text` port is not connected | `warn-llm-result-unused`, `warn-condition-one-branch-wired` (wiring one of a Condition's two branches is enough, so no warning) |
+
+Three details worth stopping at. **Rule 2 reads the settings only**: it does not look at any edge, and "empty" means absent (not an own key, or `undefined`), a blank string, or an empty array; `0`, `false`, `null` and `{}` are values (a unit test table pins each). **Rule 4's "only when there is a trigger"** reflects that a half-built workflow with no trigger yet is not wrong about reachability; there is nothing to be reachable *from* (`warn-no-trigger-no-unreachable`). **The suppression rule** is the single condition in rule 4: `!(missingInput && !connectedIn)`. Read it as "do not warn about unreachability when the node has an unconnected required input *and* nothing at all is connected into it". The fixture `warn-suppression-one-cause` shows a second, lone Output: it gets only `required-input-unconnected`. The fixture `warn-suppression-needs-no-incoming-edge` shows the limit: an Agent whose required Task input is unconnected but whose optional `tools` input receives a line from an orphan Condition gets **both** `required-input-unconnected` and `node-unreachable` (plus `result-unused`), because it does have an incoming edge, so the two warnings are two different facts.
+
+5. **Order.** The list is in a fixed order: node array order, then rule 1 to 5, then port or field in catalog order. The same input always gives the same list, and the order of the `edges` array does not matter (a test reverses it). Why it matters: a UI list that reshuffles on every edit is unusable, and a second implementation must be able to match the order.
+
+**A worked example.** Nodes in array order: `t` Manual Trigger, `l` LLM Prompt (provider set) with an empty prompt, `o` Output, `l2` LLM Prompt with provider and prompt set, `o2` Output, `o3` Output. Lines: `t.data -> l.input`, `l.text -> o.input`, `l2.text -> o2.input`. Then: `t` is connected (no rule 3 warning). `l` has `required-field-empty` for `prompt`; it is connected, reached and its result is used. `o` is fine. `l2` is **not reachable** from `t` (`node-unreachable`), though its own result is used. `o2` has a connected input but is not reachable (`node-unreachable`). `o3` has `required-input-unconnected` and, because nothing at all is connected into it, **no** `node-unreachable`. The list is therefore, in order: `required-field-empty|l|prompt`, `node-unreachable|l2`, `node-unreachable|o2`, `required-input-unconnected|o3|input`.
+
+**Structural versus run-time reachability.** `contracts/WARNINGS.md` states the limit explicitly: reachability here follows every drawn line and counts every output port, selected or not. A node can be reachable here and still be **skipped at run time** (a Condition's untaken branch, or a node whose required input has no active edge: the engine's rule 5(c) in `docs/ARCHITECTURE.md` section 6.1, specification only, no engine exists). That second cause is reported once, as `required-input-unconnected` on the node, not as `node-unreachable`.
+
+### 5. How it communicates with other components
+
+- **Inputs.** `lintWorkflow(workflow: Workflow, catalog: NodeDefinition[]): Warning[]`. The workflow is the same document the store holds and `importWorkflow` produces; the catalog is the built-in one (`frontend/src/catalog/nodes.ts`, `nodeDefinitions`). No other input, no global state.
+- **Output.** A list of `Warning` objects: `code`, `severity: 'warning'`, `nodeId`, optional `port` (for rule 1) or `field` (for rule 2), and a `message`. `nodeId` lets a UI jump to the node; `port` and `field` let it point at the exact input or setting.
+- **Callers today.** The shared-fixture runner `frontend/src/contracts/fixtures.test.ts` (the `warnings` family) and the unit tests. **T7b shows them in the UI**; I did not review T7b for this lesson. Notice what this means for the data flow: nothing about the *import* path changed. A file is parsed, migrated, validated and loaded exactly as in L8; only afterwards can the editor ask `lintWorkflow` about the loaded workflow.
+- **The validator.** `validate.ts` is untouched and does not know warnings exist (D-018). The fixture runner first calls `importWorkflow` on each fixture and asserts that it **imports successfully**: warnings are only defined for workflows that are valid but unfinished, which is also why incomplete configs import (decision C1, L7).
+- **The catalog.** Rules read `category`, port `required` flags and `configSchema.required`. The catalog is also where the planned engine and the planned natural-language generator will read the same facts.
+- **Future components (planned).** T9 will add `secret-likely` and `secret-suspected` to `WARNING_CODES` (a comment in `lint.ts` says so); Phase 2 may serve warnings next to the 422 errors from the API (D-018 consequences); the engine's rule 5 uses the *same* graph facts at run time, which is why the specification cross-refers to `node-unreachable`.
+- **The fixture family.** `contracts/fixtures/warnings/` holds 34 files at HEAD (I counted: 31 from the first commit plus the 3 whitespace fixtures from the fix commit). `MIN_COUNTS.warnings` in the runner is 34. Two coverage guards (also in the runner): every code must be **expected** by at least one fixture, and every code must appear in at least one `negativeFor`.
+
+**`negativeFor`, in plain words.** A test that only shows "this warning fires" does not show that the rule is not simply always on. So a fixture may list `negativeFor: ["result-unused"]`, meaning "this workflow *contains something the rule is about* but the rule must stay quiet". The runner checks two things: the fixture does not expect that code, and the workflow really has a node the rule applies to (`RULE_APPLIES` in the runner: for example for `result-unused`, a non-sink non-trigger node with outputs). Because the whole expected list must equal what `lintWorkflow` returns, "applies and not expected" means "applies and did not fire".
+
+### 6. Important classes, functions and code paths
+
+| Where | What it does |
+|---|---|
+| `frontend/src/workflow/lint.ts`: `lintWorkflow` | The whole function: items, edge tables, BFS, the five rules, the ordered list |
+| `lint.ts`: `WARNING_CODES`, `Warning` | The five codes (a tuple, so `WarningCode` is a union type) and the result type |
+| `lint.ts`: `isEmptyValue` | Rule 2's definition of empty: `undefined`, `value.trim() === ''` for strings, an empty array. Anything else is a value |
+| `lint.ts`: `portsOf`, `requiredFields`, `isRecord`, `list` | Defensive readers: wrong shapes become "nothing", never an exception |
+| `lint.ts`: `byType` map, `firstById` map | Exact `(type, version)` lookup; with duplicate ids the first node's definition decides which ports an edge may use |
+| `frontend/src/workflow/lint.test.ts` | 79 tests (I ran this file): each rule, messages, purity (deep-frozen inputs), determinism and order, totality on garbage, prototype-named ids, duplicate ids, scaling on two graph shapes, and the seeded property test against `reference()` |
+| `frontend/src/contracts/fixtures.test.ts`: the `warnings` family | Validates fixture shape, imports each workflow, compares warnings as a multiset (`asWarningMultiset`), runs the `negativeFor` and coverage guards |
+| `contracts/WARNINGS.md` | The contract: roles, the five rules, the 25-code-point whitespace set, order, duplicate ids, structural reachability, messages, fixture format |
+| `contracts/fixtures/warnings/*.json` | 34 language-neutral cases |
+| `docs/PHASE1_1_PLAN.md` section 3.6 | The approved design, including the roles table |
+
+### 7. Alternatives and trade-offs
+
+| Option | Good | Costs |
+|---|---|---|
+| **A separate pure derived function (chosen)** | Testable with data; cannot block or corrupt anything; nothing stored to go stale; no file-format change | The caller must recompute (cheap at editor scale: one pass over nodes and edges plus a traversal) |
+| **Warnings inside `validateWorkflow` with severity levels** (rejected, D-018) | One pass, one list | Blurs "invalid file" with "unfinished draft"; one forgotten `if (severity === 'error')` turns warnings into blockers; the backend would inherit the confusion |
+| **Store warnings in the document** | The UI could show them without recomputing | The file depends on UI state; stale after any edit; noise for the engine and the AI generator; changes the file format |
+| **Compute inside each component** (badge, list, panel) | Each component has what it needs | Three implementations that disagree; three sets of tests; no contract to give a second language |
+| **Use a lint library** | Less code to write | A rules engine for five graph rules is a heavy dependency; our rules need our catalog's roles and our exact whitespace contract; a new major dependency needs a decision record |
+| **Throw on incomplete drafts** | Simple to reason about | The editor could not hold half-finished work at all; contradicts D-017 and C1 |
+| **Make the function try/catch everything** (rejected in the review) | Looks "safer" | Hides bugs; defends against inputs (getters, proxies) that cannot occur: the input is JSON or store data. See finding 2 |
+
+### 8. Real-world engineering applications
+
+*From general knowledge, not from this repository.*
+
+- **Linters and language servers** (ESLint, the problems panel of an editor) work the same way: derived from the source, never stored in the file, severity levels separate from compile errors.
+- **Form builders and low-code tools** (n8n, Zapier, Node-RED) show "required field missing" and "node not connected" hints on a canvas without blocking save.
+- **Static analysis of pipelines**: CI systems and infrastructure-as-code tools check for unreachable jobs or unused outputs in a graph before running anything.
+- **Reachability by BFS** is also used to find dead code, orphaned database rows, and unreachable states in a state machine.
+- **Contract tests across languages**: any system that has a TypeScript front end and a Python back end that must agree on small rules (whitespace, ordering) benefits from a shared set of data cases instead of two descriptions in prose.
+
+### The cross-language lesson: what exactly is "blank"?
+
+For a text setting, "empty" uses JavaScript's `trim()`. That sounds trivial until a second language must agree. **Whitespace is not one thing; every language has its own list.** `contracts/WARNINGS.md` therefore does not say "blank means whitespace". It says **the contract is this exact set of 25 code points**, the ones `String.prototype.trim` removes. I enumerated them with Node and got the same 25: U+0009 to U+000D (5), U+0020, U+00A0, U+1680, U+2000 to U+200A (11), U+2028, U+2029, U+202F, U+205F, U+3000 and U+FEFF. Characters that look like whitespace but are **not** in the set (so a string made only of them is text, not blank): U+0085 (next line), U+180E (Mongolian vowel separator), U+200B (zero width space) and the controls U+001C to U+001F. I confirmed with Node that these are not trimmed to empty.
+
+*General knowledge, not run in this session:* Python's `str.strip()` removes a different set. It does not remove U+FEFF (JavaScript does) and it **does** remove U+0085 and U+001C to U+001F (JavaScript does not). A Python port that simply called `strip()` would disagree on exactly the characters above. Worse, **the obvious fixes also disagree**: I ran the JavaScript regular-expression whitespace shorthand and it matches U+FEFF but not U+0085 or U+001C, so someone who "improves" `trim()` into a regular expression can still change the behaviour if they pick a different class.
+
+**Fixtures are what a second implementation runs.** The review found that the first version of the tests and fixtures were silent about all this: a mutant that replaced `trim` by a regular expression missing U+2028 and U+3000 passed every test, and a Python-like strip set passed every fixture (report from Session 12). The fix added three fixtures (in the fix commit `b472579`):
+
+- `warn-unicode-spaces-only-prompt`: a prompt made of U+00A0, U+FEFF and U+2028 is **blank** (it warns). The file holds the characters as the six-character JSON escape sequences (a backslash, then `u` and four hex digits); I read the file to confirm.
+- `warn-next-line-control-is-not-blank`: a prompt of U+0085 is **not** blank (`negativeFor` `required-field-empty`).
+- `warn-file-separator-control-is-not-blank`: a prompt of U+001C is **not** blank.
+
+Plus unit tests that check the set against the platform's own `trim`. **The rule for you to take away: pin every behaviour a port could plausibly get wrong, with a case that fails if it does.** Also notice a limit of the *existing* property test: its pool of generated setting values (`VALUES` in `lint.test.ts`) holds only the empty string, two spaces and a tab as blank strings, so even a perfect independent reference would never have exercised the exotic characters. A test finds only what its inputs exercise.
+
+A related honest limit: **the result order is a contract that only the TypeScript unit tests check**, because fixtures compare as multisets (order does not matter) so a Python port gets no fixture signal for it. `WARNINGS.md` says so in its text.
+
+### What the review found (real examples)
+
+The reviewer (Opus 5.5, read-only) found **no blockers and no majors** in `62041bf` (verdict: pass with findings). These are reports from `docs/DEVELOPMENT_LOG.md` Session 12 except where I say I read the code. All were fixed in `b472579` unless stated.
+
+**1. A second implementation written from the spec alone (a method).** The reviewer did not just read the code. It wrote **its own `lintWorkflow` from the specification text**, in a different style (index-based facts, an adjacency matrix and a transitive closure instead of a BFS, an explicit code-point whitespace set), and compared the two on **4 seeds of 20,000 generated graphs each**: **0 differences on every workflow without duplicate ids** (report). That is *differential testing* against an independent reference. The repository has the same idea in miniature: `lint.test.ts` contains a `reference()` function written deliberately in another shape (plain arrays and scanning instead of Maps, a fixpoint loop instead of a queue, one predicate per rule) and a seeded property test that compares it with `lintWorkflow` on 1,500 random graphs (I read it, and I ran the file: it passes). The test also asserts that the generator really produces warnings in more than 1,000 runs and that all five codes appear, because a comparison where nothing ever fires proves nothing.
+
+**2. "Never throws" was overclaimed; document the boundary instead of covering it.** The first text said the function "never throws, whatever the object holds". The reviewer showed a **getter that throws, or a revoked proxy, on the workflow** would throw out of the function. The duplicate-id behaviour was also described wrongly (the text said the first node wins; the code keys facts by the id string, so every node with that id shares the first node's connections and reachability; the test named for it only asserted "does not crash"). The fix was to **write down what the code really does**: "never throws for any JSON-shaped value (own data properties only)", and a test that asserts both probes. **No try/catch was added.** Why this is the right call: the input is always JSON from an imported file or the store's own data; a getter or proxy cannot occur; wrapping everything in `try/catch` would add code for an unreachable case and could hide a real bug. Duplicate ids cannot reach the function in the app because validation rejects them before import. Lesson: **documenting a boundary honestly beats over-engineering for a case that cannot happen** (compare L8's "do not overclaim what a test proves").
+
+**3. Fixtures are the cross-language contract.** See the cross-language lesson above (the whitespace gap).
+
+**4. A performance test that could not catch the bug it was written for.** The first performance test linted **one 5,000-node chain** and passed under a time limit (I read it at `62041bf`). The reviewer's mutants showed it could not detect a quadratic implementation. The fix measures **scaling**: the same function on 5,000 and on 50,000 nodes (best of three runs; the minimum is the least noisy estimate) and requires the 50,000-node time to be **less than 40 times** the 5,000-node time (a linear function gives about 10, a quadratic about 100), plus a generous absolute backstop of 5 seconds. The ratio, not the milliseconds, is the signal, because machines differ. It needed **two graph shapes**, a chain and a star, and the reason is the lesson: in a **chain** the BFS queue never holds more than about one item, so a mutant that uses `queue.shift()` (which moves every remaining item, a cost proportional to the queue length) hides; in a **star** (one trigger fanned out to n processors) the queue grows to n items and the same mutant is exposed. The `items.find` mutant (a search through all nodes for every edge) fails the scaling test (report). **A test only detects what its input shape exercises.** The star also checks the number of warnings (n unused results), so a fast function that returns the wrong answer cannot pass.
+
+**5. A mismatch in the specification itself.** The reviewer noticed that `docs/ARCHITECTURE.md` section 6.1 (rule 4) said a non-trigger root that nothing starts gets `node-unreachable`, but with the approved suppression rule a root that has a required input gets `required-input-unconnected` *instead*. The code was right; the text contradicted it. The fix amended the specification ("one cause, one warning") and `contracts/WARNINGS.md` now states that reachability is structural and does not model the engine's rule 5(c). (The amended wording is in the Principal Architect's uncommitted edit of `docs/ARCHITECTURE.md`, as noted at the top.) This is the L9 lesson again, from the other side: even the author of a spec can contradict it, and an independent reader finds it.
+
+**6. A tool hazard.** The file-writing tool **decoded the Unicode escape sequences** the implementer put into the new fixture files, turning an escape into the actual character, which would have destroyed the very characters the fixtures test (and a lone surrogate cannot even be stored in a UTF-8 file). The implementer found a workaround (write a harmless placeholder after the backslash, then replace the placeholder with the `u` and hex digits in a second edit) and the Principal Architect checked the bytes of the three fixtures with `od -c` (pure ASCII, escapes intact; report). I confirmed the same thing by reading the files. Lesson: **after writing a file whose content must contain an escape, read the bytes back.** This is also why this lesson describes the escape in words instead of printing it.
+
+**Other things carried forward.** The order contract is documented as unit-test-only; the coarse `negativeFor` guard was accepted without change (the full multiset comparison already implies applicability). **For T9:** messages echo the node *label* and id; T9 scans setting values and metadata, not labels, and if it widens scanning to labels the message format must change (note N5 in the log).
+
+**What this teaches, in four lines.**
+1. **Derived data needs no storage, and a pure function needs no UI to test.** The cheapest way to keep two things in sync is to have only one.
+2. **Say exactly what you guarantee.** "Never throws for JSON-shaped values" is true and checkable; "never throws" was not.
+3. **A test is as strong as its inputs.** One shape of graph, one pool of strings, one language: each hid a different bug.
+4. **A contract between languages is data, not prose.** If a rule could be implemented two ways, write a fixture that fails for the wrong way.
+
+### Knowledge Check / Interview Questions
+
+*Answers are not given here. Study this lesson and `docs/LEARNING.md`, then answer all questions in the dedicated learning session at the end of the project.*
+
+1. A draft has these nodes in array order: a Manual Trigger `t`, an LLM Prompt `l` with its provider set and an empty prompt, an Output `o`, a second LLM Prompt `l2` with provider and prompt set, a second Output `o2`, and a third Output `o3`. Lines: `t.data -> l.input`, `l.text -> o.input`, `l2.text -> o2.input`. List every warning `lintWorkflow` returns, in order, naming the code and the port or field, and explain which rule produces each. Why does `o3` get one warning and not two, and what would have to be true of a node for it to get both? Then give one example of a node that this function calls reachable but that the engine specification (`docs/ARCHITECTURE.md` section 6.1) would skip at run time, and say why the two notions of reachability are kept apart.
+2. A teammate proposes adding an `errors` and a `warnings` list to the result of `validateWorkflow`, with a severity field, "to avoid two functions". Argue against it using decisions D-017, D-018 and C1. What exactly could go wrong in the import path, in a future save API and in a future second implementation? And what would go wrong if the warnings were stored inside the workflow document instead? Which two properties of `lintWorkflow` (name them) make "recompute after every edit" safe?
+3. The reachability search uses a queue held in an array with a moving index. Explain breadth-first search in your own words, then explain why it is iterative rather than recursive, and why the performance test needs both a chain and a star to catch a `queue.shift()` mutant. Why does the test compare a ratio of two timings rather than a fixed number of milliseconds, and what would the ratio be for a quadratic implementation?
+4. A Python backend will implement the same warnings in Phase 2. List everything in `contracts/WARNINGS.md` and the fixtures that lets it agree with the TypeScript code on "empty", on "which port counts", and on the suppression rule. Give two behaviours that the fixtures do **not** check, say which test (if any) checks them today, and what you would add so that a port could not get them wrong. Why is "use the language's strip function" not an acceptable implementation of "blank"?
+5. In review, the claim "never throws, whatever the object holds" was found to be false for a getter or a proxy, and the fix was to change the wording, not to add a `try/catch`. Defend that decision. Name a place in AgentForge where input does cross a trust boundary and a defensive check is the right tool (hint: Lessons L2 and L4), and say what makes it different from the input of `lintWorkflow`.
+6. The repository has an in-test `reference()` implementation compared with `lintWorkflow` on 1,500 random graphs, and the reviewer also wrote its own implementation and compared 80,000 graphs. What does each comparison prove, what can neither prove, and why can the in-repo property test not catch a regression in how U+2028 or U+3000 is treated (look at the value pool the generator draws from)? What would you add to the generator?
