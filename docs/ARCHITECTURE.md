@@ -168,8 +168,8 @@ interface NodeDefinition {
   icon: string;            // Lucide icon name
   inputs: PortDefinition[];
   outputs: PortDefinition[];
-  configSchema: JSONSchemaSubset;
-  defaults: Record<string, unknown>;
+  configSchema: JSONSchemaSubset;  // object schema; initial values are schema `default`s applied by applyDefaults at creation (contracts/CONFIG_SCHEMA.md)
+  ui?: object;             // presentation hints only (textarea, rows, placeholder, order); never affects validity
 }
 interface PortDefinition {
   name: string;            // handle id
@@ -177,6 +177,7 @@ interface PortDefinition {
   dataType: "any" | "text" | "json" | "number" | "boolean" | "messages" | "tool";
   required?: boolean;
   multiple?: boolean;      // input accepts multiple edges
+  branch?: boolean;        // OUTPUT only: the node may leave this port unselected (section 6.1)
 }
 ```
 
@@ -204,12 +205,50 @@ The engine is a general **dependency-based DAG executor** with **no LangGraph de
 1. **Load:** `migrate` the document, `validate` it, then resolve each node to its executor.
 2. **Plan:** a topological sort. **Cycles are rejected in v1 (D-006).** Iteration happens inside the Agent node, or later in an explicit Loop node that has its own bounded semantics.
 3. **Run:** ready nodes (all upstream inputs resolved) run concurrently with `asyncio`. Each node's outputs are written to its named output ports, and edges carry those values to downstream inputs.
-4. **Branching:** a Condition node emits only on its `true` or `false` port. Nodes that receive no input because of an untaken branch are marked `skipped`, and the skip propagates downstream.
+4. **Branching:** a Condition node emits only on its `true` or `false` port. Nodes that receive no input because of an untaken branch are marked `skipped`, and the skip propagates downstream. The precise, binding rules (edge states, run-or-skip order, joins, failure, run result) are in section 6.1.
 5. **Limits:** a per-node timeout, a per-run max step count and a per-run wall-clock limit. Cancellation is supported.
 6. **Records:** a `runs` row plus one `node_runs` row per node (status, inputs, outputs, error, timings), with secrets redacted. Events stream to the UI over SSE.
 7. **Approval:** a node flagged `requiresApproval` pauses the run in state `waiting_approval` until a user approves or rejects it.
 
 **Deployment:** v1 runs in-process as a background asyncio task behind a `start_run()` service call. When runs need durability or horizontal scale, a Redis-backed worker (arq) replaces this behind the same call. Callers do not change.
+
+### 6.1 Branching, skipping and joins (H4, D-006, D-034)
+
+**Status:** specification only. **No engine exists in Phase 1.1.** The only code that follows from it is the optional catalog marker `PortDefinition.branch` (below); Phase 3 implements the engine against this text and this text is binding for that implementation ("the engine must follow the rules exactly"). The document format needs no change: edges already name ports.
+
+**The marker.** An **output** port may declare `branch: true` ("this node may leave this port unselected"). `logic.condition` marks both of its outputs (`true`, `false`). It is optional, so existing definitions and every saved document are unaffected. `branch` is **not allowed on input ports** (a catalog test enforces it). The scheduling rules (2 to 9) work from the **absence** of an emitted port alone; the engine reads the marker for exactly one purpose, the output check of rule 1, and static checks and editor warnings (T7) also use it.
+
+**Vocabulary.** A *root* is a node with no incoming edge. A *trigger* is a node of category `Triggers`. An edge is in one of four states: `pending` (initial; its source has not finished or been skipped), `active`, `inactive`, `failed`. A node is *resolved* when it is `succeeded`, `failed` or `skipped`.
+
+**Load-time assumptions.** The load step (section 6 item 1) validates the document and the catalog: every node type and version is known, connections obey the connection rules, and the workflow has at least one trigger (a workflow without one cannot be started: load error). Everything below assumes a loaded workflow.
+
+**Rules (the engine must follow them exactly):**
+
+1. **Emission.** An executor returns a map `outputPort -> value`. A port that is **absent** from the map was **not selected**. A port that is present with the value `null` **was** selected (a present `null` makes its edges `active`). **Only ports marked `branch` may be absent**; every other declared output port must be present (`null` allowed). A node that has `branch` ports must emit on **at least one** of them. A key that the node does not declare is an executor error. Any violation **fails the node** (this is what prevents a buggy executor from silently skipping its downstream nodes).
+2. **Condition.** `logic.condition` evaluates its comparison and emits the input value on exactly one of `true` or `false`; the other port is absent.
+3. **Edge states** (the state of an edge changes from `pending` once its source node is resolved): `active` (the source succeeded and emitted on that port); `inactive` (the source succeeded but did not emit on that port, or the source was skipped with reason `no_active_input` or `unreachable`); `failed` (the source failed, or the source was skipped with reason `upstream_failed`).
+4. **Start and readiness.** A run starts with every trigger ready. A **root that is not a trigger** is skipped at the start with reason `unreachable` (nothing starts it; the editor warns about such a node with `node-unreachable`), and its outgoing edges are `inactive`, so its descendants are skipped through rules 3 and 5 unless an active path from a trigger reaches them. Every other node is ready when none of its incoming edges is `pending`.
+5. **Run or skip.** A ready node is evaluated in this order; the first matching case decides: (a) if **any** incoming edge is `failed`: skip, reason `upstream_failed` (failure wins over an active edge); (b) else if it has at least one incoming edge and **none** is `active`: skip, reason `no_active_input`; (c) else if **any `required` input port has no `active` incoming edge** (this includes a required port with no edge at all): skip, reason `no_active_input`; (d) otherwise the node **runs**. A trigger has no incoming edges and runs. An optional input port with no active edge is **absent**: its key is omitted from the executor's input map (it is not `null`). A skipped node emits nothing; rule 3 gives its outgoing edge states.
+6. **Inputs and joins.** An input port that is not `multiple` receives the single value of its (at most one) edge. A `multiple` input port is satisfied when **at least one** of its edges is `active` and receives a **list** of the values of its active edges in **edge array order** (this is why the `edges` order is preserved by the canonical form); with no active edge the key is omitted (optional) or the node is skipped by rule 5(c) (required). The v1 join policy is "any active"; other policies (all-active, for example) would be future catalog options.
+7. **Failure.** A node that throws, exceeds its timeout, or violates rule 1 **fails**; its outgoing edges are `failed`, so every downstream node is skipped with `upstream_failed` (rules 3 and 5(a)). There is **no fail-fast**: nodes that are not downstream of a failure keep running until every node is resolved, and then the run ends `failed`. There are no error branches in v1 (a future convention could use a dedicated error output port).
+8. **Run result.** The run ends `succeeded` when no node failed. Its result is a list of `{ nodeId, value }` for the Output nodes that ran, in node array order. If no Output node ran (every Output node was skipped, or the workflow has none), the run still ends `succeeded` with an empty result and the note `no_output_reached`. A run that ends `failed` reports the same list for the Output nodes that did run (partial results) together with the failure.
+9. **Concurrency.** The ready set is computed from resolved edges, and independent ready nodes may run concurrently under a bounded limit. Ties (for logging and stable behaviour) are broken by node array order. There are no cycles (D-006), so the run terminates.
+10. **Records.** Each node run is stored with a status (`succeeded`, `failed`, `skipped`; and `cancelled` or `not_started` when the run was aborted) and, for skipped nodes, a reason (`no_active_input`, `upstream_failed` or `unreachable`); each edge records its final state. The monitor and debugger display exactly these records. **Aborted runs:** a user cancellation ends the run `cancelled` (nodes in flight are `cancelled`, nodes not yet started are `not_started`); a run-level limit (maximum steps or wall-clock time, section 6 item 5) ends the run `failed` with the limit named, the same node statuses applying. A **node** timeout is a node failure (rule 7).
+11. **Approval waits** (`waiting_approval`, section 6 item 7) are a separate state and are not defined here. **Tool edges** (`dataType: tool`, the Agent node's `tools` input) are treated as ordinary data edges by these rules; their execution semantics belong to the Agent executor (Phase 4, section 7).
+
+**Worked examples** (Trigger T, Condition C, LLM nodes A and B, Output O; X is a hypothetical node whose input port `in` is `multiple`):
+
+| Graph | What happens |
+|---|---|
+| T -> C; C.true -> A; C.false -> B; A -> O | Condition is true: C emits on `true`; edge C.true is `active`, C.false is `inactive`. A runs. B has an incoming edge and none is active: rule 5(b), **skipped** (`no_active_input`); B's outgoing edges are `inactive`. O runs with A's output. Result: O's value. |
+| Same graph, condition is false | C emits on `false`. B runs; A is skipped. O's only incoming edge comes from skipped A (`inactive`): rule 5(b), O is **skipped**. The run **succeeds** with an empty result and the note `no_output_reached`. |
+| C.true -> X.in and C.false -> X.in | Exactly one of the two edges is `active`; X runs once and receives a list with that one value (rule 6). |
+| T -> A; A fails; A -> O; T -> B; B -> O2 | A is `failed`; O is skipped with `upstream_failed`. B and O2 are not downstream of A and still run (no fail-fast). The run ends `failed`; the result lists O2's value. |
+| J fed by a failed node and an active node (J has a `multiple` input) | Rule 5(a) comes first: J is skipped with `upstream_failed` even though one edge is active. |
+| An HTTP node with no incoming edge and not reachable from a trigger | Skipped with `unreachable` before it can act (the editor warns about it with `node-unreachable`). |
+| A Condition whose input edge is `inactive` | The Condition is skipped (`no_active_input`); both outgoing edges become `inactive`, and the skip propagates to both branches. |
+
+**Why this design (alternatives considered).** (a) Skip nodes implicitly whenever an input is missing: rejected, because a wrongly missing output would be silently treated as a branch; the `branch` marker together with the "only branch ports may be absent" rule makes silent skipping impossible for ordinary ports. (b) Emit a special "skip token" value on the unselected port: rejected, because every executor would have to understand it. (c) Evaluate both branches and discard one: rejected (side effects). (d) A marker that drives scheduling: rejected as unnecessary; scheduling works from absence alone and the marker serves the emission check and static checks. (e) Fail-fast: rejected for v1, because stopping independent branches mid-flight leaves half-done side effects and makes records depend on timing; draining keeps the records deterministic.
 
 ---
 

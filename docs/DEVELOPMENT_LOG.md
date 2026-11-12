@@ -709,3 +709,35 @@ T6 **accepted**. **Milestone MS-B (T1 to T6) reached: report to the Product Owne
 
 **Next Task:**
 The PO's MS-B review and decision (continue to T8, T7, T9, T10, or redirect). Phase 2 remains unauthorized.
+
+### Session: 12 / 2026-11-12
+
+**Phase:**
+Phase 1.1: MS-B approved; T8 (branch semantics) implemented, reviewed and accepted; T7a in progress
+
+**Product Owner decisions this session:** MS-B reviewed: **"Continue with T8, T7, T9, T10"** (order of the plan; Phase 2 remains unauthorized). The Principal Architect decided (within D-022 and D-026, recorded here): T7 is split like T4 to T6 into **T7a** (the pure `lintWorkflow` function, its `warnings` fixture family and spec) and **T7b** (UI: node badge, toolbar count and list, config-panel section, browser tests); the three optional extra rules of plan section 3.6 (`no-trigger`, `no-output`, `branch-unconnected`, "default off, PO to decide") are **not built** (not requested; can be added later if the PO wants them).
+
+**T8: branch semantics and the catalog marker (commits and documents):**
+
+| Item | What |
+|---|---|
+| `docs/ARCHITECTURE.md` section 6.1 + `D-034` | The Principal Architect promoted plan section 3.4 into a binding specification (eleven rules, vocabulary, load-time assumptions, worked examples, alternatives). |
+| `4c696b4` | Sonnet implementer: `PortDefinition.branch?: boolean` (output ports only), `branch: true` on both `logic.condition` outputs, `builtin.catalog.json` regenerated (diff is exactly the two lines), `contracts/README.md` note, 5 catalog tests. 993 unit tests, 39 e2e. |
+
+**Independent review (Opus 5.5, read-only) of `4c696b4` and the specification: PASS WITH FINDINGS, no blockers; the code was correct and well tested; the review of the SPECIFICATION found three Major internal inconsistencies, all in my first draft.** The reviewer walked eleven scenarios through the rules by hand. Findings and triage:
+
+| # | Finding | Disposition |
+|---|---|---|
+| Major M1 | Rule 5 contradicted itself: "runs if every required input has an active edge" (vacuously true with no required inputs) versus "a node whose incoming edges are all inactive is skipped" (vacuously true for a node with NO incoming edges, so read literally it skipped every trigger); optional inputs make orphan roots possible, and nothing said what an unconnected non-trigger root does | **Fixed**: a fixed evaluation order (a) any failed edge, (b) has edges and none active, (c) a required port without an active edge, (d) run; start rule: triggers are ready at the start, a non-trigger root is skipped `unreachable` (matches the editor warning `node-unreachable`); load-time assumptions stated (at least one trigger) |
+| Major M2 | Failure precedence and run end underspecified: a join with one failed and one active edge (rule 6 says run, rule 7 says skip); the skip reason two hops from a failure; fail-fast or drain; statuses for cancelled or limit-stopped runs; result of a failed run | **Fixed**: edges of a node skipped with `upstream_failed` are `failed`, so failure propagates and wins (rule 5a); **no fail-fast** (independent branches continue; records stay deterministic); aborted runs: `cancelled` run, nodes `cancelled` or `not_started`, run-level limit ends `failed`, node timeout is a node failure; failed runs report partial Output results |
+| Major M3 | "The runtime needs no marker" was false (rule 1 needs `branch` at run time) and was repeated in D-034; a branch node could emit on no branch port and silently skip everything; undeclared output keys unaddressed | **Fixed**: rule 1 now: only `branch` ports may be absent, every other declared port must be present (`null` allowed), a node with branch ports must emit on at least one, an undeclared key is an executor error, any violation fails the node; marker paragraph and D-034 corrected |
+| Minors | multiple-input value shape undefined; `pending` edge state lost in the promotion; "absent value" ambiguous for Python; run-result shape undefined; tool edges unaddressed; example 3 not buildable with today's catalog; section 5 `PortDefinition` block missing `branch` and still showing the deleted `defaults`; Deployment paragraph placed under 6.1 | **Fixed**: multiple inputs deliver a list in edge array order; `pending` added; absent means the key is omitted (not `null`); result is a list of `{nodeId, value}` in node array order; tool semantics deferred to the Agent executor; example uses a hypothetical node with a `multiple` input; section 5 updated; Deployment moved before 6.1; D-034 formatting |
+| Nits | the catalog test "a document and its export never contain branch" checks only the export text (a mutant that puts `ports` on the stored node survived); `branch` is allowed on input ports by the type (a test enforces it); D-034 formatting | Formatting **fixed**. The two code nits are **carried into the T7a fix round** (rename or strengthen the test); the type is accepted (documents never carry port definitions; Phase 2 Pydantic should model input and output ports separately) |
+
+**Verification by the Principal Architect (commands actually run, `frontend/`):** at `4c696b4` `npm run verify` **exit 0, 17 test files, 993 unit tests, 39 e2e**; `git show --stat` (5 files, +52/-5); the fixture, `nodes.ts` and `types.ts` diffs read line by line (two `branch: true` lines plus the type field). The implementer reported one bare `npx vitest` (local binary only, no repository change) and otherwise kept the Write/Edit-only tool rules for the first time in three tasks. The reviewer's mutation run (7 mutants: 6 killed, 1 survivor, the test-strength nit) and hand walk-through are the reviewer's report. No engine code exists; **the specification has been reviewed by analysis only, nothing executes it** until Phase 3.
+
+**Status:**
+T8 **accepted** (code at `4c696b4`; specification corrected after review, to be committed with these records). T7a (pure lint function) is with the implementer.
+
+**Next Task:**
+T7a review, then T7b (UI), then T9 (secret detection), then T10; MS-C after T10.

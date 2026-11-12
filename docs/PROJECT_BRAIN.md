@@ -207,7 +207,7 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 to T6 done; milestone MS-B reached and awaiting the Product Owner's review (MS-A was approved).** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones (next after MS-B: MS-C after T10). T8, T7, T9, T10 are not started. Phase 2 is **proposed only** and unauthorized.
+- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 to T6 and T8 done (MS-A and MS-B approved by the PO); T7a (pure warning function) in progress.** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones (next after MS-B: MS-C after T10). T8, T7, T9, T10 are not started. Phase 2 is **proposed only** and unauthorized.
 - **Last completed task:** Session 11: T5a, T5b and T6 (JSON Schema subset validator; catalog, importer and config panel on the subset; versioned node migrations with the upgrade banner) implemented, Opus-reviewed, fixed and accepted; Lessons L6 to L8 written. Earlier: T4 (Session 10), T3 (Session 9), T2 (Session 8), T1 (Session 6).
 - **Last code commit:** `35fe3bc`.
 
