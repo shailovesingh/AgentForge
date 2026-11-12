@@ -278,7 +278,10 @@ between a JavaScript object and a Python dict, and wording may change freely.)
 
 `fixtures/catalog/builtin.catalog.json` is the array `nodeDefinitions` from
 `frontend/src/catalog/nodes.ts`, exported as JSON. A test asserts that it equals the catalog in code,
-so the catalog contract cannot drift silently. If you change the catalog on purpose, regenerate the file
+so the catalog contract cannot drift silently. A port definition may carry the optional `branch: true`
+(output ports only, never on inputs): "this node may leave this port unselected" (`docs/ARCHITECTURE.md`
+section 6.1). Today only the two outputs of `logic.condition` have it. TypeScript only, no Python parity
+is claimed; the engine that uses it is Phase 3. If you change the catalog on purpose, regenerate the file
 and review the diff:
 
 ```

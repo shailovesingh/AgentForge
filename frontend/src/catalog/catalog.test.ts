@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { useEditorStore } from '../store/editorStore'
 import { checkSchemaSubset, validateAgainstSchema } from '../workflow/jsonSchema'
+import { exportWorkflowText } from '../workflow/serialize'
 import { PROVIDERS, getLatestNodeDefinition, getNodeDefinition, nodeDefinitions } from './index'
 
 describe('node catalog', () => {
@@ -25,6 +26,45 @@ describe('node catalog', () => {
       expect(def.configSchema.additionalProperties).toBe(false)
     },
   )
+
+  describe('the branch marker (T8, ARCHITECTURE 6.1)', () => {
+    const branchOutputs = nodeDefinitions.flatMap((d) => d.outputs.filter((p) => Object.hasOwn(p, 'branch')).map((p) => `${d.type}.${p.name}`))
+
+    test('branch appears only on output ports: no input port has a branch key at all', () => {
+      for (const def of nodeDefinitions) {
+        for (const port of def.inputs) expect(Object.hasOwn(port, 'branch'), `${def.type}.${port.name}`).toBe(false)
+      }
+    })
+
+    test('logic.condition has exactly two outputs, true and false, both branch: true', () => {
+      const outputs = getLatestNodeDefinition('logic.condition')!.outputs
+      expect(outputs.map((p) => [p.name, p.branch])).toEqual([['true', true], ['false', true]])
+    })
+
+    test('no other catalog node declares a branch output today (adding one must update this test and the spec)', () => {
+      expect(branchOutputs).toEqual(['logic.condition.true', 'logic.condition.false'])
+    })
+
+    test('a branch value, when present, is the boolean true', () => {
+      for (const def of nodeDefinitions) {
+        for (const port of [...def.inputs, ...def.outputs]) {
+          if (Object.hasOwn(port, 'branch')) expect(port.branch, `${def.type}.${port.name}`).toBe(true)
+        }
+      }
+    })
+
+    test('a document and its export never contain branch (it is catalog metadata only)', () => {
+      const store = useEditorStore.getState()
+      store.reset()
+      store.addNode('logic.condition', { x: 0, y: 0 })
+      const exported = exportWorkflowText(useEditorStore.getState().workflow)
+      expect(exported.ok).toBe(true)
+      if (exported.ok) {
+        expect(exported.text).toContain('logic.condition')
+        expect(exported.text).not.toContain('branch')
+      }
+    })
+  })
 
   test('the old presentation and defaults fields are gone', () => {
     for (const def of nodeDefinitions) {

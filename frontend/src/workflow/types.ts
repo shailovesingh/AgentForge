@@ -16,6 +16,8 @@ export interface PortDefinition {
   required?: boolean
   /** Input only: accepts more than one incoming edge. */
   multiple?: boolean
+  /** Output only (never on inputs): this node may leave this port unselected. See docs/ARCHITECTURE.md section 6.1. */
+  branch?: boolean
 }
 
 /**

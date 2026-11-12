@@ -196,12 +196,14 @@
       {
         "name": "true",
         "label": "True",
-        "dataType": "any"
+        "dataType": "any",
+        "branch": true
       },
       {
         "name": "false",
         "label": "False",
-        "dataType": "any"
+        "dataType": "any",
+        "branch": true
       }
     ],
     "configSchema": {

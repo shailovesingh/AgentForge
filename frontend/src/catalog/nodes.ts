@@ -91,8 +91,8 @@ export const nodeDefinitions: NodeDefinition[] = [
     icon: 'GitBranch',
     inputs: [{ name: 'input', label: 'Input', dataType: 'any', required: true }],
     outputs: [
-      { name: 'true', label: 'True', dataType: 'any' },
-      { name: 'false', label: 'False', dataType: 'any' },
+      { name: 'true', label: 'True', dataType: 'any', branch: true },
+      { name: 'false', label: 'False', dataType: 'any', branch: true },
     ],
     configSchema: {
       type: 'object',
