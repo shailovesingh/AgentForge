@@ -3,7 +3,7 @@
 > **For the Product Owner.** Part 1 is a plain-language **primer** (reference material: what we are building and how the code is organised). Part 2 is the **teaching record** (lessons actually taught and what you demonstrated).
 > The **curriculum and statuses** are in `docs/LEARNING.md`. Learning progress is tracked separately from implementation progress.
 > **Living document.** The Principal Architect updates it at the end of every task (D-028). The primer describes the project **as it is today**; where something is planned but not built, it says so.
-> Last updated: 2026-11-05, after Phase 1.1 T6 and its review fixes (Lesson L8, commits `2baee23` and `be43319`).
+> Last updated: 2026-11-12, after Phase 1.1 T8, the branching specification and the `branch` marker (Lesson L9, code commit `4c696b4`, specification corrected in `32066b2`).
 
 # Part 1: Primer
 
@@ -27,7 +27,8 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | The visual editor in the browser: drag nodes from a library, connect them with rules, edit each node's settings, save the workflow to a `.json` file and load it back | Running workflows (the "engine") |
 | A catalog of 6 node types | AI models, agents, tools (Phase 4) |
 | Old files keep working: a file saved with an older version of a node is upgraded in memory and the editor tells you (the original file is never rewritten) | Natural-language workflow generation (Phase 5) |
-| 988 unit tests in 17 test files and 39 browser tests (at commit `be43319`) | |
+| The rules for conditional branching, skipped nodes and joins are written down as a binding specification (`docs/ARCHITECTURE.md` section 6.1); the only code is a small marker on the Condition's output ports | |
+| 993 unit tests in 17 test files and 39 browser tests (at commit `4c696b4`) | |
 | A CI workflow that runs the checks on GitHub | The backend server, database, saving to a server (Phase 2) |
 
 **Important:** today everything runs **in your browser only**. There is no server. Nothing runs a workflow yet. The editor produces a *description* of a workflow; later phases will execute it.
@@ -35,7 +36,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | Phase | What it delivers | Status |
 |---|---|---|
 | 1 | The visual editor | Done and accepted |
-| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 6 of 10 done, with task 5 in two halves, T5a and T5b; T6, upgrading old files, is done; T8, the branch rules, is next) |
+| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 6 and T8 of 10 done, with task 5 in two halves, T5a and T5b; T6, upgrading old files, and T8, the branch rules, are done; T7, warnings in the editor, is next) |
 | 2 | Backend server and database; save/load workflows | Planned, not approved |
 | 3 | Execution engine: actually run workflows | Planned |
 | 4 | AI runtime: LLM and Agent nodes | Planned |
@@ -106,7 +107,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **DAG and "no cycles".** A *directed acyclic graph*: arrows that never loop back. The workflow engine will run nodes in dependency order, which only works if there are no loops. Anything that needs looping (an agent thinking in steps) happens *inside* the Agent node using a library called LangGraph. The editor already refuses a connection that would create a cycle.
 
-**Condition and branches (planned).** A Condition node sends data down either its `true` or its `false` port. Nodes on the branch not taken are *skipped*. The exact rules are written in `docs/PHASE1_1_PLAN.md` section 3.4.
+**Condition and branches (rules written, Lesson L9; the engine that applies them is planned, Phase 3).** A Condition node sends data down either its `true` or its `false` port. Nodes on the branch not taken are *skipped*, and a skip spreads downstream. The exact rules are a binding specification in `docs/ARCHITECTURE.md` section 6.1 (decision D-034): each edge is `pending`, `active`, `inactive` or `failed`; a fixed order decides whether a ready node runs or is skipped; a failure beats an active input; independent branches keep running after a failure. In the code, the Condition's two output ports carry an optional `branch: true` marker (`frontend/src/catalog/nodes.ts`). **No engine exists yet, so nothing runs these rules.**
 
 **Agent (planned).** A node where an AI model decides what to do next, repeatedly, and can call tools.
 
@@ -172,8 +173,8 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 | Kind | Tool | What it does | Command |
 |---|---|---|---|
-| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the catalog and the shared fixtures in `contracts/`). 988 in 17 test files at commit `be43319`. | `npm test` |
-| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 39 at commit `be43319`. | `npm run test:e2e` |
+| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the catalog and the shared fixtures in `contracts/`). 993 in 17 test files at commit `4c696b4`. | `npm test` |
+| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import. 39 at commit `4c696b4`. | `npm run test:e2e` |
 | **Type check** | TypeScript | Catches mismatched data shapes before running | part of `npm run build` |
 | **Lint** | Oxlint | Catches suspicious code patterns | `npm run lint` |
 | **Everything** | | All of the above, in order | `npm run verify` |
@@ -226,7 +227,7 @@ npm run dev              # open http://localhost:5173
 
 ## 10. What happens next
 
-Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (done, Lesson L8; its review fixes are committed); **T8** the branch rules written down (next); **T7** warnings in the editor; **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
+Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (done, Lesson L8; its review fixes are committed); **T8** the branch rules written down (done, Lesson L9; the specification is in `docs/ARCHITECTURE.md` section 6.1, no engine); **T7** warnings in the editor (next); **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
 
 ## 11. Glossary, quick reference
 
@@ -263,6 +264,7 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | **L6** | Phase 1.1 T5a (commits `96cc80d`, `a009b20`): the JSON Schema subset validator, explicit `applyDefaults` and the `schema` fixtures | 3 (main), 7, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L7** | Phase 1.1 T5b (commits `7b09662`, `44bd7f4`): the catalog, importer (decision C1) and settings panel move onto the JSON Schema subset | 7 (main), 3, 2, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L8** | Phase 1.1 T6 (commits `2baee23`, `be43319`): versioned node migrations, `agent.autonomous` version 2, the upgrade banner | 3 (main), 7, 2, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
+| **L9** | Phase 1.1 T8 (code `4c696b4`; specification `ARCHITECTURE.md` section 6.1 and D-034, corrected in `32066b2`): branching, skipping and joins; the `branch` marker; reviewing a specification | 6 and 5 (main, for the specification only: no engine exists), 7, 12, 3 | 2026-11-12 | 6 (answered at the end of the project) | Explained; evaluation pending |
 
 ## Concept index
 
@@ -350,6 +352,16 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | Do not overclaim what a test proves (an e2e check that cannot fail because of the app); a widened source-text guard with a regex self-test | 12 | L8 | Explained (no evidence) |
 | A user-visible banner: an always-mounted `role=status` live region, keyboard focus returned to Import on Dismiss, bounded text (`shorten`) | 2 | L8 | Explained (no evidence) |
 | Database migration at read time with a save as a new immutable version (planned for Phase 2, not built) | 1, 4 | L8 | Explained (no evidence) |
+| Absent port versus a port whose value is `null` (emission, rule 1); only `branch` ports may be absent; why a buggy executor must fail loudly | 5, 7 | L9 | Explained (no evidence) |
+| The `branch` marker: optional, output ports only, catalog metadata that is not in the document (no `schemaVersion` change); not used for scheduling | 7, 3 | L9 | Explained (no evidence) |
+| Edge states (`pending`, `active`, `inactive`, `failed`), resolved nodes, readiness (no `pending` incoming edge) and how a skip spreads downstream | 6, 5 | L9 | Explained (no evidence) |
+| The fixed run-or-skip order (failure wins, then "has edges and none active", then a required input without an active edge, then run); the start rule for triggers and unreachable roots | 5, 6 | L9 | Explained (no evidence) |
+| Vacuous truth (an empty group satisfies "all"), and precedence between rules that both apply | 12, 6 | L9 | Explained (no evidence) |
+| Joins: a `multiple` input, policy "any active", a list in edge array order; `input-occupied` limits ordinary inputs to one edge | 6, 7 | L9 | Explained (no evidence) |
+| Failure without fail-fast (drain): deterministic records versus half-done side effects; `upstream_failed` propagation; run result, `no_output_reached`, partial results, aborted runs | 5, 6 | L9 | Explained (no evidence) |
+| Concurrency from independent ready nodes, termination because the graph has no cycles (D-006) | 6, 5 | L9 | Explained (no evidence) |
+| A specification is code you cannot run: review it by walking worked examples by hand; find contradictions before acceptance; examples as future tests (specification only, no engine; reports from the review) | 12 | L9 | Explained (no evidence) |
+| Alternatives rejected for branching (implicit skipping, skip token, evaluate both, scheduling marker, fail-fast) | 5, 6 | L9 | Explained (no evidence) |
 | Primer concepts (workflow, node, port, edge, catalog, config schema, `schemaVersion` vs `typeVersion`, validation vs warnings, DAG, credentials) | 1, 2, 3, 6, 7 | Primer (Part 1) | Explained as reference (no evidence, no lesson) |
 
 ---
@@ -1630,3 +1642,178 @@ The following are reports relayed to me, except where I say I read the code.
 4. The migration rounds half up with `Math.floor(x + 0.5)`. Explain half up versus half to even, why a Python backend using the built-in `round()` would disagree, and why `Math.round(x)` is an equivalent mutant in TypeScript while a hand-written banker's rounding is not. Since no TypeScript test can fail for `Math.round`, what exactly protects the future Python port? Which of the five `.5` fixtures actually discriminate between the two rules, and why do the other three not?
 5. An e2e test compared the bytes of the imported file before and after and was named as proving "the file on disk is never modified". Why can that test never fail because of the app? What are the real guarantees, and which of them could a future change break and be caught? Rewrite the test's claim honestly in one sentence.
 6. The reviewer ran two comparisons (a reference implementation written from the spec on generated documents, and the old versus the new importer on documents without version problems). What does each comparison prove, and what can neither prove? How is this different from the mutation checks in earlier lessons, and why does this lesson count an equivalent mutant as a reason for writing a specification rather than for writing a test?
+
+---
+
+## Lesson L9: What does "send it down the true path" mean? (branching, skipping and joins: the execution rules written before the engine, and the `branch` marker)
+
+**Task:** Phase 1.1 T8 (decision H4), code commit `4c696b4` (the `branch` marker and its tests), plus the specification `docs/ARCHITECTURE.md` section 6.1 and decision D-034, rewritten after review and committed in `32066b2`. **Modules:** 5 (Workflow Execution Engine: readiness, scheduling, run result), 6 (Graph Theory and DAG Execution: edge states, reachability, joins, termination), 7 (Node Registry and Data Propagation: ports, `branch`, `multiple`), 12 (Security, Testing and Deployment: how to review a specification), 3 (Workflow JSON: the new marker is catalog metadata and does not change the document).
+
+*Status of what this lesson describes.* **There is no execution engine in AgentForge yet.** The engine is Phase 3 and is planned, not built. What exists is (a) a binding written **specification** of how branches, skipped nodes and joins must behave (section 6.1) and (b) one small code change: an optional `branch` flag on output ports. Everything in sections 2 to 4 about "what the engine does" describes **what the specification says the Phase 3 engine must do**; no code runs these rules, and the specification has been checked by a reviewer reading it and walking examples through it by hand, not by running anything. **What I verified myself:** I read `docs/ARCHITECTURE.md` sections 5, 6 and 6.1 in full, `docs/DECISIONS.md` D-006 and D-034, `git show 4c696b4 --stat` (5 files, +52/-5) and its diff of `contracts/fixtures/catalog/builtin.catalog.json` (exactly two added `"branch": true` lines), `frontend/src/workflow/types.ts` (`PortDefinition`), `frontend/src/catalog/nodes.ts` (all six definitions' ports), `frontend/src/catalog/catalog.test.ts` (the five branch tests), `frontend/src/workflow/connections.ts` (the connection rules), `contracts/README.md` at HEAD (the `branch` note), `docs/PHASE1_1_PLAN.md` section 3.4 (the first draft of the rules, to compare with the final text), and `docs/DEVELOPMENT_LOG.md` Session 12 (the review triage). I checked that `contracts/fixtures/` has no family for execution (so the worked examples below are prose, not executable data). **What I ran myself:** one line of JavaScript, `[].every(() => false)`, which printed `true` (section 2, vacuous truth). **What I did not run:** the test suites. The counts **17 test files, 993 unit tests and 39 browser tests at `4c696b4`** are the numbers from the Principal Architect's `npm run verify` (exit 0), reported to me. The reviewer's findings and its hand walk-through (eleven scenarios) and its mutation run (seven mutants) are **reports** from `docs/DEVELOPMENT_LOG.md`, not things I repeated. The editor warning `node-unreachable` is mentioned in the specification and planned in task T7 (`docs/PHASE1_1_PLAN.md` section 3.6); I do not describe it as built. Remarks about other tools are **general knowledge, not checked here**.
+
+### 1. The problem
+
+Picture a road with a fork and a traffic light. The light (our **Condition** node) sends each car **left or right, never both**. Now ask the questions nobody asked yet:
+
+- What happens to the shop on the road **not** taken? Does it open with no customer, or stay closed?
+- If the shop stays closed, what about the warehouse behind it that waits for the shop's delivery? Does it wait forever?
+- If the left road is blocked by an accident (a node **fails**), do the shops on the right road close too?
+- At the end, the Output node is on the road that was not taken. Did the whole trip fail? Or succeed with nothing to show?
+
+Here is the same thing in AgentForge terms. Take the workflow `Manual Trigger -> Condition; Condition.true -> LLM A; Condition.false -> LLM B; A -> Output`. The drawing says "take the true path". It does **not** say what "the false path is not taken" means for B, or for Output when the condition is false.
+
+Why decide this now, with no engine to test it? Three reasons from the record:
+
+1. **The Product Owner already required it** (D-006, clarification of 2026-11-03): the engine must be "a dependency-based DAG executor, not a sequential node runner", with conditional branching, branch selection, skipped nodes and independent nodes that could run at the same time. A "skipped node" is a word, not yet a rule.
+2. **Several parts must agree**: the editor's warnings (T7, planned), the validator, the future Phase 3 engine and the future Python backend. If each guessed the meaning separately, they would drift apart, the same danger as in L3 and L8.
+3. **Writing it down first is cheap, and changing a running engine is not.** A wrong rule found now costs a sentence. The same wrong rule found after the engine exists costs code, data and records.
+
+### 2. The concept
+
+**Silence is not the same as saying nothing (absent versus `null`).** When a node finishes, the engine receives a map from output port name to value, for example `{ true: "hello" }`. Compare two cases. If the port `false` is **not in the map at all**, the node made no choice for that port: it was **not selected**. If `false` is in the map with the value `null`, the node **did** send something, and the something is "nothing" (JSON `null`). These must be different, because a perfectly normal node can output `null` as data, and that must never be confused with "this branch was not taken". This is the same distinction as a missing key versus a key whose value is null in any JSON or Python dictionary.
+
+**Four states for a line (an edge).** Think of each edge as having a small light:
+
+| State | Plain meaning | Set when |
+|---|---|---|
+| `pending` | Not decided yet | Initial: the node at the start of the edge has not finished or been skipped |
+| `active` | A value travelled along this line | The source succeeded and emitted on that output port |
+| `inactive` | Nothing travelled, and that is fine | The source succeeded but did not emit on that port (a branch not taken), or the source was skipped because nothing reached it |
+| `failed` | Something went wrong upstream | The source failed, or the source was skipped because of an upstream failure |
+
+A node is **resolved** when it has `succeeded`, `failed` or been `skipped`. An edge leaves `pending` the moment its source is resolved. A node is **ready** when none of its incoming edges is `pending`. This is dependency-based scheduling: a node waits for **information about every input line**, not for the value of every line (the value may never come; "inactive" is also information).
+
+**Skipping.** A skipped node does not run and emits nothing. Its outgoing edges therefore become `inactive` (or `failed`, if it was skipped because of a failure), so the skip **spreads downstream** by the same rules. No node needs special skip code; skipping is just "all my inputs were silent".
+
+**Vacuous truth, the trap in the first draft.** A statement about "all things in an empty group" is true, whatever the statement: "all the unicorns in this room are purple" is true when the room has no unicorns. In code this is `[].every(...)`, which I ran: `[].every(() => false)` prints `true`. It is called **vacuous truth** (a condition that holds only because there is nothing to check). In a specification, "a node is skipped if all its incoming edges are inactive" is therefore true for a node with **no** incoming edges at all, such as the trigger. Section "What the review found" shows what this did.
+
+**Precedence.** When two rules give different answers for the same situation, the specification must say which wins. The final text uses a **fixed evaluation order** with "the first matching case decides" (rule 5), and says explicitly that **failure beats an active edge**.
+
+### 3. Why we selected this approach
+
+1. **Absence is the signal; nothing else.** The scheduling rules look only at "was this port emitted or not". There is no special "skip value" and no extra flag that the engine has to track. Less to implement and less to get wrong.
+2. **A marker, but only to catch bugs.** The optional `branch: true` on an **output** port says "this node is allowed to leave this port unselected". Rule 1 then says: **only** ports marked `branch` may be absent; every other declared output must be present (`null` is allowed); a node with branch ports must emit on at least one of them; a key the node does not declare is an executor error; any violation **fails the node**. Why: without this, a buggy HTTP executor that forgets to return its `body` would silently look like "a branch not taken" and its downstream nodes would be skipped with no error. With the rule, the bug is loud. The marker does **not** drive scheduling (scheduling works from absence alone); the engine reads it for exactly this one check, and static checks and editor warnings can use it too.
+3. **Failure wins, and there is no fail-fast.** If one input of a node failed and another is active, the node is skipped with the reason `upstream_failed`. When a node fails, the nodes **not** downstream of it **keep running** until everything is resolved, and then the run ends `failed`. The trade-off is in section 7.
+4. **Joins deliver a list in edge array order.** An input port that is not `multiple` accepts at most one edge (the connection rule `input-occupied`, in `connections.ts`). A `multiple` input can have several edges and, in v1, runs when **at least one** is active ("any active"), receiving a **list** of the active values **in the order the edges appear in the document's `edges` array**. The specification gives this as the reason the `edges` order is preserved by the canonical form (array order is data; I did not re-read `canonicalJson.ts` for this lesson). Other join policies (for example "wait for all") are future catalog options, not v1.
+5. **One run-or-skip order, written once.** See the diagram.
+6. **A specification with worked examples, not a pile of prose.** Seven examples sit directly under the rules in section 6.1; each one is a small test a future engine must pass.
+
+### 4. How it works internally
+
+*(All of this is the specification; no engine executes it yet.)*
+
+**The life of a run, in the order of ARCHITECTURE section 6.** Load: migrate and validate the document and resolve each node to its executor; a workflow with no trigger at all cannot be started (a load error). Plan: cycles are rejected (D-006), so the graph is a DAG and the run must end. Run: every Trigger is ready at the start; **a root that is not a trigger** (a node with no incoming edge that is not in the Triggers category) is skipped at the start with the reason `unreachable`, because nothing starts it. Then, again and again, the engine takes the **ready set** (nodes with no `pending` incoming edge), decides run-or-skip for each, runs the ones that run (independent ones may run at the same time, under a limit, ties broken by node array order), resolves them, and so turns more edges from `pending` into `active`, `inactive` or `failed`, which makes more nodes ready. Because the graph has no cycle, every node is eventually resolved and the loop ends.
+
+**The run-or-skip decision for one ready node** (rule 5). The order matters: the first case that matches decides.
+
+```mermaid
+flowchart TD
+  R["Node is ready<br/>(no incoming edge is pending)"] --> A{"Is any incoming edge failed?"}
+  A -- yes --> S1["SKIP, reason upstream_failed<br/>(outgoing edges become failed)"]
+  A -- no --> B{"Does it have incoming edges<br/>and none of them is active?"}
+  B -- yes --> S2["SKIP, reason no_active_input<br/>(outgoing edges become inactive)"]
+  B -- no --> C{"Does a required input port<br/>have no active edge?<br/>(includes no edge at all)"}
+  C -- yes --> S3["SKIP, reason no_active_input<br/>(outgoing edges become inactive)"]
+  C -- no --> D["RUN<br/>(a trigger always lands here)"]
+```
+
+Read the diagram with the vacuous-truth trap in mind: case B says "**has** incoming edges **and** none active", and the case C test is only reached after B. A trigger has no incoming edges, so A is false, B is false (it has none), C is false (it has no required inputs), and it **runs**. An optional input with no active edge is **absent** from the executor's input map (its key is omitted; it is not `null`).
+
+**Worked examples** (T = Manual Trigger, C = Condition, A and B = LLM Prompt, O = Output; X is a hypothetical node whose input is `multiple`). These are the specification's own examples, in short form with the run result:
+
+| Graph and situation | Runs | Skipped (reason) | Run result |
+|---|---|---|---|
+| T -> C; C.true -> A; C.false -> B; A -> O, condition **true** | T, C, A, O | B (`no_active_input`) | `succeeded`, result is O's value |
+| Same graph, condition **false** | T, C, B | A (`no_active_input`), then O (`no_active_input`: its only edge comes from a skipped node, so it is `inactive`) | `succeeded` with an **empty** result and the note `no_output_reached` |
+| C.true -> X.in and C.false -> X.in (`multiple`) | X once | none | X receives a **list with one value** |
+| T -> A (fails); A -> O; T -> B; B -> O2 | T, B, O2 | O (`upstream_failed`) | run ends `failed`; result lists O2's value (partial results) |
+| J has a `multiple` input fed by a failed node and an active node | none of J | J (`upstream_failed`) | rule 5a wins over the active edge |
+| An HTTP node with no incoming edge, not reachable from a trigger | none of it | itself (`unreachable`) | the run is unaffected; the editor is meant to warn (`node-unreachable`, planned T7) |
+| A Condition whose input edge is `inactive` | none of it | the Condition (`no_active_input`) | both its outgoing edges become `inactive`, so both branches are skipped |
+
+Two things in this table are worth stopping at. **Row 2** is the answer to "did the whole trip fail?": **no**. A run in which the Output node was on a branch that was not taken **succeeds with an empty result** (`no_output_reached`), because nothing went wrong; it is the workflow author's choice whether that is useful. **Row 4** shows why "no fail-fast" gives deterministic records: B and O2 are not downstream of the failure, so they always run, whichever of A and B finished first.
+
+**Records and aborted runs** (rule 10). Every node run is stored with a status (`succeeded`, `failed`, `skipped`, and for aborted runs `cancelled` or `not_started`) and, for skipped nodes, a reason; every edge records its final state. A user cancellation ends the run `cancelled`; a run-level limit (maximum steps or wall-clock time) ends it `failed` with the limit named; a **node** timeout is just a node failure (rule 7). The monitor and debugger (planned) display exactly these records.
+
+**Deferred on purpose** (rule 11): approval waits (`waiting_approval`) and the meaning of tool edges (the Agent's `tools` input) are not defined here; tool edges are treated as ordinary data edges and their semantics belong to the Phase 4 Agent executor.
+
+### 5. How it communicates with other components
+
+- **Catalog to everything.** `frontend/src/catalog/nodes.ts` is the single source of node types (architecture rule). The marker lives there: the two outputs of `logic.condition` carry `branch: true`; no other port does (a test says so, and says that adding another must update the test **and** the specification). The UI, the validator, the future engine registry and the future natural-language generator all read the catalog, so they all see the marker.
+- **Catalog to the shared fixture and the future Python backend.** `contracts/fixtures/catalog/builtin.catalog.json` is the catalog exported as data, and a drift test (L3) compares it with the code. The commit regenerated it; its diff is exactly two added lines. `contracts/README.md` documents the field ("output ports only, never on inputs", "TypeScript only, no Python parity is claimed; the engine that uses it is Phase 3"). A Python catalog in Phase 2 will have to carry `branch` too (planned).
+- **The document does not change.** Edges already name ports (`source: { nodeId, port }`), so "the edge that leaves the `true` port" is already expressible. `branch` is **catalog metadata**: it is on port **definitions**, which documents never contain. A catalog test builds a workflow with a Condition and checks that its exported text does not contain the word `branch`. So nothing about saved files, `schemaVersion`, migrations (L8) or the canonical form (L5) changes.
+- **Connection rules to scheduling.** `connections.ts` (`checkConnection`) decides which edges may exist: no cycle (this is what makes termination possible), one edge per non-`multiple` input (this is why joins only arise on `multiple` ports), no duplicates. The execution rules assume those checks have already passed ("Load-time assumptions").
+- **Editor warnings (T7, planned).** D-034 states as a consequence that the warning rules **may** use `branch`, for example "Condition has only one branch wired", and the specification relies on the planned `node-unreachable` warning for the unconnected non-trigger root. I describe these as planned; I did not read them as built.
+- **Phase 3 engine (planned).** Implements the eleven rules; the specification says it must follow them "exactly". Also records per-node statuses and reasons and streams them to the monitor (planned).
+
+### 6. Important classes, functions and code paths
+
+| Where | What it does |
+|---|---|
+| `docs/ARCHITECTURE.md` section 6.1 | The binding specification: marker, vocabulary, load-time assumptions, eleven rules, worked examples, alternatives |
+| `docs/DECISIONS.md` D-006, D-034 | The Product Owner's DAG-executor requirement; the approved decision for the specification and the marker (D-034 records the three review contradictions) |
+| `frontend/src/workflow/types.ts`: `PortDefinition.branch?: boolean` | The marker field; the comment says "Output only (never on inputs)" |
+| `frontend/src/catalog/nodes.ts`: `logic.condition` | `inputs: [input (required)]`, `outputs: [true, false]`, both `branch: true` |
+| `frontend/src/catalog/catalog.test.ts`: `describe('the branch marker ...')` | Five tests: no input port has a `branch` key; Condition has exactly `true` and `false`, both `true`; no other node declares a branch output; a present `branch` value is the boolean `true`; a document and its export never contain `branch` |
+| `contracts/fixtures/catalog/builtin.catalog.json`, `contracts/README.md` | The regenerated shared catalog fixture and the documented field |
+| `frontend/src/workflow/connections.ts`: `checkConnection`, `isReachable` | The connection rules the execution rules rely on (cycle, `input-occupied` unless `multiple`) |
+| `docs/PHASE1_1_PLAN.md` section 3.4 | The **first draft** of the rules, kept for comparison with the final text |
+
+Reading hint: compare plan section 3.4 (ten rules, one pass, "the core runtime rule below needs no marker") with ARCHITECTURE section 6.1 (eleven rules, an order, a start rule, a failure policy, an emission check that **does** use the marker). The difference is the review.
+
+### 7. Alternatives and trade-offs
+
+| Option | Good | Costs |
+|---|---|---|
+| **Absence is the signal; the marker only guards emission (chosen)** | Simple scheduling; a buggy executor fails loudly; no skip value to understand | The engine must implement the emission check; the specification is long |
+| **Skip implicitly whenever an input is missing** (rejected, D-034) | Least to write | A wrongly missing output is silently treated as a branch not taken; bugs become invisible skips |
+| **A special "skip token" value on the unselected port** (rejected) | Explicit | Every executor, edge and test must understand the token; it can leak into data |
+| **Evaluate both branches and discard one** (rejected) | Easy to reason about as pure data | Side effects (HTTP calls, emails, LLM cost) run on the branch that should not run |
+| **A marker that drives scheduling** (rejected) | One flag to look at | Unneeded: scheduling already works from absence; two sources of truth to keep consistent |
+| **Fail-fast on the first failure** (rejected for v1) | Stops quickly; less wasted work | Stopping independent branches mid-flight leaves **half-done side effects** (an email sent, a record not written) and the records depend on **timing** (which node was in flight when the stop came). Draining keeps the records deterministic |
+| **Drain (chosen): independent nodes keep running** | Deterministic records; side effects either happen fully or not at all per branch | A failed run may spend time and money on branches whose results are partial; a later option could be a per-workflow setting |
+| **Join policy "any active" (chosen for v1)** | Fits "one of two branches ran" (the usual case) | A join that must wait for **all** inputs cannot be expressed yet; planned as a future catalog option |
+
+*Other tools (general knowledge, not checked here).* Workflow tools differ on exactly these points. For example, Apache Airflow lets each task choose a "trigger rule" that says when it runs given its upstream results (all succeeded, one succeeded, and so on), and GitHub Actions skips a job whose required job failed unless the author asks otherwise. AgentForge chose one fixed rule set for v1 and left per-node policies for later; I have not compared the details with those tools.
+
+### 8. Real-world engineering applications
+
+*From general knowledge, not from this repository.*
+
+- **Conditional routing and fan-in** are in every workflow and CI system: approve or reject paths, steps that run only `if` a condition holds, and a final job that depends on several earlier ones.
+- **Short-circuit evaluation** in programming languages (`a and b` does not evaluate `b` if `a` is false) is the same idea: the branch not taken must not run.
+- **Null versus missing** is a classic source of bugs in APIs and databases (a missing field, an explicit null); treating them as different is a design decision, as here.
+- **Vacuous truth** appears in database queries (`ALL` over an empty set), in access-control rules ("all required approvals present" when none are required) and in formal specifications; careful authors always ask "what if the set is empty?".
+- **Specifications reviewed by example.** Protocol and standards authors test a draft by running worked scenarios through it by hand (or with a model checker) before anyone codes it; contract tests then turn the examples into executable checks.
+- **Drain versus fail-fast** is the familiar choice in task runners and test runners (`--fail-fast`, `keep going`): the trade-off between speed of feedback and a complete, deterministic picture.
+
+### What the review found (real examples)
+
+These are reports from `docs/DEVELOPMENT_LOG.md` Session 12, except where I say I read the file. The reviewer (Opus 5.5, read-only) found the **code correct and well tested** and **no blockers**. But it found **three Major contradictions in the specification itself**, which the Principal Architect had written in the first draft (the draft is `docs/PHASE1_1_PLAN.md` section 3.4, promoted into ARCHITECTURE). It did so by **walking eleven scenarios through the rules by hand**. All three were **fixed before the task was accepted** (the commit `32066b2` message says the section was rewritten after review).
+
+**(1) Every trigger would be skipped (vacuous truth).** The draft said a node runs "if every required input port has an active edge" and, in another place, that "a node with only inactive incoming edges is skipped". A trigger has **no incoming edges**: "every required input has an active edge" is true (it has no required inputs) **and** "all its incoming edges are inactive" is also true (it has none). Read literally, the second sentence skipped every trigger, so no workflow would ever start. It also left open what an unconnected **non-trigger** node does (optional inputs make such nodes possible: the LLM Prompt's `input` and the HTTP Request's `input` are not required, as I read in `nodes.ts`). The fix is in the diagram above: a fixed order, case B written as "has incoming edges **and** none is active", an explicit **start rule** (triggers start; a non-trigger root is skipped `unreachable`), and the load-time assumption that a workflow has at least one trigger. This is the best single example in the project of why you ask "what if the group is empty?".
+
+**(2) A join with one failed and one active input: run or skip?** One rule said a `multiple` input runs when any edge is active; another said a node downstream of a failure is skipped. For a join fed by one failed and one active edge, they disagreed. Related gaps: what is the skip reason **two hops** from a failure; fail-fast or drain; what happens when a run is cancelled or hits a limit; what a failed run returns. The fix: edges leaving a node skipped for `upstream_failed` are themselves `failed` (so the failure keeps propagating and the reason stays right two hops away), **failure wins** (rule 5a), **no fail-fast**, and the aborted-run statuses and the partial-result rule were written.
+
+**(3) "No marker is needed at run time" was false.** The draft (and D-034) said the runtime does not need the `branch` marker, yet rule 1 needs it to know which absent ports are legal. And a node with branch ports could emit on **none** of them and silently skip everything. The fix: rule 1 as described in section 3, and the marker paragraph and D-034 corrected (I read both at HEAD). **A claim in a document can be false without any code being wrong**: here the contradiction was between two sentences of the same text.
+
+**Smaller findings (all fixed in the text):** the value shape of a `multiple` input (a list, in edge array order), the `pending` state that was lost when the plan was promoted, "absent" being ambiguous for Python (it now means the key is omitted, not `null`), the run-result shape (a list of `{ nodeId, value }` in node array order), tool edges, an example that was not buildable with today's catalog (the specification now uses a hypothetical node X), a stale `PortDefinition` block in section 5 (I checked: it now shows `branch`), and a misplaced Deployment paragraph.
+
+**Code nits, carried into the next round.** The reviewer's mutation run (seven mutants: six killed, one survived) found that the test "a document and its export never contain branch" checks only the exported **text**; a mutant that stored port definitions on the node would be missed. That was passed on to the next task (T7a's fix round). Also, `branch` is allowed on input ports by the TypeScript **type**; a test enforces the rule, and the Principal Architect accepted it (documents never carry port definitions; the Phase 2 Pydantic models should model inputs and outputs separately).
+
+**What this teaches, in four lines.**
+1. **A specification is code you cannot run.** The only way to test it is to walk concrete examples through it, by hand, and to try the **empty case** and the **both-rules-apply case** every time.
+2. **Fixing it before acceptance is cheap.** The same three contradictions found in Phase 3 would have been found as engine bugs, perhaps in production runs (a workflow that never starts; a join that runs on failed data).
+3. **Examples are tests waiting for an engine.** The seven worked examples are the natural first test cases for Phase 3 (and, as L3 and L8 taught, shared data is the way to keep a second implementation honest); today they exist only as prose, and nothing executes them.
+4. **Be honest about the evidence.** "Reviewed by analysis only, nothing executes it" is in the Principal Architect's record; the lesson repeats it so that you can say it in an interview without overclaiming.
+
+### Knowledge Check / Interview Questions
+
+*Answers are not given here. Study this lesson and `docs/LEARNING.md`, then answer all questions in the dedicated learning session at the end of the project.*
+
+1. In the workflow `Trigger -> Condition; Condition.true -> LLM A; Condition.false -> LLM B; A -> Output`, the condition evaluates to `false`. Using the edge states and the run-or-skip order, walk through every node and every edge: what state does each edge end in, which nodes run, which are skipped and for what reason, and how does the run end? Then say what changes if A and B both feed a hypothetical node X with a `multiple` input (and A -> Output is removed), and why a skipped node's outgoing edge is `inactive` rather than `failed`. Why can you not simply connect both A and B to the Output node's single `input` port?
+2. Explain the difference between an output port that is **absent** and one whose value is `null`. Why must the engine treat them differently? What exactly does rule 1 require of a node that has no `branch` ports, and what bug does that requirement make impossible to hide? Why is the `branch` marker not used to schedule anything?
+3. Explain vacuous truth with the example of a trigger node. Show the two sentences in the first draft that, read together, skipped every trigger, and explain how the final order of cases (and the explicit start rule) removes the problem. Give one other place in a program or a query where "all of an empty set" could bite you.
+4. A node J has a `multiple` input fed by one failed edge and one active edge. What does the specification say happens, which rule decides, and why was this unclear in the first draft? Then argue for or against "no fail-fast": what are the costs of letting independent branches keep running after a failure, and what are the costs of stopping them?
+5. The reviewer found the code correct but the specification contradictory. What does that tell you about where bugs hide in a design? How did the reviewer find them without running anything, and what would you do to turn the seven worked examples into automatic tests once the engine exists?
+6. The `branch` marker is added to the catalog but not to saved workflow documents. Why does that mean no `schemaVersion` bump and no migration are needed, and which test checks it? What would break for old files if `branch` were stored in the document instead? Name one future component (planned, not built) that depends on `branch` appearing in the catalog fixture, and explain why.
