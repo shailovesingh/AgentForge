@@ -8,11 +8,11 @@ import { getSecretReport } from '../store/secretReport'
 import type { SecretReport } from '../store/secretReport'
 import { useHasHighSecret } from '../store/useSecretReport'
 import type { ValidationError } from '../workflow/errors'
-import { REDACTED_NAME, safeDisplayName } from '../workflow/secrets'
+import { echoSafe, echoSafePointer } from '../workflow/secrets'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importTooLarge, importWorkflow } from '../workflow/serialize'
 import type { Workflow } from '../workflow/types'
 import { ConfirmDialog } from './ConfirmDialog'
-import { shorten } from './shorten'
+import { downloadName } from './downloadName'
 import { IMPORT_BUTTON_ID } from './importButton'
 import styles from './Toolbar.module.css'
 import { WarningsMenu } from './WarningsMenu'
@@ -20,17 +20,11 @@ import { WarningsMenu } from './WarningsMenu'
 // A path or message longer than this is cut when shown, so a huge key cannot flood the alert panel.
 const MAX_SHOWN = 200
 
-/**
- * An error message or path as shown in the panel: cut to MAX_SHOWN, and replaced by "[redacted name]" when it holds a
- * credential-shaped text. A validation error can name the offending KEY (`/nodes/0/config/<key>`), and a key could itself be
- * a pasted token, which must not be echoed (contracts/SECRETS.md, never echo).
- */
-const shown = (text: string): string => (safeDisplayName(text) === REDACTED_NAME ? REDACTED_NAME : shorten(text, MAX_SHOWN))
-
-function downloadName(name: string): string {
-  const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return `${slug || 'workflow'}.json`
-}
+// An error message or path is shown through these (contracts/SECRETS.md, never echo). A validation error can name the offending
+// KEY (`/nodes/0/config/<key>`), and a key could itself be a pasted token. The checks run on the FULL text before the cut; the
+// error object keeps its exact path, only the displayed text is replaced by "(hidden: may contain a credential)".
+const shownMessage = (text: string): string => echoSafe(text, MAX_SHOWN)
+const shownPath = (pointer: string): string => echoSafePointer(pointer, MAX_SHOWN)
 
 export function Toolbar() {
   const name = useEditorStore((s) => s.workflow.name)
@@ -152,9 +146,9 @@ export function Toolbar() {
             <ul>
               {problem.errors.map((error, i) => (
                 <li key={i}>
-                  <code>{error.code}</code> {shown(error.message)}{' '}
+                  <code>{error.code}</code> {shownMessage(error.message)}{' '}
                   <span className={styles.path}>
-                    {error.path === '' ? '(whole document)' : `at ${shown(error.path)}`}
+                    {error.path === '' ? '(whole document)' : `at ${shownPath(error.path)}`}
                   </span>
                 </li>
               ))}

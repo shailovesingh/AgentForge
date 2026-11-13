@@ -97,6 +97,51 @@ export function safeDisplayName(text: string): string {
   return cut + '...'
 }
 
+// ---------------------------------------------------------------------------
+// Echoing untrusted text (T9b second review). An error message or a path that repeats a key, an id, a type or a version of an
+// imported file could repeat a pasted credential. The test runs on the FULL text BEFORE any cutting: a cut can leave a PREFIX
+// of a token (not itself credential-shaped) that was straddling the cut. Error codes and the structured `path` of an error
+// stay exact; only the DISPLAYED text is replaced.
+// ---------------------------------------------------------------------------
+
+/** Shown instead of an echoed piece of untrusted text (a key, an id, a type, a version, a path) that may hold a credential. */
+export const HIDDEN_ECHO = '(hidden: may contain a credential)'
+const ECHO_ODD_MIN_LENGTH = 12 // a short key with a space or `=` is harmless; a long one may be a secret typed INTO the key
+
+/** The display-path rule for ONE key: credential-shaped, longer than MAX_KEY_LENGTH, or holding `=`, `:` or whitespace. */
+export const isRedactedKey = (key: string): boolean => isCredentialShaped(key) || key.length > MAX_KEY_LENGTH || ODD_KEY.test(key)
+
+/** Cuts to `max` characters plus `...` (never half of a surrogate pair). */
+function cutText(text: string, max: number): string {
+  if (text.length <= max) return text
+  const last = text.charCodeAt(max - 1)
+  return text.slice(0, last >= 0xd800 && last <= 0xdbff ? max - 1 : max) + '...'
+}
+
+/**
+ * `text` as it may be shown in a message: HIDDEN_ECHO when the FULL text is credential-shaped; for a KEY (`kind` 'key') also
+ * when it is longer than MAX_KEY_LENGTH, or longer than 12 characters with `=`, `:` or whitespace in it; otherwise the text
+ * cut to `max` characters. The checks never see a cut text.
+ */
+export function echoSafe(text: string, max: number, kind: 'key' | 'text' = 'text'): string {
+  if (isCredentialShaped(text)) return HIDDEN_ECHO
+  if (kind === 'key' && (text.length > MAX_KEY_LENGTH || (text.length > ECHO_ODD_MIN_LENGTH && ODD_KEY.test(text)))) return HIDDEN_ECHO
+  return cutText(text, max)
+}
+
+/**
+ * A JSON Pointer (an error `path`) as it may be shown: HIDDEN_ECHO when the whole pointer is credential-shaped or when any
+ * of its keys is one that display paths redact (isRedactedKey, applied to each unescaped segment); otherwise the pointer cut
+ * to `max` characters.
+ */
+export function echoSafePointer(pointer: string, max: number): string {
+  if (isCredentialShaped(pointer)) return HIDDEN_ECHO
+  for (const segment of pointer.split('/')) {
+    if (isRedactedKey(segment.replace(/~1/g, '/').replace(/~0/g, '~'))) return HIDDEN_ECHO
+  }
+  return cutText(pointer, max)
+}
+
 /** One step of the walk, linked to its parent so that a path is built only for a kept finding (a 200,000-level value stays cheap). */
 interface Frame {
   value: unknown

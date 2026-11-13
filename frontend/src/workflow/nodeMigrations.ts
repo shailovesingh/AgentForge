@@ -1,6 +1,9 @@
 import { MAX_ERRORS, jsonPointer } from './errors'
 import type { ErrorCode, ValidationError } from './errors'
+import { echoSafe } from './secrets'
 import type { NodeDefinition } from './types'
+
+const MAX_ECHO = 100 // an untrusted id or type echoed in a message is cut to this many characters (after the credential test)
 
 // Versioned node migrations (H3, contracts/MIGRATIONS.md). Pure: no React, no I/O, no clock, no randomness.
 // The catalog serves only the LATEST definition of each node type; the history of how to get there lives in
@@ -81,14 +84,16 @@ export function nodeVersionProblem(
   latest: number,
   unmigrated = false,
 ): ValidationError {
-  const at = `nodes[${index}] ("${id}")`
+  // id and type come from the file: shown only through echoSafe (the credential test runs on the full text, then the cut)
+  const at = `nodes[${index}] ("${echoSafe(id, MAX_ECHO)}")`
+  const t = echoSafe(type, MAX_ECHO)
   const code: ErrorCode = version > latest ? 'node.version-newer' : 'node.no-migration-path'
   const message =
     version > latest
-      ? `${at}: ${type}@${version} was created by a newer editor (this editor has ${type}@${latest}).`
+      ? `${at}: ${t}@${version} was created by a newer editor (this editor has ${t}@${latest}).`
       : unmigrated
-        ? `${at}: ${type}@${version} is older than this editor's ${type}@${latest} and has not been migrated (migrateNodes must run before validateWorkflow).`
-        : `${at}: ${type}@${version} is too old and has no migration to ${type}@${latest}.`
+        ? `${at}: ${t}@${version} is older than this editor's ${t}@${latest} and has not been migrated (migrateNodes must run before validateWorkflow).`
+        : `${at}: ${t}@${version} is too old and has no migration to ${t}@${latest}.`
   return { code, path: jsonPointer('nodes', index, 'typeVersion'), message }
 }
 

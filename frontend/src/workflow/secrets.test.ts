@@ -4,6 +4,7 @@ import { lintWorkflow } from './lint'
 import {
   CREDENTIAL_SHAPES,
   HEADER_NAMES,
+  HIDDEN_ECHO,
   KEY_WORDS,
   MAX_FINDINGS_PER_SCAN,
   MAX_KEY_LENGTH,
@@ -13,6 +14,9 @@ import {
   REDACTED_NAME,
   detectNodeSecrets,
   detectSecrets,
+  echoSafe,
+  echoSafePointer,
+  isRedactedKey,
   safeDisplayName,
   scanSecrets,
 } from './secrets'
@@ -460,6 +464,79 @@ describe('bounded output: scanSecrets, the per-node cap and the omitted counts',
       const s = scanSecrets(w as unknown as Workflow)
       expect(s.findings).toEqual([])
       expect(s.omitted.perNode.size).toBe(0)
+    }
+  })
+})
+
+describe('echoSafe, echoSafePointer and isRedactedKey (T9b second review: the check runs on the FULL text, before any cut)', () => {
+  // A token whose 8-character windows cannot occur in a prefix of repeated letters.
+  const TOKEN = 'sk' + '-' + ['QwErTyUi', 'OpAsDfGh', 'JkLzXcVb'].join('')
+  const windows = (s: string): string[] => Array.from({ length: s.length - 7 }, (_, i) => s.slice(i, i + 8))
+  const SEPARATORS = [' ', '=', '.', ':', '/', '\t']
+
+  test.each(['key', 'text'] as const)('kind %s: a token at every offset 0..120 behind any separator never leaks 8 consecutive characters, whatever the cut', (kind) => {
+    for (const max of [20, 60, 100]) {
+      for (const separator of SEPARATORS) {
+        for (let prefix = 0; prefix <= 120; prefix++) {
+          const text = 'x'.repeat(prefix) + separator + TOKEN
+          const out = echoSafe(text, max, kind)
+          expect(windows(TOKEN).filter((w) => out.includes(w)).length, `kind ${kind}, max ${max}, separator ${JSON.stringify(separator)}, prefix ${prefix}`).toBe(0)
+          expect(out, `prefix ${prefix}`).toBe(HIDDEN_ECHO) // a credential shape anywhere in the full text hides all of it
+        }
+      }
+    }
+  })
+
+  test('a token glued to a letter is not a credential shape (the documented boundary): echoed as any other text', () => {
+    expect(echoSafe('x' + TOKEN, 100, 'text')).toBe('x' + TOKEN)
+  })
+
+  test('kind text: only the credential test, then the cut (an id, a type, a version)', () => {
+    expect(echoSafe('node-1', 100)).toBe('node-1')
+    expect(echoSafe('a b = c : d with spaces and more than twelve characters', 100)).toBe('a b = c : d with spaces and more than twelve characters')
+    expect(echoSafe('L'.repeat(150), 100)).toBe('L'.repeat(100) + '...')
+    expect(echoSafe('L'.repeat(100), 100)).toBe('L'.repeat(100))
+    const emoji = String.fromCodePoint(0x1f600)
+    expect(echoSafe('a' + emoji.repeat(60), 10)).toBe('a' + emoji.repeat(4) + '...') // the cut would fall inside a pair: never half of one
+    expect(echoSafe(`call ${TOKEN} now`, 100)).toBe(HIDDEN_ECHO)
+  })
+
+  test('kind key: also hidden when longer than 40 units, or longer than 12 characters with =, : or whitespace', () => {
+    expect(echoSafe('Content-Type', 100, 'key')).toBe('Content-Type')
+    expect(echoSafe('k'.repeat(40), 100, 'key')).toBe('k'.repeat(40))
+    expect(echoSafe('k'.repeat(41), 100, 'key')).toBe(HIDDEN_ECHO)
+    expect(echoSafe('a b', 100, 'key')).toBe('a b') // short and harmless
+    expect(echoSafe('x'.repeat(12), 100, 'key')).toBe('x'.repeat(12))
+    expect(echoSafe('password = hunter2', 100, 'key')).toBe(HIDDEN_ECHO)
+    expect(echoSafe('token:' + 'x'.repeat(10), 100, 'key')).toBe(HIDDEN_ECHO)
+    expect(echoSafe('a'.repeat(6) + ' ' + 'b'.repeat(6), 100, 'key')).toBe(HIDDEN_ECHO) // 13 characters with a space
+  })
+
+  test('isRedactedKey is the display-path rule: credential-shaped, longer than 40, or any = : or whitespace', () => {
+    expect(isRedactedKey('a b')).toBe(true)
+    expect(isRedactedKey('a=b')).toBe(true)
+    expect(isRedactedKey('a:b')).toBe(true)
+    expect(isRedactedKey(TOKEN)).toBe(true)
+    expect(isRedactedKey('k'.repeat(41))).toBe(true)
+    expect(isRedactedKey('k'.repeat(40))).toBe(false)
+    expect(isRedactedKey('Authorization')).toBe(false)
+    expect(isRedactedKey('')).toBe(false)
+  })
+
+  test('echoSafePointer: plain pointers are shown (cut), a pointer with a credential-shaped, long or odd key anywhere is hidden', () => {
+    expect(echoSafePointer('/nodes/0/config/headers', 200)).toBe('/nodes/0/config/headers')
+    expect(echoSafePointer('', 200)).toBe('')
+    expect(echoSafePointer('/nodes/0/config/' + 'k'.repeat(40), 300)).toBe('/nodes/0/config/' + 'k'.repeat(40))
+    expect(echoSafePointer('/a/' + 'k'.repeat(41), 300)).toBe(HIDDEN_ECHO)
+    expect(echoSafePointer('/a/b c', 200)).toBe(HIDDEN_ECHO)
+    expect(echoSafePointer('/a/b=c', 200)).toBe(HIDDEN_ECHO)
+    expect(echoSafePointer('/a/' + TOKEN, 200)).toBe(HIDDEN_ECHO)
+    expect(echoSafePointer('/a~1b/c~0d', 200)).toBe('/a~1b/c~0d') // escapes are undone for the check, shown as written
+    expect(echoSafePointer('/p/' + 'n'.repeat(250), 200)).toBe(HIDDEN_ECHO) // a 250-character key is over 40
+    expect(echoSafePointer('/' + Array.from({ length: 80 }, () => 'abcdefghij').join('/'), 200).endsWith('...')).toBe(true) // long, but plain: cut
+    for (let prefix = 0; prefix <= 120; prefix++) {
+      const out = echoSafePointer('/' + 'x'.repeat(prefix) + ' ' + TOKEN, 100)
+      expect(windows(TOKEN).filter((w) => out.includes(w)).length, `prefix ${prefix}`).toBe(0)
     }
   })
 })

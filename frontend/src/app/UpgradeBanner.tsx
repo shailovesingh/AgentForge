@@ -1,4 +1,5 @@
 import { useEditorStore } from '../store/editorStore'
+import { safeDisplayName } from '../workflow/secrets'
 import { describeUpgrades } from './describeUpgrades'
 import { IMPORT_BUTTON_ID } from './importButton'
 import { shorten } from './shorten'
@@ -37,7 +38,7 @@ export function UpgradeBanner() {
             <ul>
               {notes.map(({ nodeId, note }, i) => (
                 <li key={i}>
-                  <code>{shorten(nodeId, 40)}</code> {shorten(note, MAX_SHOWN)}
+                  <code>{shorten(safeDisplayName(nodeId), 40)}</code> {shorten(note, MAX_SHOWN)}
                 </li>
               ))}
             </ul>

@@ -239,10 +239,10 @@ the caps ever change.)
 
 | Where | What |
 |---|---|
-| Node badge | A distinct badge (`ShieldAlert` icon, coloured border, `data-secret-likely`), accessible name "N warnings, possible credential". Its title lists only the secret messages of that node (the other rules' messages quote the raw label, so they are replaced by a count). |
+| Node badge | A distinct badge (`ShieldAlert` icon, coloured border, `data-secret-likely`), accessible name "N warnings, possible credential". Its title lists the warning messages of that node; every lint message names the node through `safeDisplayName`, so none can quote a label that is itself a token. |
 | Toolbar | The status text "Possible credential in this workflow" (`data-secret-indicator`), present while `hasHigh` (config or metadata). Not `role=alert`, not a live region, not a modal. The toolbar subscribes to the boolean only. |
 | Config panel | For the selected node with a `secret-likely` warning: a section "Possible credential in this node" with the display paths and a sentence on removing the value. |
-| Export | If `hasHigh` at the moment Export is activated, a native modal `<dialog>` (`app/ConfirmDialog.tsx`) opens BEFORE any file is created, **on every attempt**: nothing is remembered, no "do not ask again", no storage of any kind. It says that anyone who obtains the file can use the credential and that the file may be shared, committed or stored; lists at most 50 nodes and their paths (and the metadata paths) with "and N more" where `omitted > 0` and "and N more nodes" past the 50th node; explains that credential references (an opaque id pointing to a credential stored by the AgentForge backend) are **not available yet**, that they arrive with backend credential management, and that until then the secret should be kept out of the file and provided where the workflow runs. **Cancel** has the focus on open, `Escape` cancels, Tab and Shift+Tab cycle inside, and focus returns to the Export button. Every other key is stopped inside the dialog (so Delete and Backspace never reach the canvas and cannot delete the selected node behind it). **Export anyway** runs the existing export path unchanged (an export error still shows its own panel) on **the workflow object that was current when Export was clicked**, the one the list was built from, so an import that finishes behind the dialog cannot change what is exported. The dialog component takes the report only (no workflow type). |
+| Export | If `hasHigh` at the moment Export is activated, a native modal `<dialog>` (`app/ConfirmDialog.tsx`) opens BEFORE any file is created, **on every attempt**: nothing is remembered, no "do not ask again", no storage of any kind. It says that anyone who obtains the file can use the credential and that the file may be shared, committed or stored; lists at most 50 nodes and their paths (and the metadata paths) with "and N more" where `omitted > 0` and "and N more nodes" past the 50th node; explains that credential references (an opaque id pointing to a credential stored by the AgentForge backend) are **not available yet**, that they arrive with backend credential management, and that until then the secret should be kept out of the file and provided where the workflow runs. **Cancel** has the focus on open, `Escape` cancels, Tab and Shift+Tab cycle inside, and focus returns to the Export button. The `keydown` of every key except Tab and Escape is stopped inside the dialog (so Delete and Backspace never reach React Flow's document-level handler and cannot delete the selected node behind it; a test records the keys a document listener sees). Only the event is stopped: Enter and Space on a focused button still activate it. **Export anyway** runs the existing export path unchanged (an export error still shows its own panel) on **the workflow object that was current when Export was clicked**, the one the list was built from, so an import that finishes behind the dialog cannot change what is exported. The dialog component takes the report only (no workflow type). |
 
 With no high finding the export is exactly as before (no dialog, no extra step). The dialog opens only from the Export button.
 
@@ -255,9 +255,20 @@ panel of an export that fails after the confirmation, and in the error panel of 
 one exception is the field the value was typed into (React also mirrors its value into that textarea's text, so that element is
 left out of the text scan too); other tests prove that the exception is that narrow (the same scan fails when the sentinel is
 planted in the workflow name input, or in a hidden span). Metadata, "55 medium keys before the credential", "60 high
-findings in a node" and "a credential-shaped key that makes the import fail" variants check the same. The import error panel
-shows a message or a path as `[redacted name]` when it holds a credential-shaped text (a validation path can name the
-offending key). Unit tests
+findings in a node", "a credential-shaped key that makes the import fail" and "a duplicate key that straddles the cut" variants
+check the same. **Echoed text (T9b second review).** An error message or path of an import or of a JSON setting can repeat a
+key, an id, a type or a version of the file. The shared helpers `echoSafe(text, max, kind)` and `echoSafePointer(pointer, max)`
+in `secrets.ts` run their test on the **FULL text before any cutting** (a cut can leave a prefix of a token that is no longer
+credential-shaped) and return the fixed marker `(hidden: may contain a credential)` when the full text is credential-shaped;
+for a KEY also when it is longer than 40 UTF-16 code units or longer than 12 characters with `=`, `:` or whitespace; for a JSON
+Pointer when any of its keys is one that display paths redact (credential-shaped, longer than 40, or any `=`, `:` or
+whitespace). Otherwise the text is cut as before. `strictJson`, `validate`, `nodeMigrations` and `migrate` route every
+untrusted fragment of a message through them (duplicate keys, node and edge ids, types, versions, config setting names); the
+import error panel shows messages and paths through them again. **Error codes and the structured `path` stay exact**; only the
+DISPLAYED text is replaced. Unit tests check every prefix length 0 to 120 and several separators for "no 8 consecutive
+characters of the token in any output". The marker differs on purpose from `[redacted name]`, which is only for node names.
+**The file name** of an export (`downloadName`) falls back to `workflow.json` when the workflow name is credential-shaped:
+workflow names are not scanned, but they never reach the file name when they look like a credential. Unit tests
 (`secretReport.test.ts`) plant the sentinel in a header value, a nested value, an array item, a key, a label, a node id, a
 long prompt, metadata and keys with `:` or `=`, and walk every string and key of the report. Source guards check that no UI
 file under `app`, `nodes`, `config-panel` or `store` uses `console.`, `localStorage`, `sessionStorage`, `document.cookie` or

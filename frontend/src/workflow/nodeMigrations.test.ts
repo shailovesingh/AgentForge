@@ -461,11 +461,11 @@ describe('source guards: the import path cannot write a file, store anything or 
     for (const [file, text] of Object.entries(sources)) expect(writeCapable.test(text), file).toBe(false)
   })
 
-  test('the two pure migration files use none of the stricter list and import only ./errors and ./types', () => {
+  test('the two pure migration files use none of the stricter list and import only ./errors, ./secrets (the pure echoSafe helper) and ./types', () => {
     for (const file of ['/src/workflow/migrate.ts', '/src/workflow/nodeMigrations.ts']) {
       const text = sources[file]
       expect(forbidden.test(text), file).toBe(false)
-      for (const spec of importSpecifiers(text)) expect(['./errors', './types'], `${file} imports ${spec}`).toContain(spec)
+      for (const spec of importSpecifiers(text)) expect(['./errors', './secrets', './types'], `${file} imports ${spec}`).toContain(spec)
     }
   })
 })

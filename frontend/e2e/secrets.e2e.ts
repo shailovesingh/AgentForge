@@ -35,7 +35,9 @@ declare const document: {
   activeElement: unknown
   createElement(tag: string): PageElement
   querySelectorAll(selector: string): ArrayLike<PageElement>
+  addEventListener(type: string, listener: (event: { key: string }) => void): void
 }
+declare const requestAnimationFrame: (callback: () => void) => number
 
 const exportButton = (editor: Editor) => editor.page.getByRole('button', { name: 'Export', exact: true })
 const dialogOf = (editor: Editor) => editor.page.getByRole('dialog')
@@ -521,6 +523,8 @@ test.describe('review fixes (T9b)', () => {
     await expect(dialog).toBeVisible()
 
     for (const key of ['Backspace', 'Delete', 'ArrowLeft', 'a']) await editor.page.keyboard.press(key)
+    // React Flow deletes asynchronously: let two animation frames pass, so the count below cannot be read before a delete lands
+    await editor.page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
     await expect(editor.nodes).toHaveCount(1) // React Flow's document-level Delete handler never saw the keys
     await expect(editor.node('http.request')).toHaveClass(/\bselected\b/)
     await expect(dialog).toBeVisible()
@@ -601,7 +605,104 @@ test.describe('review fixes (T9b)', () => {
   })
 })
 
+test.describe('keys and focus while the dialog is open (T9b second review)', () => {
+  test('only Tab and Escape reach the page: a document-level listener sees no other key while the dialog is open', async ({ editor }) => {
+    await plantHeader(editor, makeSentinel())
+    await exportButton(editor).click()
+    const dialog = dialogOf(editor)
+    await expect(dialog).toBeVisible()
+    // A BUBBLE-phase listener on the document, like React Flow's: it records every key that gets out of the dialog.
+    await editor.page.evaluate(() => {
+      const keys: string[] = []
+      ;(globalThis as unknown as { seenKeys: string[] }).seenKeys = keys
+      document.addEventListener('keydown', (event) => keys.push(event.key))
+    })
+    const seen = () => editor.page.evaluate(() => (globalThis as unknown as { seenKeys: string[] }).seenKeys.slice())
+
+    // (Enter and Space on a focused button activate it, so they are not pressed here; arrows, letters, Delete, Backspace, Home, F2 ...)
+    for (const key of ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'a', 'Z', '1', 'Backspace', 'Delete', 'Home', 'End', 'PageDown', 'F2', 'Control+z', 'Shift+Tab', 'Tab']) {
+      await editor.page.keyboard.press(key)
+    }
+    await editor.page.keyboard.press('Escape')
+    await expect(editor.page.locator('dialog')).toHaveCount(0)
+
+    const reached = await seen()
+    expect(reached.filter((k) => k !== 'Tab' && k !== 'Escape'), 'keys that got out of the dialog').toEqual([])
+    expect(reached).toContain('Tab') // the listener works, and Tab and Escape are the dialog's own business
+    expect(reached).toContain('Escape')
+
+    // control: with the dialog gone the same listener sees an ordinary key
+    await editor.page.keyboard.press('q')
+    expect(await seen()).toContain('q')
+  })
+
+  test('a close that is not an Escape (dialog.close()) resets the confirming state: Export opens the dialog again', async ({ editor }) => {
+    await plantHeader(editor, makeSentinel())
+    await exportButton(editor).click()
+    await expect(dialogOf(editor)).toBeVisible()
+
+    await dialogOf(editor).evaluate((d: { close(): void }) => d.close()) // no cancel event first
+    await expect(editor.page.locator('dialog')).toHaveCount(0) // the toolbar forgot the dialog (it is unmounted)
+    await exportButton(editor).click()
+    await expect(dialogOf(editor)).toBeVisible() // Export is not dead
+    await expect(dialogOf(editor).getByRole('button', { name: 'Cancel' })).toBeFocused()
+    await dialogOf(editor).getByRole('button', { name: 'Cancel' }).click()
+  })
+
+  test('a credential-shaped workflow name never reaches the file name', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    await editor.page.getByLabel('Workflow name').fill(sentinel)
+    const { filename } = await editor.exportWorkflow()
+    expect(filename).toBe('workflow.json')
+    for (const piece of piecesOf(sentinel)) expect(filename.toLowerCase().includes(piece.toLowerCase())).toBe(false)
+  })
+})
+
+test.describe('a duplicate key that straddles the cut is never echoed (T9b second review)', () => {
+  const windowsOf = (s: string): string[] => Array.from({ length: s.length - 7 }, (_, i) => s.slice(i, i + 8))
+
+  test('import: the alert hides the key, for the separators space, = and .', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    const windows = windowsOf(sentinel)
+    for (const separator of [' ', '=', '.']) {
+      const key = 'x'.repeat(80) + separator + sentinel // 80 characters, then the token: the old cut at 100 kept 18 of its 27 characters
+      await editor.importText(`{"metadata":{${JSON.stringify(key)}:1,${JSON.stringify(key)}:2}}`)
+      const alert = editor.toolbar.getByRole('alert')
+      await expect(alert.getByText('doc.duplicate-key', { exact: true })).toBeVisible()
+      await expect(alert).toContainText('(hidden: may contain a credential)')
+      expect(await leaksIn(editor.page, windows, null), `separator ${JSON.stringify(separator)}`).toEqual([])
+    }
+  })
+
+  test('the config panel: typing the same duplicate key into a JSON setting shows the hidden message, not the key', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    const windows = windowsOf(sentinel)
+    await editor.libraryItem('HTTP Request').click()
+    const skipId = await headersField(editor).getAttribute('id')
+    for (const separator of [' ', '=', '.']) {
+      const key = 'x'.repeat(80) + separator + sentinel
+      await headersField(editor).fill(`{${JSON.stringify(key)}:1,${JSON.stringify(key)}:2}`)
+      const error = editor.settings.getByRole('alert')
+      await expect(error).toContainText('(hidden: may contain a credential)')
+      expect(await leaksIn(editor.page, windows, skipId), `separator ${JSON.stringify(separator)}`).toEqual([])
+    }
+  })
+})
+
 test.describe('the import error panel and credential-shaped text', () => {
+  test('a secret typed INTO a key (a short key with = or whitespace, not credential-shaped) is not echoed in the path or the message', async ({ editor }) => {
+    for (const key of ['password=hunter2', 'my password hunter2', 'token: hunter2']) {
+      const node = httpNode('h1', 'Call', {})
+      ;(node.config as Record<string, unknown>)[key] = 1 // an unknown setting: the validator names the key in the error path
+      await editor.importText(fileWith({ nodes: [node] }))
+      const alert = editor.toolbar.getByRole('alert')
+      await expect(alert.getByText('schema.additionalProperties', { exact: true })).toBeVisible()
+      await expect(alert).toContainText('(hidden: may contain a credential)')
+      expect(await alert.innerText(), key).not.toContain('hunter2')
+      expect(await leaksIn(editor.page, ['hunter2'], null), key).toEqual([])
+    }
+  })
+
   test('a file rejected BECAUSE of a credential-shaped key (an unknown config property) is reported without echoing the key', async ({ editor }) => {
     const sentinel = makeSentinel()
     const node = httpNode('h1', 'Call', {})

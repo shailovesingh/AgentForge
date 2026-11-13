@@ -13,18 +13,9 @@ import styles from './WorkflowNode.module.css'
 // A message longer than this is cut in the badge's tooltip, so a huge node label cannot flood it.
 const MAX_TITLE = 200
 
-/**
- * The badge's tooltip: one line per warning. On a node with a possible credential only the secret messages are listed (they name
- * the node through safeDisplayName); the other rules' messages quote the raw label, which could itself be a pasted token, so
- * they are left out and counted instead (contracts/SECRETS.md).
- */
-function titleOf(warnings: readonly Warning[], likelySecret: boolean): string {
-  if (!likelySecret) return warnings.map((w) => shorten(w.message, MAX_TITLE)).join('\n')
-  const secret = warnings.filter((w) => w.code === 'secret-likely' || w.code === 'secret-suspected')
-  const lines = secret.map((w) => shorten(w.message, MAX_TITLE))
-  if (secret.length < warnings.length) lines.push(`and ${warningCountText(warnings.length - secret.length)} of other kinds`)
-  return lines.join('\n')
-}
+// The badge's tooltip: one line per warning. Every lint message names the node through safeDisplayName (contracts/SECRETS.md),
+// so none of them can quote a label that is itself a pasted token.
+const titleOf = (warnings: readonly Warning[]): string => warnings.map((w) => shorten(w.message, MAX_TITLE)).join('\n')
 
 /** The single node component for every catalog type. Ports and icon come from the catalog. */
 export function WorkflowNodeView({ data, selected }: NodeProps<FlowNode>) {
@@ -55,7 +46,7 @@ export function WorkflowNodeView({ data, selected }: NodeProps<FlowNode>) {
             className={likelySecret ? `${styles.warning} ${styles.secret}` : styles.warning}
             role="img"
             aria-label={likelySecret ? `${warningCountText(warnings.length)}, possible credential` : warningCountText(warnings.length)}
-            title={titleOf(warnings, likelySecret)}
+            title={titleOf(warnings)}
             data-secret-likely={likelySecret ? '' : undefined}
           >
             {likelySecret ? <ShieldAlert size={12} aria-hidden="true" /> : <TriangleAlert size={12} aria-hidden="true" />}

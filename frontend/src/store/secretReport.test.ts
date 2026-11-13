@@ -272,7 +272,9 @@ describe('source-text guards for the secret UI', () => {
     }
   })
 
-  test('the dialog and its export are bound to the workflow that was listed (the object captured at click time), and the dialog stops every key but Tab and Escape', () => {
+  // Source-text guards only: they catch a deleted line, not a wrong behaviour. The behaviour is tested in e2e/secrets.e2e.ts
+  // (a document listener records the keys that get out of the dialog; the export is compared with the workflow at click time).
+  test('source guard: the export uses the workflow object captured at click time; the dialog stops propagation and handles onClose', () => {
     const toolbar = text('/src/app/Toolbar.tsx')
     expect(/exportNow\(workflow\)/.test(toolbar)).toBe(true)
     // the confirm handler uses the captured object, and does not read the store again

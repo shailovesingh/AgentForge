@@ -3,7 +3,14 @@ import { MAX_ERRORS, jsonPointer } from './errors'
 import type { ErrorCode, ValidationError } from './errors'
 import { validateAgainstSchema } from './jsonSchema'
 import { nodeVersionProblem } from './nodeMigrations'
+import { HIDDEN_ECHO, echoSafe, echoSafePointer } from './secrets'
 import type { NodeDefinition, Workflow, WorkflowEdge, WorkflowNode } from './types'
+
+// Ids, types and keys of an imported file are untrusted and could be pasted credentials: a message echoes them only through
+// echoSafe (the credential test runs on the FULL text, then the cut). The error `path` stays exact. Messages that do not echo
+// untrusted text are unchanged.
+const MAX_ECHO = 100
+const echo = (text: string): string => echoSafe(text, MAX_ECHO)
 
 export type ValidateResult = { ok: true; workflow: Workflow } | { ok: false; errors: ValidationError[] }
 
@@ -53,7 +60,7 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
       return err('node.malformed', ptr, `${at} is malformed (needs id, type, typeVersion, label, config, position {x,y}).`)
     }
     if (nodeIds.has(raw.id)) {
-      return err('node.duplicate-id', jsonPointer('nodes', i, 'id'), `${at}: duplicate node id "${raw.id}".`)
+      return err('node.duplicate-id', jsonPointer('nodes', i, 'id'), `${at}: duplicate node id "${echo(raw.id)}".`)
     }
     nodeIds.add(raw.id)
 
@@ -69,7 +76,7 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
       return err(
         'node.unknown-type',
         jsonPointer('nodes', i, 'type'),
-        `${at} ("${raw.id}"): unknown node type ${raw.type}@${String(raw.typeVersion)}.`,
+        `${at} ("${echo(raw.id)}"): unknown node type ${echo(raw.type)}@${echo(String(raw.typeVersion))}.`,
       )
     }
     // Decision C1: an absent required key is NOT a structural error, so an incomplete draft imports.
@@ -77,8 +84,10 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
     for (const { code, path, message } of validateAgainstSchema(def.configSchema, raw.config, { checkRequired: false })) {
       // `path` is relative to the config object ("/provider"); the message names the setting without the leading slash,
       // with the JSON Pointer escapes undone (`~1` first, then `~0`, per RFC 6901) so a key "a/b" reads "a/b", not "a~1b".
-      const setting = path.slice(1).replace(/~1/g, '/').replace(/~0/g, '~')
-      err(code, jsonPointer('nodes', i, 'config') + path, `${at} ("${raw.id}"): config "${setting}" ${message}.`)
+      // The setting is a config KEY path (untrusted): hidden when any of its keys is credential-shaped, long or odd.
+      const shownPath = echoSafePointer(path, MAX_ECHO)
+      const setting = shownPath === HIDDEN_ECHO ? shownPath : shownPath.slice(1).replace(/~1/g, '/').replace(/~0/g, '~')
+      err(code, jsonPointer('nodes', i, 'config') + path, `${at} ("${echo(raw.id)}"): config "${setting}" ${message}.`)
     }
     nodes.push({
       id: raw.id,
@@ -113,7 +122,7 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
       return err('edge.malformed', ptr, malformed)
     }
     if (edgeIds.has(raw.id)) {
-      return err('edge.duplicate-id', jsonPointer('edges', i, 'id'), `${at}: duplicate edge id "${raw.id}".`)
+      return err('edge.duplicate-id', jsonPointer('edges', i, 'id'), `${at}: duplicate edge id "${echo(raw.id)}".`)
     }
     edgeIds.add(raw.id)
 
@@ -126,7 +135,7 @@ export function validateWorkflow(doc: Record<string, unknown>, catalog: NodeDefi
     const problem = checkConnection(partial, catalog, edge.source, edge.target)
     if (problem) {
       // `as const` makes this a template-literal type, so a ConnectionError without a code fails to compile.
-      return err(`connection.${problem}` as const, ptr, `${at} ("${raw.id}") ${CONNECTION_ERROR_MESSAGES[problem]}.`)
+      return err(`connection.${problem}` as const, ptr, `${at} ("${echo(raw.id)}") ${CONNECTION_ERROR_MESSAGES[problem]}.`)
     }
     edges.push(edge)
   })

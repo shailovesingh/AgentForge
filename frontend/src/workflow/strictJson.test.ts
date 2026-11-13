@@ -120,10 +120,37 @@ describe('duplicate keys', () => {
     const e = error(`{"${key}":1,"${key}":2}`)
     expect(e.code).toBe('doc.duplicate-key')
     expect(e.path).toBe('/' + key)
+    // a key longer than the display key limit (40) is not echoed at all: it could be a pasted credential (T9b second review)
+    expect(e.message).toBe('Duplicate object key (hidden: may contain a credential).')
+    // A key at the limit is echoed whole; one more character and it is hidden.
+    expect(error('{"' + 'k'.repeat(40) + '":1,"' + 'k'.repeat(40) + '":2}').message).toBe(`Duplicate object key "${'k'.repeat(40)}".`)
+    expect(error('{"' + 'k'.repeat(41) + '":1,"' + 'k'.repeat(41) + '":2}').message).toBe('Duplicate object key (hidden: may contain a credential).')
+  })
+
+  test('a short key whose JSON escapes make the echoed text long is still cut', () => {
+    const key = String.fromCharCode(1).repeat(30) // 30 characters, 182 characters once written as escapes
+    const e = error(`{${JSON.stringify(key)}:1,${JSON.stringify(key)}:2}`)
     expect(e.message.length).toBeLessThanOrEqual(150)
     expect(e.message).toContain('...')
-    // A key at the cut-off is echoed whole.
-    expect(error('{"' + 'k'.repeat(98) + '":1,"' + 'k'.repeat(98) + '":2}').message).toBe(`Duplicate object key "${'k'.repeat(98)}".`)
+  })
+
+  describe('a credential in the key is never echoed, whole or in part, wherever the cut falls (T9b second review)', () => {
+    // Built at run time from parts (no token-shaped literal in a source file).
+    const TOKEN = ['s', 'k'].join('') + '-' + ['QwErTyUi', 'OpAsDfGh', 'JkLzXcVb'].join('')
+    const windows = (s: string): string[] => Array.from({ length: s.length - 7 }, (_, i) => s.slice(i, i + 8))
+
+    // (A letter, digit, `_` or `-` right before the token glues it into a word: not a credential shape by the documented boundary.)
+    test.each([' ', '=', '.', ':'])('prefix of every length 0..120, separator %j: no 8 consecutive characters of the token', (separator) => {
+      for (let prefix = 0; prefix <= 120; prefix++) {
+        const key = 'x'.repeat(prefix) + separator + TOKEN
+        const e = error(`{${JSON.stringify(key)}:1,${JSON.stringify(key)}:2}`)
+        expect(e.code).toBe('doc.duplicate-key')
+        const leaked = windows(TOKEN).filter((w) => e.message.includes(w))
+        expect(leaked.length, `prefix ${prefix}: pieces of the token in the message`).toBe(0)
+        expect(e.message, `prefix ${prefix}`).toBe('Duplicate object key (hidden: may contain a credential).')
+        expect(e.path, 'the structured path stays exact').toBe('/' + key.replace(/~/g, '~0').replace(/\//g, '~1'))
+      }
+    })
   })
 
   test('the same key in sibling objects, and keys that differ by case, are fine', () => {

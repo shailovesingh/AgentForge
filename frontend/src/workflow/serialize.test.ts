@@ -474,6 +474,91 @@ describe('migrate', () => {
   })
 })
 
+describe('untrusted text in error messages is never echoed when it holds a credential (T9b second review)', () => {
+  // Built at run time from parts: no token-shaped literal in a source file.
+  const TOKEN = 'sk' + '-' + ['QwErTyUi', 'OpAsDfGh', 'JkLzXcVb'].join('')
+  const windows = (s: string): string[] => Array.from({ length: s.length - 7 }, (_, i) => s.slice(i, i + 8))
+  const leaks = (text: string): string[] => windows(TOKEN).filter((w) => text.includes(w))
+  const allText = (errors: { message: string }[]): string => errors.map((e) => e.message).join('\n')
+
+  test('a token-shaped node id: the duplicate-id message hides it; the code and the exact path stay', () => {
+    const errors = errorsOf(withEdit((w) => (w.nodes = [node(TOKEN, 'trigger.manual', { payload: {} }), node(TOKEN, 'output.result', { format: 'text' })])))
+    expect(errors[0]).toMatchObject({ code: 'node.duplicate-id', path: '/nodes/1/id' })
+    expect(errors[0].message).toBe('nodes[1]: duplicate node id "(hidden: may contain a credential)".')
+    expect(leaks(allText(errors))).toEqual([])
+  })
+
+  test('an id that straddles the 100-character cut (any separator, any offset) is hidden: no piece of the token in any message', () => {
+    for (const separator of [' ', '=', '.', ':']) {
+      for (let prefix = 0; prefix <= 120; prefix++) {
+        const id = 'x'.repeat(prefix) + separator + TOKEN
+        const errors = errorsOf(withEdit((w) => (w.nodes = [node(id, 'trigger.manual', { payload: {} }), node(id, 'output.result', { format: 'text' })])))
+        expect(errors[0].code).toBe('node.duplicate-id')
+        expect(leaks(allText(errors)), `separator ${JSON.stringify(separator)}, prefix ${prefix}`).toEqual([])
+      }
+    }
+  })
+
+  test('a token-shaped node type: the unknown-type message hides it', () => {
+    const errors = errorsOf(withEdit((w) => (w.nodes = [node('a', TOKEN)])))
+    expect(errors[0]).toMatchObject({ code: 'node.unknown-type', path: '/nodes/0/type' })
+    expect(errors[0].message).toBe('nodes[0] ("a"): unknown node type (hidden: may contain a credential)@1.')
+    expect(leaks(allText(errors))).toEqual([])
+  })
+
+  test('a token-shaped id on a node of a known type with a newer version: the version message hides it', () => {
+    const errors = errorsOf(withEdit((w) => (w.nodes = [{ ...node(TOKEN, 'llm.prompt', { provider: 'ollama', prompt: 'p' }), typeVersion: 99 }])))
+    expect(errors[0]).toMatchObject({ code: 'node.version-newer', path: '/nodes/0/typeVersion' })
+    expect(leaks(allText(errors))).toEqual([])
+  })
+
+  test('a token-shaped unknown config key: the message hides it, the structured path keeps it exact', () => {
+    const errors = errorsOf(withEdit((w) => (w.nodes = [node('h', 'http.request', { method: 'GET', url: 'u', headers: {}, body: '', [TOKEN]: 1 })])))
+    const e = errors.find((x) => x.code === 'schema.additionalProperties')!
+    expect(e.path).toBe('/nodes/0/config/' + TOKEN) // the contract value: exact
+    expect(e.message).toBe('nodes[0] ("h"): config "(hidden: may contain a credential)" is not a known setting.')
+    expect(leaks(e.message)).toEqual([])
+  })
+
+  test('an unknown config key that is long or odd is hidden too; an ordinary one is shown', () => {
+    const top = (key: string) =>
+      errorsOf(withEdit((w) => (w.nodes = [node('h', 'http.request', { method: 'GET', url: 'u', headers: {}, body: '', [key]: 1 })]))).find((x) => x.code === 'schema.additionalProperties')!.message
+    expect(top('extra')).toBe('nodes[0] ("h"): config "extra" is not a known setting.')
+    expect(top('k'.repeat(41))).toContain('(hidden: may contain a credential)')
+    expect(top('a b')).toContain('(hidden: may contain a credential)')
+  })
+
+  test('a token-shaped schemaVersion: the unsupported-version message hides it', () => {
+    const e = errorsOf(withEdit((w) => (w.schemaVersion = TOKEN)))[0]
+    expect(e).toMatchObject({ code: 'doc.unsupported-version', path: '/schemaVersion' })
+    expect(e.message).toBe('Unsupported schemaVersion (hidden: may contain a credential); this editor supports 1.0.')
+    expect(errorsOf(withEdit((w) => (w.schemaVersion = 'x'.repeat(50) + ' ' + TOKEN)))[0].message).toBe('Unsupported schemaVersion (hidden: may contain a credential); this editor supports 1.0.')
+  })
+
+  test('a duplicate key typed into a JSON setting that straddles the cut is hidden in the field error (the config panel)', () => {
+    const payload = nodeDefinitions.find((d) => d.type === 'trigger.manual')!.configSchema.properties!.payload
+    for (const separator of [' ', '=', '.']) {
+      for (let prefix = 0; prefix <= 120; prefix += 7) {
+        const key = 'x'.repeat(prefix) + separator + TOKEN
+        const r = parseConfigInput(payload, `{${JSON.stringify(key)}:1,${JSON.stringify(key)}:2}`)
+        expect(r.ok).toBe(false)
+        if (!r.ok) {
+          expect(leaks(r.error), `separator ${JSON.stringify(separator)}, prefix ${prefix}`).toEqual([])
+          expect(r.error).toBe('Duplicate object key (hidden: may contain a credential).')
+        }
+      }
+    }
+  })
+
+  test('messages that echo nothing untrusted, and ordinary ids and types, are unchanged', () => {
+    expect(errorsOf(withEdit((w) => (w.nodes = [node('a', 'trigger.manual', { payload: {} }), node('a', 'output.result', { format: 'text' })])))[0].message).toBe(
+      'nodes[1]: duplicate node id "a".',
+    )
+    expect(errorsOf(withEdit((w) => (w.nodes = [node('a', 'mystery.node')])))[0].message).toBe('nodes[0] ("a"): unknown node type mystery.node@1.')
+    expect(errorsOf(withEdit((w) => (w.schemaVersion = '9.9')))[0].message).toBe('Unsupported schemaVersion "9.9"; this editor supports 1.0.')
+  })
+})
+
 describe('parseConfigInput', () => {
   const llm = nodeDefinitions.find((d) => d.type === 'llm.prompt')!.configSchema.properties!
   const payload = nodeDefinitions.find((d) => d.type === 'trigger.manual')!.configSchema.properties!.payload

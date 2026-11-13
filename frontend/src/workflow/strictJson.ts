@@ -10,6 +10,7 @@
 
 import { jsonPointer } from './errors'
 import type { ErrorCode, ValidationError } from './errors'
+import { HIDDEN_ECHO, echoSafe } from './secrets'
 import { MAX_DEPTH, MAX_SAFE_MAGNITUDE, POLICY_MESSAGES, stringProblem } from './valuePolicy'
 import type { PolicyCode } from './valuePolicy'
 
@@ -233,7 +234,11 @@ export function strictParse(text: string): StrictParseResult {
       const key = parseString()
       path.push(key)
       checkString(key)
-      if (seen.has(key)) stop('doc.duplicate-key', `Duplicate object key ${shorten(JSON.stringify(key), MAX_ECHO)}.`, path)
+      if (seen.has(key)) {
+        // The key is untrusted and could be a pasted credential: the test runs on the FULL key, before the cut (echoSafe).
+        const echoed = echoSafe(key, MAX_ECHO, 'key') === HIDDEN_ECHO ? HIDDEN_ECHO : shorten(JSON.stringify(key), MAX_ECHO)
+        stop('doc.duplicate-key', `Duplicate object key ${echoed}.`, path)
+      }
       seen.add(key)
       skipWhitespace()
       if (text[pos] !== ':') {
