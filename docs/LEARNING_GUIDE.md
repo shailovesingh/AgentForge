@@ -3,7 +3,7 @@
 > **For the Product Owner.** Part 1 is a plain-language **primer** (reference material: what we are building and how the code is organised). Part 2 is the **teaching record** (lessons actually taught and what you demonstrated).
 > The **curriculum and statuses** are in `docs/LEARNING.md`. Learning progress is tracked separately from implementation progress.
 > **Living document.** The Principal Architect updates it at the end of every task (D-028). The primer describes the project **as it is today**; where something is planned but not built, it says so.
-> Last updated: 2026-11-13, after Phase 1.1 T7b, showing the editor warnings in the UI without slowing the editor (Lesson L11, commits `eb166b1` and `5fd6687`). Before that: T7a, the pure editor-warning function `lintWorkflow` (Lesson L10, commits `62041bf` and `b472579`) and T8, the branching specification (Lesson L9). T9a, the secret detector, is committed and under review and is not taught yet.
+> Last updated: 2026-11-13, after Phase 1.1 T9a, the pure secret detector (Lesson L12, commits `33740c3` and `2a0f501`). T9b, the export confirmation dialog and the indicators, is being built and is not taught yet. Before that: T7b, showing the editor warnings in the UI without slowing the editor (Lesson L11), T7a, the pure editor-warning function `lintWorkflow` (Lesson L10) and T8, the branching specification (Lesson L9).
 
 # Part 1: Primer
 
@@ -29,7 +29,8 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | Old files keep working: a file saved with an older version of a node is upgraded in memory and the editor tells you (the original file is never rewritten) | Natural-language workflow generation (Phase 5) |
 | The rules for conditional branching, skipped nodes and joins are written down as a binding specification (`docs/ARCHITECTURE.md` section 6.1); the only code is a small marker on the Condition's output ports | |
 | The editor warnings (an unconnected required input, an empty required setting, a trigger leading nowhere, a node nothing starts, a result nobody uses): a pure function that works them out (Lesson L10) and, since T7b, a small badge on each node, a count and list in the toolbar and a section in the settings panel (Lesson L11); they never block anything and are never saved in the file | |
-| 1320 unit tests in 20 test files and 56 browser tests (at commit `5fd6687`; the unit count includes the tests of T9a, the secret detector, which is committed and under review and is not taught yet) | |
+| A secret detector (T9a, Lesson L12): a pure function that finds a credential someone pasted into a setting or into `metadata`, and two warnings, `secret-likely` and `secret-suspected`, that never contain the value; the findings show where and why, never what | The export confirmation dialog, the distinct badge and the toolbar indicator for likely secrets (T9b, being built); backend enforcement and credential references (Phase 2 and later) |
+| 1367 unit tests in 20 test files and 56 browser tests (at commit `2a0f501`; the Principal Architect's `npm run verify`) | |
 | A CI workflow that runs the checks on GitHub | The backend server, database, saving to a server (Phase 2) |
 
 **Important:** today everything runs **in your browser only**. There is no server. Nothing runs a workflow yet. The editor produces a *description* of a workflow; later phases will execute it.
@@ -37,7 +38,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | Phase | What it delivers | Status |
 |---|---|---|
 | 1 | The visual editor | Done and accepted |
-| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 6, T8 and T7 of 10 done, with task 5 in two halves, T5a and T5b, and task 7 in two halves, T7a and T7b; T6, upgrading old files, T8, the branch rules, and T7, the warning function and showing the warnings in the editor, are done; T9, secret detection, has its first half T9a committed and under review) |
+| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 6, T8, T7 and T9a of 10 done, with task 5 in two halves, T5a and T5b, task 7 in two halves, T7a and T7b, and task 9 in two halves, T9a and T9b; T6, upgrading old files, T8, the branch rules, T7, the warning function and showing the warnings in the editor, and T9a, the pure secret detector, are done; T9b, the export confirmation and the indicators, is being built) |
 | 2 | Backend server and database; save/load workflows | Planned, not approved |
 | 3 | Execution engine: actually run workflows | Planned |
 | 4 | AI runtime: LLM and Agent nodes | Planned |
@@ -112,7 +113,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **Agent (planned).** A node where an AI model decides what to do next, repeatedly, and can call tools.
 
-**Credentials.** API keys and passwords. **They never go inside a workflow file** (decision D-016). Later, workflows will refer to a stored credential by id. Until then, a detector will warn if someone pastes a secret into a setting (planned, task T9).
+**Credentials.** API keys and passwords. **They never go inside a workflow file** (decision D-016). Later, workflows will refer to a stored credential by id (`credentialRef`, planned for Phase 2 and later; it does not exist yet). Until then, a detector warns if someone pastes a secret into a setting or into `metadata` (built in T9a, Lesson L12: `frontend/src/workflow/secrets.ts`). It is a **heuristic**: it looks for the shape of well-known tokens and for suspicious setting names, so it has false alarms and misses. It never shows the value it found, only where and why. A confirmation before each export when a likely secret exists is decision D-023; that dialog is planned (T9b, being built), and whether a server refuses such a workflow is a separate Phase 2 decision.
 
 **Provider.** Which AI service a node uses: Ollama (local), OpenAI, Anthropic or Groq. We design so adding one does not change the file format. Groq was added in T5b; the one `PROVIDERS` list in `frontend/src/catalog/nodes.ts` feeds both the LLM Prompt and the Agent node.
 
@@ -137,6 +138,8 @@ frontend/src/
     jsonSchema.ts     the JSON Schema subset checker and applyDefaults (T5a, L6)
     configSchema.ts   parses what you type into one settings field and checks it against that property's schema
     codeExemptions.ts two lists of error codes that tests exempt; imported by tests only (T5b)
+    lint.ts           the editor warnings: a pure function (T7a, L10; since T9a also the two secret warnings, L12)
+    secrets.ts        the secret detector: finds a pasted credential, shows where and why, never what (T9a, L12)
     migrate.ts        upgrades old document formats (schemaVersion; no steps registered yet)
     nodeMigrations.ts upgrades old node versions (typeVersion) in memory, and reports what changed (T6)
     serialize.ts      export to text (with the export guard), import from text (bytes or text)
@@ -175,8 +178,8 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 | Kind | Tool | What it does | Command |
 |---|---|---|---|
-| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the warning function, the catalog and the shared fixtures in `contracts/`). 1320 in 20 test files at commit `5fd6687` (the Principal Architect's `npm run verify`; the count includes the tests of T9a, the secret detector, which is under review). | `npm test` |
-| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import (and, since T7b, the warnings). 56 at commit `5fd6687`. | `npm run test:e2e` |
+| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the warning function, the catalog and the shared fixtures in `contracts/`). 1367 in 20 test files at commit `2a0f501` (the Principal Architect's `npm run verify`; the count includes the secret detector's tests, T9a, Lesson L12). | `npm test` |
+| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import (and, since T7b, the warnings). 56 at commit `2a0f501`. | `npm run test:e2e` |
 | **Type check** | TypeScript | Catches mismatched data shapes before running | part of `npm run build` |
 | **Lint** | Oxlint | Catches suspicious code patterns | `npm run lint` |
 | **Everything** | | All of the above, in order | `npm run verify` |
@@ -229,7 +232,7 @@ npm run dev              # open http://localhost:5173
 
 ## 10. What happens next
 
-Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (done, Lesson L8; its review fixes are committed); **T8** the branch rules written down (done, Lesson L9; the specification is in `docs/ARCHITECTURE.md` section 6.1, no engine); **T7a** the pure warning function (done, Lesson L10); **T7b** showing the warnings in the editor (done, Lesson L11; its review fixes are committed); **T9** secret detection (the first half, T9a, a pure detector, is committed and under review; the second half, T9b, the export confirmation and indicators, is next); **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
+Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (done, Lesson L8; its review fixes are committed); **T8** the branch rules written down (done, Lesson L9; the specification is in `docs/ARCHITECTURE.md` section 6.1, no engine); **T7a** the pure warning function (done, Lesson L10); **T7b** showing the warnings in the editor (done, Lesson L11; its review fixes are committed); **T9** secret detection (the first half, T9a, a pure detector, is done, Lesson L12; the second half, T9b, the export confirmation and indicators, is being built); **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
 
 ## 11. Glossary, quick reference
 
@@ -269,6 +272,7 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | **L9** | Phase 1.1 T8 (code `4c696b4`; specification `ARCHITECTURE.md` section 6.1 and D-034, corrected in `32066b2`): branching, skipping and joins; the `branch` marker; reviewing a specification | 6 and 5 (main, for the specification only: no engine exists), 7, 12, 3 | 2026-11-12 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L10** | Phase 1.1 T7a (commits `62041bf`, `b472579`): editor warnings as a pure, derived function (`lintWorkflow`), the five rules, the whitespace contract and the review stories (the UI that shows them, T7b, is not covered) | 3 (main), 7, 6, 12 | 2026-11-12 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L11** | Phase 1.1 T7b (commits `eb166b1`, `5fd6687`): showing derived warnings in the UI (node badge, toolbar list, settings section) without slowing the editor: reference identity, selectors, structural sharing, measuring rendering cost, and the review stories | 2 (main), 3, 12 | 2026-11-13 | 6 (answered at the end of the project) | Explained; evaluation pending |
+| **L12** | Phase 1.1 T9a (commits `33740c3`, `2a0f501`): finding a pasted secret without repeating it: the pure detector `secrets.ts`, the two lint warnings, never echo, bounded output, the placeholder method and the repository-wide token guard, and the review stories (the confirmation dialog and indicators, T9b, are not covered: being built) | 12 (main), 3, 7 | 2026-11-13 | 6 (answered at the end of the project) | Explained; evaluation pending |
 
 ## Concept index
 
@@ -394,6 +398,22 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | Keyboard and focus: Escape returns focus to the toggle, Delete and Backspace stopped inside the list, focus moved only when it was really lost, stable keys | 2 | L11 | Explained (no evidence) |
 | Accessibility judgement and its limits: contrast ratios from the reviewer (5.80 and 6.26 to 1; reports), accessibility-tree snapshots, no real screen-reader test | 2, 12 | L11 | Explained (no evidence) |
 | A UX decision recorded: a fresh node warns at once, visually subdued | 2 | L11 | Explained (no evidence) |
+| Why credentials must never be in the workflow document (D-016) and the plan to replace them with `credentialRef` (planned, not built); detection as a seat belt, not the fix | 3, 7, 12 | L12 | Explained (no evidence) |
+| Secret detection as a heuristic: false positives and false negatives, high versus medium confidence, shapes versus key names | 12 | L12 | Explained (no evidence) |
+| The detector's rules: seven header names, nine credential shapes (each found anywhere in a text or key), six key words; the per-key medium rule | 12 | L12 | Explained (no evidence) |
+| The left boundary and precision versus recall; the honest list of misses and of formats not detected | 12 | L12 | Explained (no evidence) |
+| Never echo: a finding is a node id, a confidence, a reason and a display path, never a value, a prefix, a hash or a credential-shaped key | 12, 3 | L12 | Explained (no evidence) |
+| A display path that cannot leak: `[redacted key]` for credential-shaped, long or odd keys; `safeDisplayName` for node names | 12 | L12 | Explained (no evidence) |
+| Bounding the OUTPUT: linear in the input is not enough; 50 findings per node, counted not collected, 200-character paths, `scanSecrets` omitted counts | 12 | L12 | Explained (no evidence) |
+| An iterative walk with an explicit stack and parent-linked frames (a 200,000-level value; paths built only for kept findings) | 12, 3 | L12 | Explained (no evidence) |
+| Warnings from a pure detector: `secret-likely` and `secret-suspected` in `lintWorkflow`; metadata findings are not warnings; the UI, dialog and indicators are planned (T9b) | 3, 12 | L12 | Explained (no evidence) |
+| Test data that cannot trigger push protection: placeholders built from pieces at run time (`TOKEN_BUILDERS`, `fillDeep`), strict placeholder checking, key-collision failure | 12 | L12 | Explained (no evidence) |
+| A repository-wide guard test: 13 boundary-free patterns, prints only file, line and pattern name; its self-test; its honest scope (working tree, not history) | 12 | L12 | Explained (no evidence) |
+| Never echo in tests and CI logs: a labelled-needle sentinel test, 12 placements plus a 1,200-config seeded property run; failure messages with codes and lengths only | 12 | L12 | Explained (no evidence) |
+| An independent reference implementation with a different technique (a reviewer's scanner without regular expressions, 20,000 workflows, 0 differences: a report) | 12 | L12 | Explained (no evidence) |
+| When a specification and the code disagree: decide which is right, fix the other, pin with fixtures (per-key versus per-path medium rule) | 12 | L12 | Explained (no evidence) |
+| A minimum-count floor left too low (67 versus 83 fixtures) and why a commit message's numbers are claims to verify | 12 | L12 | Explained (no evidence) |
+| Alternatives: entropy scanning, an existing rule set (gitleaks, general knowledge), blocking export, encrypting in the file, asking the user, server-only checks (X10, planned) | 12 | L12 | Explained (no evidence) |
 | Primer concepts (workflow, node, port, edge, catalog, config schema, `schemaVersion` vs `typeVersion`, validation vs warnings, DAG, credentials) | 1, 2, 3, 6, 7 | Primer (Part 1) | Explained as reference (no evidence, no lesson) |
 
 ---
@@ -2231,3 +2251,212 @@ The Opus reviewer found no blockers and one major, and fixed items came back in 
 4. The project has no React testing library and no test that renders a component. List what protects the "no extra re-render" behaviour today and what each protection can and cannot catch. Describe one realistic change that would bring the slowdown back without failing any test, and what you would add (and what it would cost) to close that gap.
 5. Six mutants survived the first version's tests, including "the list entry always selects the first warning's node" and "warnings leaked into the export under another key". For each of those two, explain why the original tests could not see it and what the fixed tests pin. State the general rule about what a test should look for when checking that nothing leaked.
 6. Why is the warnings list a disclosure (a button with `aria-expanded`) and not a dialog, and why is there no live region? Explain what Delete and Backspace would have done inside the list without the `stopPropagation`, how the component decides when to move focus to the toggle (and when not to), and why the e2e tests do not pin the exact message sentences. What was not tested about accessibility?
+
+---
+
+## Lesson L12: Finding a secret without ever repeating it (secret detection as a pure function: never echo, bounded output, and test data that cannot trigger GitHub)
+
+**Task:** Phase 1.1 T9a (decisions D-016 and D-023; plan section 3.7), commits `33740c3` (the detector, the lint warnings, the fixtures and the specification) and `2a0f501` (the review fixes). **Modules:** 12 (Security, Testing and Deployment: secret detection, never echo, bounded output, placeholders and a repository-wide guard, mutation testing, an independent reference implementation), 3 (Workflow JSON and State Management: the document must never hold credentials, D-016), 7 (Node Registry: `credentialRef` is the planned replacement and does not exist yet).
+
+*Status of what this lesson describes, and what I checked.* T9a is built, reviewed, fixed and accepted (`docs/DEVELOPMENT_LOG.md`, Session 13). **T9b, the part the user will see (a confirmation dialog on export, a distinct node badge, a toolbar indicator, a notice in the settings panel), is NOT done: it is being built as I write this, so everything about it below is "planned" and comes from `docs/PHASE1_1_PLAN.md` section 3.7 and `contracts/SECRETS.md`.** **What I read myself at HEAD (`2a0f501` plus a later documentation commit):** `frontend/src/workflow/secrets.ts` in full; the secret part of `frontend/src/workflow/lint.ts`; `frontend/src/workflow/secrets.test.ts` (the shape cases, the scale tests, the never-echo tests); `contracts/SECRETS.md` in full; the `secrets` runner, the placeholder table and the repository-wide guard in `frontend/src/contracts/fixtures.test.ts`; eight of the `contracts/fixtures/secrets/*.json` files and one of the five `contracts/fixtures/warnings/warn-secret-*.json` files; `docs/PHASE1_1_PLAN.md` section 3.7; `docs/DECISIONS.md` D-016, D-023 and D-029; `docs/DEVELOPMENT_LOG.md` Session 13; `git show --stat` of both commits; `frontend/src/store/warnings.ts` (it passes every warning of `lintWorkflow` on, with no filter). **What I counted:** 83 files in `contracts/fixtures/secrets/` (67 added in `33740c3`, 16 in `2a0f501`), five `warn-secret-*` files. **What I ran** (my first attempts with the default Vitest worker pool failed for every test file, including unrelated ones, with "Cannot read properties of undefined (reading 'config')" before any test ran; I did not find the cause; it came and went between runs (I suspect other test processes running in the same folder at the same time, which I could not confirm), and the last full run, after all my edits, passed; while it lasted I used the option `--pool=vmThreads`): `src/workflow/secrets.test.ts`, `src/workflow/lint.test.ts` and `src/contracts/fixtures.test.ts` together: **3 files, 875 tests passed**, of which `secrets.test.ts` alone is **125 tests**; and, after writing this lesson, the whole `npm test` (which includes the repository-wide token guard over this very file): **21 files, 1384 tests passed**, a total that is *not* a count for commit `2a0f501` because the working tree then also held T9b's unfinished, uncommitted work. **Reports, not repeated by me:** the totals at `2a0f501` (**20 test files, 1367 unit tests, 56 end-to-end tests; the Principal Architect's `npm run verify`, exit 0**), and everything the Opus reviewer measured or compared (named as reports below). **Not done by anyone:** no Python version exists (no parity is claimed), no real browser test of the T9b dialog yet (T9b), no run of a real secret scanner such as GitHub's or gitleaks against this repository by me.
+
+### 1. The problem
+
+AgentForge's workflow is a JSON file. A user can type anything into some settings: the HTTP Request node has a free-form `headers` object, the Manual Trigger has a `payload`, the LLM Prompt has a free-text `prompt`, and every workflow has a free-form `metadata` object. Someone will, sooner or later, paste `Authorization: Bearer ...` into those headers to make a call work. Then:
+
+- the **Export** button writes that credential into a `.json` file, which gets emailed, committed to Git, attached to a ticket;
+- from Phase 2 the server will store the document in a database, so the credential lands there too.
+
+That breaks decision **D-016: credentials never live in the workflow JSON** (the plan is an opaque `credentialRef`, resolved only inside the backend; `docs/ARCHITECTURE.md` sections 4 and 11). Before T9a nothing stopped it: only a sentence in the field's description said "do not put secrets here".
+
+The Product Owner's decision (**D-023**, as revised; the earlier idea of blocking every export was not approved): **detect** likely credentials, **warn prominently**, **never repeat the value**, and make the user **explicitly confirm before each export**; nothing else is blocked. Whether the *server* should refuse such a workflow is a separate Phase 2 decision (called X10 in `docs/PHASE2_PLAN.md`) and is not decided or built.
+
+T9a is the first half: the **detector** and the two **warnings**. The confirmation dialog and the indicators are T9b (planned).
+
+A second, quite different problem sits inside this one, and it is the most instructive part: **the tests for a secret detector need secrets**. But this repository is pushed to GitHub, whose *push protection* rejects any push that contains something shaped like a token. So how do you test a secret detector without committing a secret?
+
+### 2. The concept
+
+**Secret detection as a heuristic.** A program cannot know that a string is a real credential. It can only recognise a *shape* (many services give their keys a recognisable prefix and length) or a *name* (a setting called `password`). So the detector is a **heuristic**: it has **false positives** (a harmless setting named `token_count` is flagged) and **false negatives** (a credential in an unfamiliar format is missed). It reduces accidents; it is **not a guarantee**. `contracts/SECRETS.md` says this in its first section, and fixtures document both kinds of mistake on purpose (section 6).
+
+**Confidence levels.** *High* confidence: either a header whose **name** is a credential by itself (Authorization, Cookie and so on) with a non-empty value, or a value or key that has the **shape** of a well-known token. *Medium*: an object key whose name merely **contains** a suspicious word (`secret`, `password`, `token`...), with a text value. High gets the prominent treatment (and, in T9b, the export confirmation); medium only warns.
+
+**Never echo.** A tool that says "I found your password: hunter2" has just copied the secret to a screen, a log, a screenshot and a test report. So a finding says **where** (a node id and a display path) and **why** (a reason code), and never **what**. This rule is stricter than it looks: no prefix, no suffix, no hash of the value, and not even a *key* that itself looks like a credential. The same rule has to hold in *test output*, because CI logs are stored and shared.
+
+**Bound your output.** "Linear time in the size of the input" is not enough if the *output* can be much larger than the input. A detector that returns one finding per bad setting can return far more data than the file it was given (section 6, story 2).
+
+**Placeholders built at run time.** Test data holds a *placeholder* (a marker such as `@@GHP@@`), and the test code builds the real token-shaped string in memory, from pieces, only while the test runs. The file on disk never contains the token, so a scanner reading the repository finds nothing.
+
+**An independent reference.** To check a tricky piece of code, write it a *second* time in a different way and compare the two on many inputs. If the two agree, a bug that both share is unlikely, because they do not share an implementation technique (section 6, story 1).
+
+### 3. Why we selected this approach
+
+1. **A pure function in the `workflow/` layer** (`frontend/src/workflow/secrets.ts`): no React, no dependency, no network. The same rule as L10: it can be tested with plain data and, later, ported to Python so the backend applies the same rule to the same fixtures (planned, Phase 2; no parity claimed).
+2. **Regular expressions for shapes, plain code for names.** Each well-known token has a recognisable shape, which a short regular expression states clearly. Names need only a lower-case comparison and a substring test.
+3. **Warn, never block** (D-017, D-018, D-023): the detection is a *warning*, produced by `lintWorkflow`, not a validation error. The user can always export; they must confirm first.
+4. **Display paths, not values.** A finding is `{confidence, location, nodeId, path, reason}` and has no field that could hold the value, so a careless caller cannot print one by accident. The type itself enforces the rule.
+5. **A cap on the output** (50 findings per node), added after the review.
+6. **Fixtures with placeholders, plus a repository-wide guard**, so that the test data can be pushed and the guarantee "no token-shaped text is committed" is itself tested.
+7. **A specification with the code** (`contracts/SECRETS.md`) so a Python port can follow it exactly, including the places where JavaScript and Python behave differently.
+
+### 4. How it works internally
+
+**The data flow.** The diagram follows `frontend/src/workflow/secrets.ts` and the secret part of `frontend/src/workflow/lint.ts`. The last box is planned.
+
+```mermaid
+flowchart TD
+  WF["Workflow document: already imported and valid"] --> SS["scanSecrets: every node config in array order, then metadata"]
+  SS --> WALK["scan: walks one config with an explicit stack, no recursion; own keys only (Object.keys); one Frame per step, linked to its parent"]
+  WALK --> KEYCHK{"the key of this step"}
+  WALK --> VALCHK{"the value of this step, if it is a text"}
+  KEYCHK -- "trimmed and lower-cased is one of the 7 header names, and the value is non-empty text" --> HIGH1["HIGH, reason header-name"]
+  KEYCHK -- "the key itself has a credential shape" --> HIGH2["HIGH, reason credential-shape"]
+  VALCHK -- "contains one of the 9 shapes (skipped when shorter than 15 characters)" --> HIGH2
+  KEYCHK -- "contains secret, password, passwd, token, apikey or api_key, the value is non-empty text, and THIS step is not already HIGH" --> MED["MEDIUM, reason key-name"]
+  HIGH1 --> EMIT["emit"]
+  HIGH2 --> EMIT
+  MED --> EMIT
+  EMIT --> CAP{"already 50 findings in this scan?"}
+  CAP -- "yes" --> COUNT["only count it: no path text, no dedup key built"]
+  CAP -- "no" --> PATH["displayPath: steps joined as a.b[2].c; a key that is credential-shaped, longer than 40 UTF-16 units or holding = : or whitespace is shown as [redacted key]; cut at 200 characters, at a whole step"]
+  PATH --> FIND["SecretFinding: confidence, location, nodeId, path, reason (never a value)"]
+  FIND --> LINT["lintWorkflow: secret-likely for HIGH, secret-suspected for MEDIUM, one per kept config finding; node name through safeDisplayName"]
+  LINT --> UI["T7b list, badge and count show them like any warning (they come from the same function)"]
+  FIND --> T9B["PLANNED, T9b: export dialog, distinct badge, toolbar indicator; reads scanSecrets, so it can say 'and N more'"]
+  COUNT --> T9B
+```
+
+**The walk, in plain words.** `scanSecrets(workflow)` goes through each node's `config` in array order and then `metadata`. For one object it keeps a *stack* of "things still to look at" (an array used last-in, first-out) instead of calling itself recursively. Why: JSON can be nested very deeply, and a function that calls itself runs out of stack space; a test builds a **200,000-level** value and the walk finishes (`secrets.test.ts`, "a 200,000-level deep value"). It reads only an object's **own** keys (`Object.keys`), so inherited properties are never seen and a key named `__proto__` is just a key.
+
+For each step it asks three questions in a fixed order, and a step can give more than one finding:
+
+1. **Header name.** Is the *key*, trimmed and lower-cased, one of the seven names (`HEADER_NAMES`: authorization, proxy-authorization, cookie, x-api-key, api-key, x-auth-token, x-access-token) *and* is the value text that is not blank? Then **high, `header-name`**. (The name alone is not enough: an `Authorization` setting that is empty is not a leaked credential.)
+2. **Credential shape.** Is the *value* text (anywhere inside it) or the *key* itself shaped like one of nine token formats (`CREDENTIAL_SHAPES`)? Then **high, `credential-shape`**. A prompt that says "use this key: ..." with a pasted key matches, because the search is *anywhere inside* the text.
+3. **Key word.** Does the *key* contain `secret`, `password`, `passwd`, `token`, `apikey` or `api_key`, with a non-blank text value, and was this very step **not already high**? Then **medium, `key-name`**.
+
+**The two kinds of rule, with the examples in words** (I describe them; the fixtures build the real shapes at run time).
+
+| Confidence | Reason | Fires when | Example in words |
+|---|---|---|---|
+| High | `header-name` | one of the 7 header names (any capitalisation, spaces around it ignored) with a non-blank text value | an HTTP Request node whose `headers` has an `Authorization` entry with any text (fixture `sec-header-authorization`) |
+| High | `credential-shape` | any text or key contains one of the 9 shapes below | a prompt that contains a pasted GitHub token; a header *named* with a token (fixture `sec-shape-as-key`) |
+| Medium | `key-name` | a key containing a suspicious word, with non-blank text, not already high | a payload with a `session_token` entry; also a harmless `token_count` set to the text "5", which is a **known false positive** (fixture `sec-key-false-positive-token-count`) |
+
+| Shape name in the code | What it looks like, in words | Left boundary |
+|---|---|---|
+| `sk` | the letters sk, a hyphen, then at least 20 letters, digits, underscores or hyphens (also covers the longer `sk-ant-` style) | strict |
+| `gsk` | the letters gsk, an underscore, then at least 20 letters or digits | relaxed |
+| `gh` | gh, one of the letters p, o, u, s, r, an underscore, then at least 36 letters or digits (the GitHub token kinds) | relaxed |
+| `github_pat` | the prefix github_pat_ then at least 22 letters, digits or underscores | relaxed |
+| `akia` | AKIA then at least 16 capital letters or digits | relaxed |
+| `xox` | xox, one of b, a, p, r, s, a hyphen, then at least 10 letters, digits or hyphens | relaxed |
+| `jwt` | eyJ plus letters, then a dot, a second run, a dot, a third run (each at least 5 characters) | strict |
+| `pem` | the five-dash BEGIN line of a private key (plain, RSA, EC, OPENSSH or ENCRYPTED), not a public key | none |
+| `bearer` | the word Bearer (this exact capitalisation), whitespace, then at least 20 token characters | strict |
+
+The service names (AWS for AKIA, Slack for xox, Groq for gsk_) are general knowledge; the code only knows shapes. The lengths in the code are exact counts such as "20 characters" (which match the same texts as "20 or more", because only existence matters) so each regular-expression attempt is bounded.
+
+**The left boundary (precision versus recall).** The shape must not start in the middle of an ordinary word. The three generic shapes (`sk`, `jwt`, `bearer`) may not be preceded by a letter, digit, underscore or hyphen. Why: the words `task-...` and `risk-assessment...` *contain* the letters sk and a hyphen, so without the rule a long hyphenated word looks like a key. The distinctive prefixes (gsk_, the GitHub kinds, github_pat_, AKIA, xox...) are rarely part of a normal word, so they are allowed after an underscore or a hyphen and are blocked only after a letter or digit: `GITHUB_TOKEN_` followed by a GitHub token is still found. The price is a **documented miss**: an `sk-` key glued after an underscore (`OPENAI_API_KEY_` then the key) is *not* found (fixture `sec-boundary-underscore-before-sk-false-negative`). That is the **precision versus recall** trade-off: a stricter rule gives fewer false alarms and more misses. The honest list of misses is part of the specification (section 6, story 5).
+
+**The display path and the redaction.** `path` is where to look: the steps from the root of the config joined as `headers.Authorization` or `items[2].token`. A *header name* like `Authorization` is not secret and is shown. But a path is built from **keys**, and a key can be the secret itself (a user types `token: abc123` into the *key* box, or a key is a pasted token). So `scan` replaces a key with the text `[redacted key]` in the path when the key is credential-shaped, longer than 40 UTF-16 units, or contains `=`, `:` or whitespace (`MAX_KEY_LENGTH`, `ODD_KEY`, `REDACTED_KEY` in `secrets.ts`). In the same spirit `safeDisplayName(text)` is used for **node names** in the lint messages: a node's label or id is *not scanned* (a documented limit), so it could itself be a pasted token; if it is credential-shaped it shows as `[redacted name]`, otherwise it is cut to 60 characters.
+
+**Bounding the output.** `emit` counts every finding but keeps only the first **50 per scan** (`MAX_FINDINGS_PER_SCAN`; a scan is one node's config, or the metadata). After that the walk keeps going but only *counts* (`omitted++`): no path string, no entry in the de-duplication set. A path is capped at 200 characters (`MAX_PATH_LENGTH`), cut after a whole step so a `[redacted key]` marker is never sliced. Frames point to their parent, so a path string is built only for a finding that is kept. `scanSecrets` returns the kept findings **and** the omitted counts (`omitted.perNode`, `omitted.metadata`), so T9b can show "and N more"; `detectSecrets` returns just the findings. The bound on the whole output is then nodes times 50 times 200 characters.
+
+**The lint warnings** (`frontend/src/workflow/lint.ts`). After a node's five older rules (L10), for *every* node, including a node of an unknown type (it is exported all the same), `lintWorkflow` calls `detectNodeSecrets(item.id, item.config)` and turns each high finding into a `secret-likely` warning and each medium one into `secret-suspected`, with the display path in the warning's `field`. The message names the node through `safeDisplayName`, the path, and says a credential may be present; it contains **no value**. Metadata findings are *not* warnings, because a `Warning` needs a node id: T9b is planned to read `scanSecrets` directly for them.
+
+### 5. How it communicates with other components
+
+- **Input.** A `Workflow` that already passed import (`importWorkflow`, L2 to L8). The detector never parses text; it receives the validated object, and tolerates a malformed one by returning no findings.
+- **Output.** `SecretFinding[]` (and `SecretScan`), and `safeDisplayName`. **Nothing is stored.** Like every warning (L10, L11) the result is derived each time and never enters the document or the export.
+- **Lint.** `lintWorkflow` calls the per-node form `detectNodeSecrets` so two nodes that share an id (impossible after import validation, possible in a hand-built object) are scanned separately. The T7b cache and list (L11, `frontend/src/store/warnings.ts`) do not filter by code, so secret warnings appear in the same count and list; I did not run a browser check of that. They are *not* shown with the prominent indicator yet: **planned, T9b.**
+- **Fixtures.** `frontend/src/contracts/fixtures.test.ts` reads `contracts/fixtures/secrets/*.json` (83 files) and the five `warn-secret-*.json` files (the `warnings` family, L10). Each secrets fixture has a workflow with placeholders and the list of findings expected; the runner fills the placeholders, imports the workflow with the **real** importer, runs `detectSecrets` and compares the findings as a multiset.
+- **Backend (planned, not built).** The plan says the detector and its fixtures are "written so the backend can reuse them" (`docs/PHASE1_1_PLAN.md` section 3.7), and the Phase 2 decision X10 would decide whether a *server* refuses such a workflow. `contracts/SECRETS.md` says plainly: nothing here is a server-side guarantee. A user who skips the browser can send anything.
+
+### 6. Important classes, functions and code paths
+
+| Where | What it does |
+|---|---|
+| `frontend/src/workflow/secrets.ts`: `scanSecrets`, `detectSecrets`, `detectNodeSecrets` | The three entry points: all nodes and metadata with omitted counts; the same, findings only; one node's config (used by lint) |
+| `secrets.ts`: `scan` and `emit` | The iterative walk, the three questions per step, the cap and the counting |
+| `secrets.ts`: `CREDENTIAL_SHAPES`, `HEADER_NAMES`, `KEY_WORDS` | The exported lists: the rules as data (the fixture runner reads them to check coverage) |
+| `secrets.ts`: `displayPath`, `REDACTED_KEY`, `ODD_KEY`, `MAX_KEY_LENGTH`, `MAX_PATH_LENGTH` | Building a path that never contains a secret-looking key and is at most 200 characters |
+| `secrets.ts`: `safeDisplayName`, `REDACTED_NAME` | A node name that is safe to show next to a secret warning |
+| `frontend/src/workflow/lint.ts` (the last block of the per-node loop) | `secret-likely` and `secret-suspected` warnings, after the five rules, for every node |
+| `frontend/src/workflow/secrets.test.ts` (125 tests, I ran them) | Shape cases, boundaries, key words, display paths, the cap, `safeDisplayName`, order, purity, scale, never echo |
+| `frontend/src/contracts/fixtures.test.ts`: `TOKEN_BUILDERS`, `fillPlaceholders`, `fillDeep` | The placeholder table and the run-time substitution |
+| `fixtures.test.ts`: `LITERAL_TOKEN_PATTERNS`, `findTokenLiterals`, `textFilesOf` | The repository-wide guard: no text file may hold a token-shaped literal |
+| `contracts/SECRETS.md` | The specification, including the rules a Python port must copy |
+| `contracts/fixtures/secrets/` (83) and `contracts/fixtures/warnings/warn-secret-*.json` (5) | The shared test data |
+
+#### The push-protection design, in detail (teach this clearly)
+
+The rule: **a fixture, a test or a source file never contains a literal token.** How it is kept:
+
+1. **Fixtures hold a placeholder**, for example a trigger payload entry named `token` whose value is `@@GHP@@` (`contracts/fixtures/secrets/sec-high-hides-medium.json`). `TOKEN_BUILDERS` in `fixtures.test.ts` maps each placeholder name to a function that builds the token from **separate pieces joined with `+`** (the prefix is split, for example `'gh' + 'p_' + ...`), so the source text of the test file itself has no token-shaped run either. `@@NAME:n@@` chooses the size, which is how the boundary fixtures ("exactly at the minimum", "one below") are made without writing a long string.
+2. **`fillDeep` replaces placeholders in every string and every object key** before the workflow goes through `importWorkflow`. Two strictness rules guard the guard: anything shaped like `@@...@@` that is not in the table (a typo, a lower-case name, a bad size) **fails the run** rather than being left as plain text (otherwise a typo would leave a fixture that silently tests nothing), and two keys that become one after substitution fail the run (a finding hidden by a collision would look like a pass). A test checks that every placeholder in the table is used by at least one fixture and that no fixture uses an unknown one.
+3. **A repository-wide guard test** (`describe('push protection: ...')`) walks **every text file** of the working tree (skipping `node_modules`, `.git`, build output and binary files) with a plain file walk, and fails on any of **13 patterns** (the GitHub token kinds, the fine-grained GitHub token, Groq, `sk-`, Stripe-style, AWS key ids, Slack, Google, npm, JWT, a PEM private-key header, a Bearer token). The patterns have **no left boundary on purpose**: a push-protection scanner would not apply the detector's boundary rule. This guard also scans the documents of `docs/` and `contracts/`, which is why I describe token shapes in words in this lesson and in `LEARNING.md`.
+4. **The guard never prints the matched text**: a failure message is `file:line (pattern name)`. A self-test builds one synthetic token per pattern at run time and checks that the report contains none of the token's first 8 characters.
+5. **The honest scope:** the guard checks the files **in the working tree when the tests run**. It does not look at Git history (the reviewer audited the history separately: **a report**, below), files outside the tree, or documents that do not exist yet.
+
+**Never echo, in the tests.** `secrets.test.ts` plants one *sentinel* token in twelve places (a header value, a nested value, an array item, as a key, inside a long prompt, in a key with a colon or an equals sign, and more) and in 1,200 seeded random configs. It then checks that the sentinel, its first 8 characters, its last 8 characters and two renderings of a simple hash of it appear in **no finding and no lint warning**. The check is itself tested ("the sentinel is detectable by the needles"), so it cannot pass by looking for the wrong thing. The needles are **labelled**, so when an assertion fails it prints *which* needle leaked ("first 8 characters") and never the needle; the fixture runner prints error *codes* only, because an error path could contain a token.
+
+### 7. Alternatives and trade-offs
+
+| Option | Good | Costs |
+|---|---|---|
+| **Shapes plus names, a pure function, warn and confirm (chosen)** | Simple, fast, testable, explains itself, never blocks work | A heuristic: false positives and misses, and a list of formats that has to be kept up to date |
+| **Entropy scanning** (flag strings that look random) | Catches unknown formats | Many false positives (ids, hashes, base64 data are random-looking), and hard to explain to a user. General knowledge; not built here |
+| **Reuse a ready rule set** (the open-source scanners gitleaks and trufflehog ship large lists of rules; GitHub scans pushes with its own) | Far more formats, maintained by others | A new dependency or a port of its rules (a major technology needs approval, `CLAUDE.md` section 4); I did **not** check their rule sets here, this is general knowledge. The shape table is deliberately small and the list of **not detected** formats (Stripe, Google, npm, SendGrid, Slack webhook URLs, AWS secret keys, database URLs with a password) is written down |
+| **Block export when a secret is found** | The simplest guarantee | The Product Owner did not approve it (D-023): a false positive would trap the user; the detector is only a heuristic |
+| **Encrypt the secret inside the file** | The file is safe to share | Where does the key live? A decryption key in the file is no protection and one outside it is a credential store, which is the real fix (`credentialRef`) |
+| **Ask the user to classify each setting** | Exact | Friction on every setting; users answer wrongly; no help for pasted text in a prompt |
+| **Only check on the server** (Phase 2) | The real control; users cannot skip it | Does not help before the file is exported; it is a separate decision (X10) and not built |
+| **A credential reference** (`credentialRef`, planned) | The actual fix: the document never holds the secret | Needs backend credential storage (Phase 2 onward); until then detection is a seat belt |
+
+### 8. Real-world engineering applications
+
+*From general knowledge, not from this repository.*
+
+- **Secret scanning and push protection** (GitHub, GitLab) and tools such as **gitleaks** and **trufflehog** scan commits and pushes for credential shapes, exactly as this detector does for a workflow; teams add them as a pre-commit check and in CI.
+- **Log redaction**: logging libraries and observability platforms mask fields called `password`, `authorization` or `token`, which is the "key name" rule of this lesson applied to logs.
+- **Never echoing a secret** is why a login form does not show a password after an error, why an API shows only the last four characters of a key, and why secrets are kept out of CI logs.
+- **Bounded output** (cap the number of results and say "and N more") is standard in search, linting and error-reporting tools, for the same reason as story 2 below.
+- **Workflow tools** (n8n, Zapier, Make) keep credentials in a separate store and put only a reference into the workflow, which is what AgentForge plans with `credentialRef`.
+
+### What the review found (real examples)
+
+The Opus reviewer found no blocker and no major, and one near-major. Fixes came back in `2a0f501`. Everything the reviewer measured or compared is a **report** from `docs/DEVELOPMENT_LOG.md` Session 13 unless I say I read the code or ran the test.
+
+**1. A second, different implementation (a report).** The reviewer wrote its **own** detector from the specification using hand-written character-class scanners and **no regular expressions**, then compared the two on **20,000 generated workflows (81,264 findings): 0 differences, order included**. Why this is strong: a bug that sits in the *regular expressions* of the original cannot also be in a scanner that does not use regular expressions, so agreement is much better evidence than two copies of the same technique agreeing. (L5 and L10 describe other reviewer-written reference implementations.) The limit: both implement the same *specification*, so a wrong specification is invisible to this test.
+
+**2. The output blow-up (the near-major; the main lesson).** The reviewer crafted a **2 MB** file that imports normally: 58 levels of nested 40-character keys over 120,000 keys named `token0`, `token1`, and so on. It imports because depth 58 is under the limit of 64 levels and 2 MB is under the 5,000,000-byte limit (`MAX_DEPTH` in `valuePolicy.ts`, `MAX_IMPORT_BYTES` in `serialize.ts`: I read both). The first version produced **120,000 findings, each with a display path of 58 steps: about 288 MB of path text** (reported: that is about 144 times the size of the input), `detectSecrets` took 1.9 s and `lintWorkflow` 3.2 s (reported), and **lint reruns on every change in the editor** (L10, L11), so the editor would freeze. The detector was *linear in the input*, as claimed, and still a problem, because **its output was much larger than its input**. The validator's depth and size limits did not help: this file respected all of them. The fix is in the code I read: `emit` stops building anything after 50 findings and only counts; the de-duplication set is built only for kept findings; a path is capped at 200 characters; and `scanSecrets` returns the omitted counts. The tests I read pin it: a 120,000-finding file keeps exactly 50 and counts 119,950; the 58-level shape (at 20,000 keys) stays under a total of 300,000 characters of path and message text; chains of 2,000, 10,000 and 20,000 levels stay bounded; all inside a two-second limit. A related correction: `contracts/WARNINGS.md` had said "linear time", which was no longer true as stated, and was corrected. **The rule: bound the output, not only the work; limits on the input do not bound what you derive from it.**
+
+**3. The spec said one thing and the code another.** The specification said a medium finding is skipped when its *path* already has a high finding; the code skips it when the *key's own value* is already high (a per-key rule). The reviewer noticed. The decision was *which one is right*: the code, because a display path is not a unique address (two different keys can have the same display path, for example two redacted keys). So the **specification was fixed**, and the two cases the reviewer found were **pinned with new fixtures** (`sec-medium-per-key-redacted-collision`, which I read, and `sec-medium-per-key-dotted-key`). The rule: **when a specification and its code disagree, decide which is right, fix the other one, and pin the decision with a test or fixture** so it cannot drift back.
+
+**4. The display path itself could leak.** A secret typed *into a key*, such as a key reading `token: abc123...` or `password=hunter2`, would have appeared in the path of its own finding. The fix is the `ODD_KEY` rule (keys with `=`, `:` or whitespace, and keys over 40 characters, show as `[redacted key]`) pinned by the fixtures `sec-key-secret-typed-into-key` (which I read), `sec-key-equals-sign-in-key` and `sec-key-with-space`, and by two of the twelve placements in the never-echo test. This is the same lesson as the label in the warning message: **a "safe" output is only safe if you check every field that goes into it**, including the ones that feel like metadata.
+
+**5. A boundary decision, with a list of what is missed.** Section 4 explained the left-boundary rule. The review kept it for `sk-`, JWT and `Bearer` and relaxed it for the distinctive prefixes. The point for an interview: it is a *judgement about precision versus recall*, recorded in the specification, tested at the edges (a token just inside and just outside the boundary; fixtures `sec-boundary-*`), and accompanied by an **honest list of misses** instead of a claim of completeness.
+
+**6. Honest limits, in one place** (`contracts/SECRETS.md`, "Honest limits"). A heuristic with false positives and misses. **Not scanned**: node labels, ids and types, edges, the workflow id, name and description; a credential typed there is not found. **Not detected**: other vendors' formats (the list above), obfuscated or encoded values, a lowercase `bearer`, a credential in a JSON *string* that contains a header object as text, an unfamiliar header name. A short plain key that describes a secret is shown in a path. TypeScript only: **no Python version, no parity claimed**, and `SECRETS.md` lists the places where a Python port would silently differ (which `trim`, what counts as whitespace after `Bearer`, string length in UTF-16 units, "letter" meaning ASCII only), with fixtures named `sec-port-*` for the ones a fixture can express. **No server-side enforcement**: decision X10 is open.
+
+**7. Other review points, in brief.** (a) The token guard first scanned only the fixtures and five files, using the detector's own boundary; it was widened to the whole tree with 13 boundary-free patterns (the guard above). The reviewer also audited **the whole Git history** (`git log -p --all`, 45 commits) for anything GitHub's scanning or gitleaks would flag: **clean** (a report; I did not repeat it). (b) Three mutants survived the first tests (a lowercase letter in the private-key gap, a private-key header without its closing dashes, a dot before a token); three tests now kill them (reviewer ran 74 mutants, 71 killed: a report). (c) Failure messages could have printed a synthetic token, a placeholder with a typo was silently left alone, and two keys could silently merge: all fixed (section 6).
+
+**8. A process note: the fix commit left a floor too low.** `fixtures.test.ts` holds `MIN_COUNTS.secrets`, a minimum number of fixtures the family must have (L3: a floor catches fixtures that are deleted by accident). I read it at HEAD: it is **67**, but the family has **83** files (the fix commit added 16, and its message says 14). The floor therefore would not notice if 16 fixtures were deleted. The Principal Architect found it at acceptance, recorded it as a known issue assigned to T9b, and **history was not rewritten**; the floor is still 67 at the commit I read. Lesson: when you add test data, raise the number that guards it in the same commit, and read the *numbers* in a commit message as claims to verify.
+
+**What this teaches, in five lines.**
+1. **A detector must never become a leak.** Make the output type unable to hold the value, and check every field, including paths, names and test failure messages.
+2. **Bound the output, not only the work.** Linear time on the input is not a bound if the output can be 144 times bigger.
+3. **Test data can be a risk too.** Build tokens from pieces at run time, and add a guard that scans the whole repository and prints only the file, line and pattern name.
+4. **An independent second implementation** (a different technique) is the best answer to "how do I know my tests are not circular?"
+5. **Say what you miss.** A heuristic with a written list of false positives and misses is trustworthy; one that claims to be complete is not.
+
+### Knowledge Check / Interview Questions
+
+*Answers are not given here. Study this lesson and `docs/LEARNING.md`, then answer all questions in the dedicated learning session at the end of the project.*
+
+1. A teammate says: "The detector runs in linear time, so it cannot cause a performance problem." The reviewer found a 2 MB file that imports normally and still froze the editor. Explain exactly what the file contained, why the import limits (depth and size) did not stop it, why "linear in the input" did not help, what `emit` in `secrets.ts` does differently after the fix, and what a caller such as the future export dialog gets back so it can still tell the user that more findings exist. Give one other place in a system where you would cap output and report a count.
+2. The detector reports `headers.Authorization` and `reason: header-name` but never the value, never a prefix of it and never a hash. Name three different places where a careless implementation could still leak the value (think about the path, the node name and the tests), say what AgentForge does in each place (`[redacted key]`, `safeDisplayName`, labelled test needles), and say why the *type* of `SecretFinding` is part of the defence.
+3. The repository is pushed to GitHub and a detector's tests need token-shaped strings. Describe the whole mechanism that lets the tests exist without committing a token: what a fixture contains, how and when the token is built, why the runner fails on an unknown or malformed placeholder and on colliding keys, what the repository-wide guard scans, why its patterns have no boundary, and why it prints only a file, a line and a pattern name. What does the guard *not* protect against?
+4. `sk-` followed by a long run is a high-confidence shape, yet the words `task-` and `risk-assessment` contain those letters. Explain the left-boundary rule, why the distinctive prefixes get a more relaxed boundary than `sk-`, and which realistic key is therefore missed. Use the words precision and recall, say who should decide where to draw the line, and where the answer is written down so a Python port will draw it in the same place.
+5. The specification said the medium finding is hidden when the *path* already has a high finding, but the code hid it per *key*. Describe how you decide which one is wrong, what the final decision was and why a display path cannot be treated as a unique address, and which fixtures pin the decision. What general process would you follow whenever a reviewer finds that a document and the code disagree?
+6. The reviewer wrote a second detector without regular expressions and compared it with the original on 20,000 generated workflows. Why is that stronger evidence than the original's own unit tests? What bugs could both implementations still share, and which part of this lesson's design (a mutation run, a fixture that states a miss, a written list of unsupported formats) covers a different kind of risk? Finally: D-023 says warn and confirm but never block. Argue for one reason the Product Owner's choice is right for a heuristic detector, and say what real fix removes the need for the detector.
