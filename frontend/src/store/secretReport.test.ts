@@ -38,7 +38,7 @@ describe('buildSecretReport', () => {
     expect(report).toEqual({
       hasHigh: true,
       hasMedium: false,
-      high: { nodes: [{ name: 'Fetch', paths: ['headers.Authorization'], omitted: 0 }], metadata: { paths: [], omitted: 0 } },
+      high: { nodes: [{ name: 'Fetch', paths: ['headers.Authorization'], omitted: 0 }], omittedNodes: 0, metadata: { paths: [], omitted: 0 } },
       counts: { high: 2, medium: 0 },
     } satisfies SecretReport)
   })
@@ -96,14 +96,69 @@ describe('buildSecretReport', () => {
     expect(report.high.nodes.map((n) => n.name)).toEqual(['plain-id', '[redacted name]', '[redacted name]', 'L'.repeat(60) + '...'])
   })
 
-  test('the cap: 50 findings are kept per node, the rest is "omitted"; metadata too', () => {
+  test('the cap: a node with 60 highs keeps 50 paths and says "10 more"; metadata too; counts include the omitted ones', () => {
     const many = (): Record<string, string> => Object.fromEntries(Array.from({ length: 60 }, (_, i) => ['k' + i, SENTINEL]))
     const report = buildSecretReport(workflowOf([node('a', many(), 'Big')], many()))
+    expect(report.hasHigh).toBe(true)
     expect(report.high.nodes[0].paths).toHaveLength(50)
     expect(report.high.nodes[0].omitted).toBe(10)
     expect(report.high.metadata.paths).toHaveLength(50)
     expect(report.high.metadata.omitted).toBe(10)
-    expect(report.counts.high).toBe(100)
+    expect(report.counts.high).toBe(120) // 50 + 10 in the node, 50 + 10 in the metadata
+  })
+
+  // M1 (T9b review): the reviewer's four constructions plus a metadata one. In each, medium findings come BEFORE a high one,
+  // and the report must still say "high": the indicator, the badge condition and the export dialog all read hasHigh.
+  describe('medium findings never hide a high one (hasHigh, so the indicator and the export dialog)', () => {
+    const mediums = (n: number, prefix = 'token'): Record<string, unknown> => Object.fromEntries(Array.from({ length: n }, (_, i) => [`${prefix}${i}`, 'v']))
+
+    test.each([
+      ['50 token keys, then Authorization', { headers: { ...mediums(50), Authorization: SENTINEL } }, 'headers.Authorization'],
+      ['50 max_tokens_N keys, then X-API-Key', { headers: { ...mediums(50, 'max_tokens_'), 'X-API-Key': 'abc' } }, 'headers.X-API-Key'],
+      ['an array of 50 {token} items, then headers', { items: Array.from({ length: 50 }, () => ({ token: 'x' })), headers: { Cookie: 'c' } }, 'headers.Cookie'],
+      ['200 mediums, then a shaped value', { ...mediums(200), note: SENTINEL }, 'note'],
+    ])('%s', (_name, config, path) => {
+      const report = buildSecretReport(workflowOf([node('a', config, 'Fetch')]))
+      expect(report.hasHigh).toBe(true)
+      expect(report.high.nodes).toEqual([{ name: 'Fetch', paths: [path], omitted: 0 }])
+      expect(report.counts.medium).toBeGreaterThanOrEqual(50)
+    })
+
+    test('metadata with 50 passwordN keys, then a shaped value', () => {
+      const report = buildSecretReport(workflowOf([node('a', {})], { ...mediums(50, 'password'), note: SENTINEL }))
+      expect(report.hasHigh).toBe(true)
+      expect(report.high.metadata).toEqual({ paths: ['note'], omitted: 0 })
+    })
+
+    test('the 49-medium control and a clean workflow of 5,000 nodes still behave', () => {
+      expect(buildSecretReport(workflowOf([node('a', { headers: { ...mediums(49), Authorization: SENTINEL } })])).hasHigh).toBe(true)
+      const clean = workflowOf(Array.from({ length: 5000 }, (_, i) => node('n' + i, { url: 'https://example.com/' + i })))
+      expect(buildSecretReport(clean).hasHigh).toBe(false)
+    })
+
+    test('55 mediums only (no high): still no high', () => {
+      const report = buildSecretReport(workflowOf([node('a', { headers: mediums(55) })]))
+      expect(report.hasHigh).toBe(false)
+      expect(report.hasMedium).toBe(true)
+      expect(report.counts).toEqual({ high: 0, medium: 55 })
+    })
+  })
+
+  test('the node list is capped at 50 nodes: "omittedNodes" counts the rest, and the output stays small', () => {
+    const nodes = Array.from({ length: 120 }, (_, i) => node('n' + i, { headers: { Cookie: 'c' + i } }, 'Node ' + i))
+    const report = buildSecretReport(workflowOf(nodes))
+    expect(report.high.nodes).toHaveLength(50)
+    expect(report.high.nodes.map((n) => n.name)).toEqual(Array.from({ length: 50 }, (_, i) => 'Node ' + i)) // array order
+    expect(report.high.omittedNodes).toBe(70)
+    expect(report.hasHigh).toBe(true)
+    expect(report.counts.high).toBe(120)
+    expect(JSON.stringify(report).length).toBeLessThan(20_000)
+    expect(buildSecretReport(workflowOf(nodes.slice(0, 50))).high.omittedNodes).toBe(0) // exactly 50: nothing is omitted
+  })
+
+  test('a whitespace-only label falls back to the id, like the lint messages; a blank label with a token-shaped id is redacted', () => {
+    const report = buildSecretReport(workflowOf([node('plain-id', { h: SENTINEL }, '   '), node(SENTINEL, { h: SENTINEL }, ' \t')]))
+    expect(report.high.nodes.map((n) => n.name)).toEqual(['plain-id', '[redacted name]'])
   })
 
   test('the sentinel, its first and last 8 characters appear in NO string and NO key of the report (every place it can be planted)', () => {
@@ -156,6 +211,18 @@ describe('getSecretReport (identity stays while nothing the report shows changes
     expect(getSecretReport(relabelled)).toBe(first)
   })
 
+  test('a new config alone (same id, same label, same metadata) invalidates the cache: a pasted secret makes hasHigh true', () => {
+    const wf = workflowOf([node('a', { headers: {} }, 'Fetch')])
+    expect(getSecretReport(wf).hasHigh).toBe(false)
+    const pasted: Workflow = { ...wf, nodes: [{ ...wf.nodes[0], config: { headers: { Authorization: SENTINEL } } }] }
+    expect(pasted.metadata).toBe(wf.metadata)
+    expect(pasted.nodes[0].id).toBe(wf.nodes[0].id)
+    expect(pasted.nodes[0].label).toBe(wf.nodes[0].label)
+    expect(getSecretReport(pasted).hasHigh).toBe(true)
+    const removed: Workflow = { ...pasted, nodes: [{ ...pasted.nodes[0], config: { headers: {} } }] }
+    expect(getSecretReport(removed).hasHigh).toBe(false)
+  })
+
   test('a real change gives a new report, and the old one is untouched', () => {
     const wf = workflowOf([node('a', { h: SENTINEL }, 'One')])
     const first = getSecretReport(wf)
@@ -198,12 +265,24 @@ describe('source-text guards for the secret UI', () => {
     expect(/\.(label|id)\b/.test(source)).toBe(false)
   })
 
-  test('the toolbar subscribes to the boolean, not the whole report; the node and the panel read their own warnings', () => {
+  test('the toolbar subscribes to the boolean; the node and the panel read their own warnings, never the scan', () => {
     expect(/\buseHasHighSecret\(/.test(text('/src/app/Toolbar.tsx'))).toBe(true)
-    expect(/\buseSecretReport\(/.test(text('/src/app/Toolbar.tsx'))).toBe(false)
     for (const file of ['/src/nodes/WorkflowNode.tsx', '/src/config-panel/ConfigPanel.tsx']) {
-      expect(/\b(useSecretReport|getSecretReport|scanSecrets|detectSecrets)\(/.test(text(file)), file).toBe(false)
+      expect(/\b(useHasHighSecret|getSecretReport|scanSecrets|detectSecrets)\(/.test(text(file)), file).toBe(false)
     }
+  })
+
+  test('the dialog and its export are bound to the workflow that was listed (the object captured at click time), and the dialog stops every key but Tab and Escape', () => {
+    const toolbar = text('/src/app/Toolbar.tsx')
+    expect(/exportNow\(workflow\)/.test(toolbar)).toBe(true)
+    // the confirm handler uses the captured object, and does not read the store again
+    const confirm = /onConfirm=\{\(\) => \{([\s\S]*?)\n {10}\}\}/.exec(toolbar)
+    expect(confirm, 'the onConfirm handler is found').not.toBeNull()
+    expect(/getState\(\)/.test(confirm![1])).toBe(false)
+    expect(/confirming/.test(confirm![1])).toBe(true)
+    const dialog = text('/src/app/ConfirmDialog.tsx')
+    expect(/e\.stopPropagation\(\)/.test(dialog)).toBe(true)
+    expect(/onClose=\{onClose\}/.test(dialog)).toBe(true)
   })
 
   test('the secret indicator is a status text, not an alert or a live region', () => {

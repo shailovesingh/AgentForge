@@ -8,7 +8,9 @@ import { getSecretReport } from '../store/secretReport'
 import type { SecretReport } from '../store/secretReport'
 import { useHasHighSecret } from '../store/useSecretReport'
 import type { ValidationError } from '../workflow/errors'
+import { REDACTED_NAME, safeDisplayName } from '../workflow/secrets'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importTooLarge, importWorkflow } from '../workflow/serialize'
+import type { Workflow } from '../workflow/types'
 import { ConfirmDialog } from './ConfirmDialog'
 import { shorten } from './shorten'
 import { IMPORT_BUTTON_ID } from './importButton'
@@ -17,6 +19,13 @@ import { WarningsMenu } from './WarningsMenu'
 
 // A path or message longer than this is cut when shown, so a huge key cannot flood the alert panel.
 const MAX_SHOWN = 200
+
+/**
+ * An error message or path as shown in the panel: cut to MAX_SHOWN, and replaced by "[redacted name]" when it holds a
+ * credential-shaped text. A validation error can name the offending KEY (`/nodes/0/config/<key>`), and a key could itself be
+ * a pasted token, which must not be echoed (contracts/SECRETS.md, never echo).
+ */
+const shown = (text: string): string => (safeDisplayName(text) === REDACTED_NAME ? REDACTED_NAME : shorten(text, MAX_SHOWN))
 
 function downloadName(name: string): string {
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
@@ -34,8 +43,11 @@ export function Toolbar() {
   const nameId = useId()
   const { fitView } = useReactFlow()
   const hasHighSecret = useHasHighSecret() // a boolean: a drag or a keystroke elsewhere does not re-render the toolbar
-  // The report of the export that is waiting for a confirmation (null: no dialog). Never remembered: every export asks again.
-  const [confirming, setConfirming] = useState<SecretReport | null>(null)
+  // The export that is waiting for a confirmation (null: no dialog): the workflow OBJECT that was current when Export was
+  // clicked and the report built from it. "Export anyway" exports that very object, so the file is what the dialog listed,
+  // whatever happens to the editor meanwhile (an import that finishes behind the dialog, a key that reaches the canvas).
+  // Never remembered: every export asks again.
+  const [confirming, setConfirming] = useState<{ report: SecretReport; workflow: Workflow } | null>(null)
   const wasConfirming = useRef(false)
 
   // After the dialog is gone (its cleanup has closed it), focus goes back to the Export button.
@@ -45,13 +57,13 @@ export function Toolbar() {
   }, [confirming])
 
   const onExportClick = () => {
-    const report = getSecretReport(useEditorStore.getState().workflow)
-    if (report.hasHigh) setConfirming(report)
-    else onExport()
+    const { workflow } = useEditorStore.getState() // read at click time, never earlier
+    const report = getSecretReport(workflow)
+    if (report.hasHigh) setConfirming({ report, workflow })
+    else exportNow(workflow)
   }
 
-  const onExport = () => {
-    const { workflow } = useEditorStore.getState()
+  const exportNow = (workflow: Workflow) => {
     const exported = exportWorkflowText(workflow)
     if (!exported.ok) {
       // Refused before anything is written, so no file is created.
@@ -90,76 +102,77 @@ export function Toolbar() {
 
   return (
     <>
-    <header className={styles.toolbar}>
-      <strong className={styles.brand}>AgentForge</strong>
-      <label htmlFor={nameId} className={styles.srOnly}>
-        Workflow name
-      </label>
-      <input
-        id={nameId}
-        className={styles.name}
-        type="text"
-        value={name}
-        onChange={(e) => setWorkflowName(e.target.value)}
-      />
-      {hasHighSecret && (
-        // A status TEXT, not an alert and not a live region: it stays until the credential is removed. Never names a value.
-        <span className={styles.secretNotice} data-secret-indicator>
-          <ShieldAlert size={14} aria-hidden="true" /> Possible credential in this workflow
-        </span>
-      )}
-      <div className={styles.actions}>
-        <WarningsMenu />
-        <button type="button" onClick={() => useEditorStore.getState().reset()}>
-          <FilePlus size={14} aria-hidden="true" /> New
-        </button>
-        <button id={IMPORT_BUTTON_ID} type="button" onClick={() => fileInput.current?.click()}>
-          <Upload size={14} aria-hidden="true" /> Import
-        </button>
-        <button ref={exportButton} type="button" onClick={onExportClick}>
-          <Download size={14} aria-hidden="true" /> Export
-        </button>
+      <header className={styles.toolbar}>
+        <strong className={styles.brand}>AgentForge</strong>
+        <label htmlFor={nameId} className={styles.srOnly}>
+          Workflow name
+        </label>
         <input
-          ref={fileInput}
-          type="file"
-          accept="application/json,.json"
-          hidden
-          aria-label="Import workflow file"
-          onChange={onImport}
+          id={nameId}
+          className={styles.name}
+          type="text"
+          value={name}
+          onChange={(e) => setWorkflowName(e.target.value)}
         />
-      </div>
-
-      {problem && (
-        <div className={styles.errors} role="alert">
-          <div className={styles.errorsHeader}>
-            <strong>{problem.heading}</strong>
-            <button type="button" onClick={() => setProblem(null)}>
-              Dismiss
-            </button>
-          </div>
-          <ul>
-            {problem.errors.map((error, i) => (
-              <li key={i}>
-                <code>{error.code}</code> {shorten(error.message, MAX_SHOWN)}{' '}
-                <span className={styles.path}>
-                  {error.path === '' ? '(whole document)' : `at ${shorten(error.path, MAX_SHOWN)}`}
-                </span>
-              </li>
-            ))}
-          </ul>
+        {hasHighSecret && (
+          // A status TEXT, not an alert and not a live region: it stays until the credential is removed. Never names a value.
+          <span className={styles.secretNotice} data-secret-indicator>
+            <ShieldAlert size={14} aria-hidden="true" /> Possible credential in this workflow
+          </span>
+        )}
+        <div className={styles.actions}>
+          <WarningsMenu />
+          <button type="button" onClick={() => useEditorStore.getState().reset()}>
+            <FilePlus size={14} aria-hidden="true" /> New
+          </button>
+          <button id={IMPORT_BUTTON_ID} type="button" onClick={() => fileInput.current?.click()}>
+            <Upload size={14} aria-hidden="true" /> Import
+          </button>
+          <button ref={exportButton} type="button" onClick={onExportClick}>
+            <Download size={14} aria-hidden="true" /> Export
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            aria-label="Import workflow file"
+            onChange={onImport}
+          />
         </div>
+
+        {problem && (
+          <div className={styles.errors} role="alert">
+            <div className={styles.errorsHeader}>
+              <strong>{problem.heading}</strong>
+              <button type="button" onClick={() => setProblem(null)}>
+                Dismiss
+              </button>
+            </div>
+            <ul>
+              {problem.errors.map((error, i) => (
+                <li key={i}>
+                  <code>{error.code}</code> {shown(error.message)}{' '}
+                  <span className={styles.path}>
+                    {error.path === '' ? '(whole document)' : `at ${shown(error.path)}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </header>
+      {confirming && (
+        <ConfirmDialog
+          report={confirming.report}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { workflow } = confirming
+            setConfirming(null)
+            exportNow(workflow) // the existing export path, on the workflow the dialog listed (an export error still shows its panel)
+          }}
+        />
       )}
-    </header>
-    {confirming && (
-      <ConfirmDialog
-        report={confirming}
-        onCancel={() => setConfirming(null)}
-        onConfirm={() => {
-          setConfirming(null)
-          onExport() // the existing export path, unchanged (an export error still shows its panel)
-        }}
-      />
-    )}
     </>
   )
 }

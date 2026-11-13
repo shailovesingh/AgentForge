@@ -399,6 +399,22 @@ describe('rules 6 and 7: secret-likely and secret-suspected (contracts/SECRETS.m
     expect(short.message.startsWith('"Fetch" ')).toBe(true)
   })
 
+  test('EVERY rule names the node through safeDisplayName (T9b review): a credential-shaped label is redacted and a long one cut, in all messages', () => {
+    const empty = { provider: 'ollama', model: 'm', systemPrompt: '', prompt: '', temperature: 0.5 }
+    const asLabel = lint(wf([node('l', 'llm.prompt', empty, `call ${SK} now`)]), nodeDefinitions)
+    expect(asLabel.map((x) => x.code)).toEqual(['required-field-empty', 'result-unused']) // the older rules, not only the secret ones
+    for (const x of asLabel) {
+      expect(x.message.includes(SK), 'message holds the token').toBe(false)
+      expect(x.message.includes(SK.slice(0, 8)), 'message holds the first 8 characters').toBe(false)
+      expect(x.message.startsWith('"[redacted name]" ')).toBe(true)
+    }
+    const asId = lint(wf([node(SK, 'llm.prompt', empty, '  ')]), nodeDefinitions) // a blank label falls back to the id
+    for (const x of asId) expect(x.message.startsWith('"[redacted name]" '), x.code).toBe(true)
+    const long = lint(wf([node('l', 'llm.prompt', empty, 'L'.repeat(100))]), nodeDefinitions)
+    expect(long.length).toBe(2)
+    for (const x of long) expect(x.message.startsWith(`"${'L'.repeat(60)}..." `), x.code).toBe(true)
+  })
+
   test('at most 50 secret warnings per node, the rest is not a warning (the UI reads the omitted count from scanSecrets)', () => {
     const payload = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`token${i}`, 'v']))
     const secret = lint(wf([node('t', 'trigger.manual', { payload })]), nodeDefinitions).filter((x) => x.code === 'secret-suspected')

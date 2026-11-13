@@ -369,10 +369,10 @@ describe('bounded output: scanSecrets, the per-node cap and the omitted counts',
     expect(scan.findings.filter((x) => x.nodeId === 'a').length).toBe(50)
     expect(scan.findings.filter((x) => x.nodeId === 'b').length).toBe(3)
     expect(scan.findings.filter((x) => x.location === 'metadata').length).toBe(50)
-    expect(scan.omitted.perNode.get('a')).toBe(70)
+    expect(scan.omitted.perNode.get('a')).toEqual({ high: 0, medium: 70 })
     expect(scan.omitted.perNode.has('b')).toBe(false) // only nodes with something omitted
     expect(scan.omitted.perNode.has('c')).toBe(false)
-    expect(scan.omitted.metadata).toBe(10)
+    expect(scan.omitted.metadata).toEqual({ high: 0, medium: 10 })
     // the first 50 in walk order are the ones kept
     expect(scan.findings.filter((x) => x.nodeId === 'a').map((x) => x.path)).toEqual(Array.from({ length: 50 }, (_, i) => `token${i}`))
   })
@@ -381,14 +381,78 @@ describe('bounded output: scanSecrets, the per-node cap and the omitted counts',
     expect(scanSecrets(wf([cfgNode('a', tokens(50))])).omitted.perNode.size).toBe(0)
     const s = scanSecrets(wf([cfgNode('a', tokens(51))]))
     expect(s.findings.length).toBe(50)
-    expect(s.omitted.perNode.get('a')).toBe(1)
+    expect(s.omitted.perNode.get('a')).toEqual({ high: 0, medium: 1 })
   })
 
   test('detectSecrets returns exactly the findings of scanSecrets; nodes with one id add up their omitted counts', () => {
     const w = wf([cfgNode('a', tokens(60)), cfgNode('a', tokens(70))])
     expect(detectSecrets(w)).toEqual(scanSecrets(w).findings)
-    expect(scanSecrets(w).omitted.perNode.get('a')).toBe(10 + 20)
-    expect(scanSecrets(wf([])).omitted.metadata).toBe(0)
+    expect(scanSecrets(w).omitted.perNode.get('a')).toEqual({ high: 0, medium: 10 + 20 })
+    expect(scanSecrets(wf([])).omitted.metadata).toEqual({ high: 0, medium: 0 })
+  })
+
+  // M1 (T9b review): the caps are SEPARATE per confidence. 50 medium findings placed BEFORE a high one used to push it out of
+  // the 50 kept, so no indicator and no dialog appeared and the file left with the credential (D-023 narrowed).
+  describe('separate caps per confidence: medium findings never hide a high one', () => {
+    const SK = T.sk(24)
+    const mediums = (n: number, prefix = 'token'): Record<string, unknown> => Object.fromEntries(Array.from({ length: n }, (_, i) => [`${prefix}${i}`, 'v']))
+    const highOf = (s: ReturnType<typeof scanSecrets>) => s.findings.filter((x) => x.confidence === 'high')
+
+    test('50 mediums, then a header named Authorization: the high findings are kept', () => {
+      const s = scanSecrets(wf([cfgNode('a', { headers: { ...mediums(50), Authorization: SK } })]))
+      expect(highOf(s).map((x) => [x.path, x.reason])).toEqual([['headers.Authorization', 'header-name'], ['headers.Authorization', 'credential-shape']])
+      expect(s.findings.filter((x) => x.confidence === 'medium').length).toBe(50)
+      expect(s.omitted.perNode.has('a')).toBe(false)
+    })
+
+    test('50 max_tokens_N keys, then X-API-Key', () => {
+      const s = scanSecrets(wf([cfgNode('a', { headers: { ...mediums(50, 'max_tokens_'), 'X-API-Key': 'abc' } })]))
+      expect(highOf(s).map((x) => [x.path, x.reason])).toEqual([['headers.X-API-Key', 'header-name']])
+    })
+
+    test('metadata with 50 passwordN keys, then a credential-shaped value', () => {
+      const s = scanSecrets(wf([], { ...mediums(50, 'password'), note: SK }))
+      expect(highOf(s).map((x) => [x.location, x.path])).toEqual([['metadata', 'note']])
+      expect(s.omitted.metadata).toEqual({ high: 0, medium: 0 })
+    })
+
+    test('an array of 50 {token: "x"} items before headers', () => {
+      const s = scanSecrets(wf([cfgNode('a', { items: Array.from({ length: 50 }, () => ({ token: 'x' })), headers: { Cookie: 'c' } })]))
+      expect(highOf(s).map((x) => x.path)).toEqual(['headers.Cookie'])
+    })
+
+    test('55 mediums before a high: 50 mediums kept, 5 omitted, the high kept', () => {
+      const s = scanSecrets(wf([cfgNode('a', { ...mediums(55), headers: { Authorization: SK } })]))
+      expect(highOf(s).length).toBe(2)
+      expect(s.findings.filter((x) => x.confidence === 'medium').length).toBe(50)
+      expect(s.omitted.perNode.get('a')).toEqual({ high: 0, medium: 5 })
+    })
+
+    test('a node with 60 highs keeps 50 and omits 10; metadata the same; mediums are unaffected', () => {
+      const highs = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`k${i}`, SK]))
+      const s = scanSecrets(wf([cfgNode('a', { ...highs, ...mediums(3) })], highs))
+      expect(highOf(s).filter((x) => x.nodeId === 'a').length).toBe(50)
+      expect(highOf(s).filter((x) => x.location === 'metadata').length).toBe(50)
+      expect(s.findings.filter((x) => x.nodeId === 'a' && x.confidence === 'medium').length).toBe(3)
+      expect(s.omitted.perNode.get('a')).toEqual({ high: 10, medium: 0 })
+      expect(s.omitted.metadata).toEqual({ high: 10, medium: 0 })
+    })
+
+    test('invariant: a node or the metadata that has a high finding anywhere always KEEPS at least one (so "has a high" is exact)', () => {
+      for (const n of [1, 49, 50, 51, 200]) {
+        const config = { ...mediums(n), headers: { Authorization: SK } }
+        const s = scanSecrets(wf([cfgNode('a', config)], config))
+        expect(highOf(s).filter((x) => x.location === 'config').length, `${n} mediums first`).toBeGreaterThan(0)
+        expect(highOf(s).filter((x) => x.location === 'metadata').length, `${n} mediums first (metadata)`).toBeGreaterThan(0)
+      }
+    })
+
+    test('lint: the secret-likely warnings are there however many medium findings come first', () => {
+      const w = wf([{ ...cfgNode('a', {}), type: 'http.request', config: { method: 'GET', url: 'u', body: '', headers: { ...mediums(60), Authorization: SK } } }])
+      const codes = lintWorkflow(w, nodeDefinitions).filter((x) => x.code.startsWith('secret')).map((x) => x.code)
+      expect(codes.filter((c) => c === 'secret-likely').length).toBe(2)
+      expect(codes.filter((c) => c === 'secret-suspected').length).toBe(50)
+    })
   })
 
   test('a malformed workflow gives an empty scan', () => {
@@ -547,7 +611,7 @@ describe('scale and linear time', () => {
   test('a 120,000-finding file keeps 50 and counts the rest, in time and with small output', () => {
     const [scan, ms] = timed(() => scanSecrets(wf([cfgNode('n', Object.fromEntries(Array.from({ length: 120_000 }, (_, i) => [`token${i}`, 'v'])))])))
     expect(scan.findings.length).toBe(MAX_FINDINGS_PER_SCAN)
-    expect(scan.omitted.perNode.get('n')).toBe(120_000 - MAX_FINDINGS_PER_SCAN)
+    expect(scan.omitted.perNode.get('n')).toEqual({ high: 0, medium: 120_000 - MAX_FINDINGS_PER_SCAN })
     expect(ms).toBeLessThan(LIMIT_MS)
   }, 30_000)
 
@@ -560,7 +624,7 @@ describe('scale and linear time', () => {
     const [scan, scanMs] = timed(() => scanSecrets(w))
     const [warnings, lintMs] = timed(() => lintWorkflow(w, nodeDefinitions))
     expect(scan.findings.length).toBeLessThanOrEqual(MAX_FINDINGS_PER_SCAN)
-    expect(scan.omitted.perNode.get('n'), 'every finding past the cap is only counted').toBe(20_000 - MAX_FINDINGS_PER_SCAN)
+    expect(scan.omitted.perNode.get('n'), 'every finding past the cap is only counted').toEqual({ high: 0, medium: 20_000 - MAX_FINDINGS_PER_SCAN })
     expect(scan.findings.every((x) => x.path.length <= MAX_PATH_LENGTH)).toBe(true)
     expect(scan.findings.reduce((sum, x) => sum + x.path.length, 0)).toBeLessThan(300_000)
     const secret = warnings.filter((x) => x.code.startsWith('secret'))
@@ -574,7 +638,7 @@ describe('scale and linear time', () => {
     for (let i = 1; i < levels; i++) chain = { token: 'v', n: chain }
     const [scan, ms] = timed(() => scanSecrets(wf([cfgNode('n', chain)])))
     expect(scan.findings.length).toBe(MAX_FINDINGS_PER_SCAN)
-    expect(scan.omitted.perNode.get('n')).toBe(levels - MAX_FINDINGS_PER_SCAN)
+    expect(scan.omitted.perNode.get('n')).toEqual({ high: 0, medium: levels - MAX_FINDINGS_PER_SCAN })
     expect(scan.findings.every((x) => x.path.length <= MAX_PATH_LENGTH)).toBe(true)
     expect(ms, `${ms.toFixed(0)} ms`).toBeLessThan(LIMIT_MS)
   }, 30_000)

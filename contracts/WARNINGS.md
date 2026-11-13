@@ -45,15 +45,16 @@ for `secret-likely` and `secret-suspected`, the display path of the finding insi
 | 3 | `trigger-not-connected` | a `Triggers` node that has outputs and **none** of whose outputs has an outgoing edge. | A trigger with at least one connected output. |
 | 4 | `node-unreachable` | every node whose category is not `Triggers` that is not reachable from any `Triggers` node, **only evaluated when the graph contains at least one Trigger**. | Suppressed for a node that already has a `required-input-unconnected` warning **and** has no incoming edge at all (one cause, one warning). A graph with no Trigger gets no `node-unreachable` warnings. |
 | 5 | `result-unused` | every node whose category is neither `Output` nor `Triggers`, that has at least one output port, where **no** output port has an outgoing edge. | A Condition with only one of its two branch outputs wired does **not** warn: every Condition output is a `branch` port, and this single rule already gives that. A node without outputs never warns. |
-| 6 | `secret-likely` | a **high-confidence** finding of the secret detector in the node's `config` (a credential header name with a value, or a well-known credential shape in a value or a key). One warning per finding; `field` is the display path. | Every node is scanned, **known type or not**. Metadata findings are not warnings (a warning needs a node): the UI reads `scanSecrets` for them. **At most 50 warnings per node**: the detector keeps 50 findings per node and counts the rest; no extra warning and no count appears in any message (the UI shows "and N more" from `scanSecrets`). |
+| 6 | `secret-likely` | a **high-confidence** finding of the secret detector in the node's `config` (a credential header name with a value, or a well-known credential shape in a value or a key). One warning per finding; `field` is the display path. | Every node is scanned, **known type or not**. Metadata findings are not warnings (a warning needs a node): the UI reads `scanSecrets` for them. **At most 50 warnings per node**: the detector keeps 50 high findings per node (the medium findings have their own cap, so they cannot hide a high one) and counts the rest; no extra warning and no count appears in any message (the UI shows "and N more" from `scanSecrets`). |
 | 7 | `secret-suspected` | a **medium-confidence** finding in the node's `config` (a key containing `secret`, `password`, `passwd`, `token`, `apikey` or `api_key` with a non-empty string value). One warning per finding; `field` is the display path. | Not reported for a key whose own value is already a high finding (`SECRETS.md`). Same cap of 50 per node. |
 
 Rules 6 and 7 come **after** rules 1 to 5 of the same node: all `secret-likely`, then all `secret-suspected`, each in the
 detector's depth-first traversal order (own keys in `Object.keys` order, integer-like keys first). Their messages name the
-node (its label or id through `safeDisplayName`: a credential-shaped name shows as `[redacted name]`, a long one is cut to
-60 characters) and the display path, and **never a value or a credential-shaped key** (`SECRETS.md`, "Never echo"). The
-messages of rules 1 to 5 are unchanged: they quote the label as it is, so a surface that reports secrets must not render them.
-Rules 1 to 5 skip a node whose definition is unknown; rules 6 and 7 do not.
+node and the display path, and **never a value or a credential-shaped key** (`SECRETS.md`, "Never echo"). **The node name in
+EVERY rule's message (1 to 7) is its label, or its id when the label is blank, through `safeDisplayName`**: a credential-shaped
+name shows as `[redacted name]`, a name longer than 60 characters is cut to 60 plus `...` (changed in the T9b review; before it,
+rules 1 to 5 quoted the label as written, which could echo a token pasted into a label). Message wording is free; the fixtures
+pin codes, nodes and fields, never the message. Rules 1 to 5 skip a node whose definition is unknown; rules 6 and 7 do not.
 
 An edge only counts when both of its nodes exist, and, for a node whose definition is known, its port exists in the
 right direction (the source port among the node's outputs, the target port among its inputs). An edge to a missing node
@@ -113,7 +114,7 @@ default strip. Fixtures pin both sides (`warn-unicode-spaces-only-prompt`, `warn
 
 ## Messages never include values
 
-A message names the node (its label, or its id when the label is blank) and the port or field. It **never contains a
+A message names the node (its label, or its id when the label is blank, through `safeDisplayName`) and the port or field. It **never contains a
 config value or a metadata value**, and for the secret codes never a credential-shaped key (the display path shows
 `[redacted key]`): a warning that repeated a value would copy the secret into the UI. A unit test plants a sentinel string in config values, metadata, the workflow name and
 description, and asserts it appears in no message.

@@ -54,7 +54,7 @@ function isEmptyValue(value: unknown): boolean {
 
 interface Item {
   id: string
-  /** What messages call the node: its label, else its id. */
+  /** What messages call the node: its label, else its id, through safeDisplayName (credential-shaped: redacted; long: cut). */
   name: string
   /** Undefined for an unknown type or version: such a node only counts for reachability. */
   def?: NodeDefinition
@@ -99,7 +99,8 @@ export function lintWorkflow(workflow: Workflow, catalog: NodeDefinition[]): War
         : undefined
     const item: Item = {
       id: n.id,
-      name: typeof n.label === 'string' && n.label.trim() !== '' ? n.label : n.id,
+      // safeDisplayName: a label or an id could itself be a pasted token (they are not scanned), so NO message quotes one raw.
+      name: safeDisplayName(typeof n.label === 'string' && n.label.trim() !== '' ? n.label : n.id),
       def,
       config: isRecord(n.config) ? n.config : {},
     }
@@ -194,12 +195,12 @@ export function lintWorkflow(workflow: Workflow, catalog: NodeDefinition[]): War
 
     // 6 and 7. a credential in the config (contracts/SECRETS.md): every node counts, known type or not, because it is exported
     // either way. The message names the display path, which never holds a value or a credential-shaped key, and the node
-    // through safeDisplayName (a label or an id is not scanned, so it could itself be a pasted token). Metadata findings are
-    // not warnings (no node): the UI reads scanSecrets for them. At most 50 findings are kept per node, so at most 50 secret
-    // warnings per node; the omitted count is not in any message (the UI reads it from scanSecrets).
+    // (item.name is already safeDisplayName). Metadata findings are not warnings (no node): the UI reads scanSecrets for
+    // them. At most 50 high and 50 medium findings are kept per node, so at most 50 secret-likely and 50 secret-suspected
+    // warnings per node; the omitted counts are not in any message (the UI reads them from scanSecrets).
     const found = detectNodeSecrets(item.id, item.config)
     const secretWarn = (code: 'secret-likely' | 'secret-suspected', path: string, message: string) =>
-      warnings.push({ code, severity: 'warning', nodeId: item.id, field: path, message: `"${safeDisplayName(item.name)}" ${message}` })
+      warnings.push({ code, severity: 'warning', nodeId: item.id, field: path, message: `"${item.name}" ${message}` })
     for (const f of found.filter((s) => s.confidence === 'high')) {
       secretWarn('secret-likely', f.path, `may hold a credential at "${f.path}". Remove it from the workflow: anyone with the exported file could use it.`)
     }

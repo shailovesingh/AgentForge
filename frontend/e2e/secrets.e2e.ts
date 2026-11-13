@@ -20,13 +20,20 @@ const piecesOf = (s: string): string[] => [s, s.slice(0, 8), s.slice(-8)]
 interface PageElement {
   tagName: string
   value?: unknown
+  hidden?: boolean
+  textContent: string | null
   getAttributeNames(): string[]
   getAttribute(name: string): string | null
+  querySelector(selector: string): PageElement | null
+  cloneNode(deep: boolean): PageElement
+  remove(): void
 }
 declare const document: {
-  body: { innerText: string }
+  body: { innerText: string; appendChild(child: PageElement): void }
+  documentElement: PageElement
   title: string
   activeElement: unknown
+  createElement(tag: string): PageElement
   querySelectorAll(selector: string): ArrayLike<PageElement>
 }
 
@@ -59,8 +66,9 @@ async function plantHeader(editor: Editor, sentinel: string) {
 
 /**
  * Where the pieces of the sentinel appear in the page, as short descriptions that never contain the value: the visible text,
- * the title, every attribute NAME and VALUE of every element, and the value of every form control. The one element left out is
- * the field the user typed it into (its id is given): its value is the user's own input.
+ * ALL text including hidden text (`innerText` skips display:none and `hidden`; `textContent` does not), the title, every
+ * attribute NAME and VALUE of every element, and the value of every form control. The one element left out is the field the
+ * user typed it into (its id is given): its value is the user's own input (React also mirrors it into the textarea's text).
  */
 async function leaksIn(page: Page, pieces: string[], skipId: string | null): Promise<string[]> {
   return page.evaluate(
@@ -68,6 +76,9 @@ async function leaksIn(page: Page, pieces: string[], skipId: string | null): Pro
       const found: string[] = []
       const has = (text: string) => pieces.some((p) => text.includes(p))
       if (has(document.body.innerText)) found.push('visible text')
+      const copy = document.documentElement.cloneNode(true)
+      if (skipId !== null) copy.querySelector(`[id="${skipId}"]`)?.remove()
+      if (has(copy.textContent ?? '')) found.push('text content (hidden text included)')
       if (has(document.title)) found.push('title')
       for (const el of Array.from(document.querySelectorAll('*'))) {
         const tag = el.tagName.toLowerCase()
@@ -315,6 +326,23 @@ test.describe('never echo the value', () => {
     for (const piece of pieces) expect(messages.filter((m) => m.includes(piece)).length, `console messages with a ${piece.length}-character piece`).toBe(0)
   })
 
+  test('the scan sees HIDDEN text too: a leak in a hidden span is invisible to innerText but caught through textContent', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    const pieces = piecesOf(sentinel)
+    await plantHeader(editor, sentinel)
+    const skipId = await headersField(editor).getAttribute('id')
+    expect(await leaksIn(editor.page, pieces, skipId)).toEqual([])
+    await editor.page.evaluate((text) => {
+      const span = document.createElement('span')
+      span.hidden = true
+      span.textContent = text
+      document.body.appendChild(span)
+    }, sentinel)
+    const leaks = await leaksIn(editor.page, pieces, skipId)
+    expect(leaks).toContain('text content (hidden text included)')
+    expect(leaks).not.toContain('visible text') // innerText alone would have missed it
+  })
+
   test('the scan itself works: it FAILS if the sentinel is planted anywhere except the excluded field (toolbar name input)', async ({ editor }) => {
     const sentinel = makeSentinel()
     const pieces = piecesOf(sentinel)
@@ -333,23 +361,34 @@ test.describe('never echo the value', () => {
   })
 })
 
-test.describe('import, nothing blocked', () => {
-  const fileWith = (overrides: object): string =>
-    JSON.stringify(
-      {
-        schemaVersion: '1.0',
-        id: 'wf_secret',
-        name: 'Imported',
-        description: '',
-        nodes: [{ id: 'n1', type: 'trigger.manual', typeVersion: 1, label: 'Start', config: { payload: {} }, position: { x: 80, y: 120 } }],
-        edges: [],
-        metadata: {},
-        ...overrides,
-      },
-      null,
-      2,
-    ) + '\n'
+/** A workflow file's text: one trigger node by default; `overrides` replace top-level keys (nodes, metadata, name). */
+const fileWith = (overrides: object): string =>
+  JSON.stringify(
+    {
+      schemaVersion: '1.0',
+      id: 'wf_secret',
+      name: 'Imported',
+      description: '',
+      nodes: [{ id: 'n1', type: 'trigger.manual', typeVersion: 1, label: 'Start', config: { payload: {} }, position: { x: 80, y: 120 } }],
+      edges: [],
+      metadata: {},
+      ...overrides,
+    },
+    null,
+    2,
+  ) + '\n'
 
+/** An HTTP Request node as it appears in a file. */
+const httpNode = (id: string, label: string, headers: Record<string, unknown>, x = 300, y = 120) => ({
+  id,
+  type: 'http.request',
+  typeVersion: 1,
+  label,
+  config: { method: 'GET', url: 'https://example.com', headers, body: '' },
+  position: { x, y },
+})
+
+test.describe('import, nothing blocked', () => {
   test('a credential in metadata: the toolbar indicator, a dialog on Export that lists the metadata path, no value anywhere', async ({ editor }) => {
     const sentinel = makeSentinel()
     const pieces = piecesOf(sentinel)
@@ -414,5 +453,187 @@ test.describe('import, nothing blocked', () => {
     await expect(editor.toolbar.getByText(INDICATOR)).toBeVisible()
     await expect(editor.page.locator('dialog')).toHaveCount(0)
     await expect(editor.page.locator('[role="alert"]')).toHaveCount(0)
+  })
+})
+
+test.describe('review fixes (T9b)', () => {
+  test('M1: 55 medium keys BEFORE a credential header: the indicator, the dialog on Export, no file on Cancel, nothing echoed', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    const pieces = piecesOf(sentinel)
+    const messages = watchConsole(editor.page)
+    const downloads = countDownloads(editor.page)
+    const headers: Record<string, unknown> = Object.fromEntries(Array.from({ length: 55 }, (_, i) => [`token${i}`, 'v']))
+    headers.Authorization = sentinel // after 55 medium findings: the old shared cap of 50 hid it, and the file left unasked
+    await editor.importText(fileWith({ nodes: [httpNode('h1', 'Call', headers)] }))
+
+    await expect(editor.nodes).toHaveCount(1)
+    await expect(editor.toolbar.getByText(INDICATOR)).toBeVisible()
+    await expect(editor.node('http.request').locator('[data-secret-likely]')).toBeVisible()
+    await exportButton(editor).click()
+    const dialog = dialogOf(editor)
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toContainText('Call')
+    await expect(dialog.getByText('headers.Authorization', { exact: true })).toBeVisible()
+    expect(await leaksIn(editor.page, pieces, null)).toEqual([])
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(editor.page.locator('dialog')).toHaveCount(0)
+    await editor.page.waitForTimeout(1000)
+    expect(downloads()).toBe(0)
+    expect(await leaksIn(editor.page, pieces, null)).toEqual([])
+    for (const piece of pieces) expect(messages.filter((m) => m.includes(piece)).length).toBe(0)
+  })
+
+  test('the dialog says "and N more" when a node has more than 50 high findings, and its list stays small', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    const headers = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`h${i}`, sentinel]))
+    await editor.importText(fileWith({ nodes: [httpNode('h1', 'Many', headers)] }))
+    await exportButton(editor).click()
+    const dialog = dialogOf(editor)
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toContainText('Many')
+    await expect(dialog.getByText('and 10 more', { exact: true })).toBeVisible()
+    await expect(dialog.locator('code')).toHaveCount(50)
+    expect(await leaksIn(editor.page, piecesOf(sentinel), null)).toEqual([])
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+  })
+
+  test('the dialog lists at most 50 nodes and says "and N more nodes": the DOM stays small', async ({ editor }) => {
+    const nodes = Array.from({ length: 120 }, (_, i) => httpNode('n' + i, 'Node ' + i, { Cookie: 'c' + i }, 100 + (i % 12) * 220, 100 + Math.floor(i / 12) * 150))
+    await editor.importText(fileWith({ nodes }))
+    await expect(editor.nodes).toHaveCount(120)
+    await exportButton(editor).click()
+    const dialog = dialogOf(editor)
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText('and 70 more nodes', { exact: true })).toBeVisible()
+    await expect(dialog.getByText('Node 49', { exact: true })).toHaveCount(1)
+    await expect(dialog.getByText('Node 50', { exact: true })).toHaveCount(0)
+    expect(await dialog.locator('li').count()).toBeLessThan(250) // 50 nodes x (1 + 1 path) + a few, not 120 x 2 and not thousands
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+  })
+
+  test('M2: keys pressed while the dialog is open never reach the canvas; Export anyway exports the workflow that was listed', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    const downloads = countDownloads(editor.page)
+    await plantHeader(editor, sentinel) // the new node is selected
+    await expect(editor.node('http.request')).toHaveClass(/\bselected\b/)
+    await exportButton(editor).click()
+    const dialog = dialogOf(editor)
+    await expect(dialog).toBeVisible()
+
+    for (const key of ['Backspace', 'Delete', 'ArrowLeft', 'a']) await editor.page.keyboard.press(key)
+    await expect(editor.nodes).toHaveCount(1) // React Flow's document-level Delete handler never saw the keys
+    await expect(editor.node('http.request')).toHaveClass(/\bselected\b/)
+    await expect(dialog).toBeVisible()
+    expect(downloads()).toBe(0)
+
+    const [download] = await Promise.all([editor.page.waitForEvent('download'), dialog.getByRole('button', { name: 'Export anyway' }).click()])
+    const doc = JSON.parse(readFileSync(await download.path(), 'utf8')) as { nodes: { type: string; config: { headers: Record<string, string> } }[] }
+    expect(doc.nodes).toHaveLength(1)
+    expect(doc.nodes[0].config.headers.Authorization).toBe(sentinel)
+  })
+
+  test('M2: an import that finishes behind the open dialog does not change what Export anyway exports', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    await plantHeader(editor, sentinel)
+    await editor.page.getByLabel('Workflow name').fill('Listed')
+    await exportButton(editor).click()
+    const dialog = dialogOf(editor)
+    await expect(dialog).toBeVisible()
+
+    await editor.importText(fileWith({ name: 'Replaced' })) // the editor now holds a clean, different workflow
+    await expect(editor.node('trigger.manual')).toHaveCount(1)
+    await expect(editor.node('http.request')).toHaveCount(0)
+
+    const [download] = await Promise.all([editor.page.waitForEvent('download'), dialog.getByRole('button', { name: 'Export anyway' }).click()])
+    expect(download.suggestedFilename()).toBe('listed.json')
+    const doc = JSON.parse(readFileSync(await download.path(), 'utf8')) as { name: string; nodes: { type: string; config: { headers: Record<string, string> } }[] }
+    expect(doc.name).toBe('Listed')
+    expect(doc.nodes.map((n) => n.type)).toEqual(['http.request'])
+    expect(doc.nodes[0].config.headers.Authorization).toBe(sentinel)
+  })
+
+  test('the secret state is read at CLICK time: dialog, then a clean export with no dialog, then the dialog again', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    await plantHeader(editor, sentinel)
+    await exportButton(editor).click()
+    await expect(dialogOf(editor)).toBeVisible()
+    await dialogOf(editor).getByRole('button', { name: 'Cancel' }).click()
+
+    await headersField(editor).fill('{}') // the credential is removed
+    await expect(editor.toolbar.getByText(INDICATOR)).toHaveCount(0)
+    const clean = await editor.exportWorkflow() // resolves only if the file arrives with no dialog in the way
+    expect(clean.text).not.toContain(sentinel)
+    await expect(editor.page.locator('dialog')).toHaveCount(0)
+
+    await headersField(editor).fill(JSON.stringify({ Authorization: sentinel })) // pasted again
+    await expect(editor.toolbar.getByText(INDICATOR)).toBeVisible()
+    await exportButton(editor).click()
+    await expect(dialogOf(editor)).toBeVisible()
+    await dialogOf(editor).getByRole('button', { name: 'Cancel' }).click()
+  })
+
+  test('the error panels never echo the value: an export that fails after confirmation, and an import of the planted file that fails', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    const pieces = piecesOf(sentinel)
+    await plantHeader(editor, sentinel)
+    const skipId = await headersField(editor).getAttribute('id')
+
+    // 1. export fails after the confirmation (a NUL in the name)
+    const NUL = String.fromCharCode(0) // built at run time
+    await editor.page.getByLabel('Workflow name').fill('a' + NUL + 'b')
+    await exportButton(editor).click()
+    await dialogOf(editor).getByRole('button', { name: 'Export anyway' }).click()
+    const alert = editor.toolbar.getByRole('alert')
+    await expect(alert.getByText('Export failed. No file was created.', { exact: true })).toBeVisible()
+    expect(await leaksIn(editor.page, pieces, skipId)).toEqual([])
+    await alert.getByRole('button', { name: 'Dismiss' }).click()
+    await editor.page.getByLabel('Workflow name').fill('Planted')
+
+    // 2. the planted file, made invalid (an unknown node type), is imported and rejected
+    await exportButton(editor).click()
+    const [download] = await Promise.all([editor.page.waitForEvent('download'), dialogOf(editor).getByRole('button', { name: 'Export anyway' }).click()])
+    const doc = JSON.parse(readFileSync(await download.path(), 'utf8')) as { nodes: { type: string }[] }
+    expect(JSON.stringify(doc)).toContain(sentinel) // the file really holds it
+    doc.nodes[0].type = 'mystery.node'
+    await editor.importText(JSON.stringify(doc))
+    await expect(alert.getByText('node.unknown-type', { exact: true })).toBeVisible()
+    expect(await leaksIn(editor.page, pieces, skipId)).toEqual([])
+  })
+})
+
+test.describe('the import error panel and credential-shaped text', () => {
+  test('a file rejected BECAUSE of a credential-shaped key (an unknown config property) is reported without echoing the key', async ({ editor }) => {
+    const sentinel = makeSentinel()
+    const node = httpNode('h1', 'Call', {})
+    ;(node.config as Record<string, unknown>)[sentinel] = 1 // validation names the offending key in the error path
+    await editor.importText(fileWith({ nodes: [node] }))
+    const alert = editor.toolbar.getByRole('alert')
+    await expect(alert.getByText('Import failed. The current workflow was not changed.', { exact: true })).toBeVisible()
+    await expect(alert.locator('code').first()).toBeVisible() // the error code is still shown
+    expect(await leaksIn(editor.page, piecesOf(sentinel), null)).toEqual([])
+  })
+})
+
+test.describe('the dialog on a small screen', () => {
+  test('at 360 px wide the dialog is inside the viewport and both buttons are visible and usable', async ({ editor }) => {
+    await plantHeader(editor, makeSentinel())
+    await exportButton(editor).click()
+    const dialog = dialogOf(editor)
+    await expect(dialog).toBeVisible()
+    await editor.page.setViewportSize({ width: 360, height: 800 })
+
+    const box = (await dialog.boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.y).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(360)
+    expect(box.y + box.height).toBeLessThanOrEqual(800)
+    const cancel = dialog.getByRole('button', { name: 'Cancel' })
+    const confirm = dialog.getByRole('button', { name: 'Export anyway' })
+    await expect(cancel).toBeInViewport()
+    await expect(confirm).toBeInViewport()
+    const horizontal = await dialog.evaluate((d: { scrollWidth: number; clientWidth: number }) => d.scrollWidth - d.clientWidth)
+    expect(horizontal).toBeLessThanOrEqual(0) // no sideways scrolling inside the dialog
+    await cancel.click() // reachable
+    await expect(editor.page.locator('dialog')).toHaveCount(0)
   })
 })

@@ -22,15 +22,18 @@ const FOCUSABLE = 'button:not([disabled]), [tabindex]:not([tabindex="-1"])'
 export function ConfirmDialog({ report, onCancel, onConfirm }: ConfirmDialogProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
+  const closedByUs = useRef(false)
   const titleId = useId()
   const descId = useId()
-  const { nodes, metadata } = report.high
+  const { nodes, omittedNodes, metadata } = report.high
 
   useEffect(() => {
     const el = dialog.current
+    closedByUs.current = false // (a development double-mount runs the cleanup first)
     if (el && !el.open) el.showModal()
     cancel.current?.focus() // the safe choice is the default
     return () => {
+      closedByUs.current = true // our own close() below must not count as the browser closing the dialog
       if (el?.open) el.close() // the browser gives focus back to the element that had it before showModal
     }
   }, [])
@@ -41,9 +44,23 @@ export function ConfirmDialog({ report, onCancel, onConfirm }: ConfirmDialogProp
     onCancel()
   }
 
-  // Tab and Shift+Tab cycle inside the dialog (the browser would let focus leave a modal dialog for its own toolbar).
+  // A close that did not come from our own cleanup and had no cancel event first: the parent must forget the dialog, or
+  // Export would stay dead (the state would say "open" with no dialog on screen).
+  // (A development double-mount closes and re-opens it: that `close` event arrives while the dialog is open again, so the
+  // open check ignores it.)
+  const onClose = (e: { currentTarget: { open: boolean } }) => {
+    if (!closedByUs.current && !e.currentTarget.open) onCancel()
+  }
+
   const onKeyDown = (e: KeyboardEvent<HTMLDialogElement>) => {
-    if (e.key !== 'Tab') return
+    // Only Tab (cycled below) and Escape (the native cancel) are the dialog's business. Every other key is stopped HERE:
+    // React Flow listens on the document for Delete and Backspace, and a node deleted while the dialog is open would make the
+    // export differ from the list the person is reading.
+    if (e.key !== 'Tab') {
+      if (e.key !== 'Escape') e.stopPropagation()
+      return
+    }
+    // Tab and Shift+Tab cycle inside the dialog (the browser would let focus leave a modal dialog for its own toolbar).
     const items = [...e.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE)]
     if (items.length === 0) return
     const first = items[0]
@@ -65,6 +82,7 @@ export function ConfirmDialog({ report, onCancel, onConfirm }: ConfirmDialogProp
       aria-labelledby={titleId}
       aria-describedby={descId}
       onCancel={onCancelEvent}
+      onClose={onClose}
       onKeyDown={onKeyDown}
     >
       <h2 id={titleId} className={styles.title}>
@@ -91,7 +109,8 @@ export function ConfirmDialog({ report, onCancel, onConfirm }: ConfirmDialogProp
               </ul>
             </li>
           ))}
-          {metadata.paths.length > 0 && (
+          {omittedNodes > 0 && <li>and {omittedNodes} more nodes</li>}
+          {(metadata.paths.length > 0 || metadata.omitted > 0) && (
             <li>
               <strong>Workflow metadata</strong>
               <ul>

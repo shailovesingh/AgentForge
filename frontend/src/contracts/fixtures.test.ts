@@ -527,7 +527,7 @@ const MIN_COUNTS = {
   // T9a: +5 (the secret-likely and secret-suspected codes: positives, a clean case, a metadata case).
   warnings: 39,
   // T9a: the secrets family (contracts/SECRETS.md). Not part of `total` either; its own floor.
-  secrets: 83,
+  secrets: 84,
 }
 
 // Which kind a schema case is (the three shapes are told apart by `applyDefaults` / `checkSchema`).

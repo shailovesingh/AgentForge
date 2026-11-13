@@ -6,8 +6,10 @@ import type { Workflow } from './types'
 // NEVER ECHO: a finding carries a display path, never a value, never a piece or hash of a value, and a key that is
 // credential-shaped, long, or holds `=`, `:` or whitespace is replaced by REDACTED_KEY in the path. Total for JSON-shaped
 // input (own data properties; getters and proxies are out of scope).
-// BOUNDED OUTPUT: at most MAX_FINDINGS_PER_SCAN findings are kept per node (and for metadata), each path is at most
-// MAX_PATH_LENGTH characters; the rest is only counted (scanSecrets reports the omitted counts).
+// BOUNDED OUTPUT: at most MAX_FINDINGS_PER_SCAN HIGH and at most MAX_FINDINGS_PER_SCAN MEDIUM findings are kept per node (and
+// for metadata), each path is at most MAX_PATH_LENGTH characters; the rest is only counted, per confidence (scanSecrets
+// reports the omitted counts). The caps are SEPARATE so that medium findings can never hide a high one (D-023: every export
+// with a high finding must ask).
 
 export type SecretConfidence = 'high' | 'medium'
 export type SecretReason = 'header-name' | 'credential-shape' | 'key-name'
@@ -23,13 +25,19 @@ export interface SecretFinding {
   reason: SecretReason
 }
 
+/** Findings that were found but not kept, per confidence (see MAX_FINDINGS_PER_SCAN). */
+export interface OmittedCounts {
+  high: number
+  medium: number
+}
+
 /** The findings, and how many more were found but not kept (see MAX_FINDINGS_PER_SCAN). */
 export interface SecretScan {
   findings: SecretFinding[]
   omitted: {
-    /** Node id to the number of omitted config findings (only nodes with at least one). An upper bound: duplicates of a kept (path, reason) are counted. */
-    perNode: Map<string, number>
-    metadata: number
+    /** Node id to the omitted config findings (only nodes with at least one of either kind). An upper bound: duplicates of a kept (path, reason) are counted. */
+    perNode: Map<string, OmittedCounts>
+    metadata: OmittedCounts
   }
 }
 
@@ -45,7 +53,7 @@ export const MAX_KEY_LENGTH = 40
 /** Shown instead of a node name (a label or an id) that is credential-shaped. */
 export const REDACTED_NAME = '[redacted name]'
 export const MAX_NAME_LENGTH = 60
-/** At most this many findings are kept per node (and for metadata); the rest are only counted. */
+/** At most this many HIGH and this many MEDIUM findings are kept per node (and for metadata); the rest are only counted. */
 export const MAX_FINDINGS_PER_SCAN = 50
 /** A display path is at most this long: a longer one is cut after the last whole step that leaves room for `...`, which is appended. */
 export const MAX_PATH_LENGTH = 200
@@ -122,18 +130,20 @@ function displayPath(frame: Frame): string {
 /**
  * Walks one config or metadata object with an explicit stack (no recursion). Findings come out in depth-first order, keys in
  * `Object.keys` order; for one key the reasons come in the order header-name, credential-shape, key-name. Keeps at most
- * MAX_FINDINGS_PER_SCAN findings and returns how many more it found (counted without building their paths).
+ * MAX_FINDINGS_PER_SCAN findings of EACH confidence and returns how many more of each it found (counted without building
+ * their paths). The caps are separate: no number of medium findings can push a high one out.
  */
-function scan(root: Record<string, unknown>, location: 'config' | 'metadata', nodeId: string | undefined, out: SecretFinding[]): number {
+function scan(root: Record<string, unknown>, location: 'config' | 'metadata', nodeId: string | undefined, out: SecretFinding[]): OmittedCounts {
   const reported = new Set<string>() // one finding per distinct (path, reason) of this scan, over the kept findings
-  let found = 0 // findings met so far, kept or not (a duplicate of a kept one counts: two long paths can be cut to the same text)
-  let omitted = 0
+  // findings met so far per confidence, kept or not (a duplicate of a kept one counts: two long paths can be cut to the same text)
+  const found: OmittedCounts = { high: 0, medium: 0 }
+  const omitted: OmittedCounts = { high: 0, medium: 0 }
   const emit = (f: Frame, confidence: SecretConfidence, reason: SecretReason) => {
-    if (found >= MAX_FINDINGS_PER_SCAN) {
-      omitted++ // no path string, no dedup key: this is what keeps a 120,000-finding file cheap
+    if (found[confidence] >= MAX_FINDINGS_PER_SCAN) {
+      omitted[confidence]++ // no path string, no dedup key: this is what keeps a 120,000-finding file cheap
       return
     }
-    found++
+    found[confidence]++
     const path = displayPath(f)
     const id = JSON.stringify([path, reason])
     if (reported.has(id)) return
@@ -189,7 +199,7 @@ function scan(root: Record<string, unknown>, location: 'config' | 'metadata', no
   return omitted
 }
 
-/** The kept findings for ONE node's config (what lintWorkflow calls per node): at most MAX_FINDINGS_PER_SCAN. */
+/** The kept findings for ONE node's config (what lintWorkflow calls per node): at most MAX_FINDINGS_PER_SCAN high and as many medium. */
 export function detectNodeSecrets(nodeId: string, config: Record<string, unknown>): SecretFinding[] {
   const out: SecretFinding[] = []
   scan(config, 'config', nodeId, out)
@@ -197,19 +207,22 @@ export function detectNodeSecrets(nodeId: string, config: Record<string, unknown
 }
 
 /**
- * The findings in `workflow` (at most MAX_FINDINGS_PER_SCAN per node and for metadata) and the counts that were left out:
+ * The findings in `workflow` (at most MAX_FINDINGS_PER_SCAN high and as many medium per node and for metadata) and the counts that were left out:
  * nodes in array order (each node's config), then `metadata`. Not scanned: node labels, ids and types, edges, the workflow
  * id, name and description (contracts/SECRETS.md). Never throws for a JSON-shaped value; does not change its input.
  */
 export function scanSecrets(workflow: Workflow): SecretScan {
   const doc: unknown = workflow
-  const result: SecretScan = { findings: [], omitted: { perNode: new Map(), metadata: 0 } }
+  const result: SecretScan = { findings: [], omitted: { perNode: new Map(), metadata: { high: 0, medium: 0 } } }
   if (!isRecord(doc)) return result
   if (Array.isArray(doc.nodes)) {
     for (const n of doc.nodes) {
       if (!isRecord(n) || typeof n.id !== 'string' || !isRecord(n.config)) continue
       const omitted = scan(n.config, 'config', n.id, result.findings)
-      if (omitted > 0) result.omitted.perNode.set(n.id, (result.omitted.perNode.get(n.id) ?? 0) + omitted)
+      if (omitted.high + omitted.medium > 0) {
+        const before = result.omitted.perNode.get(n.id)
+        result.omitted.perNode.set(n.id, { high: (before?.high ?? 0) + omitted.high, medium: (before?.medium ?? 0) + omitted.medium })
+      }
     }
   }
   if (isRecord(doc.metadata)) result.omitted.metadata = scan(doc.metadata, 'metadata', undefined, result.findings)
