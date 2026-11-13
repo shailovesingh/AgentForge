@@ -766,3 +766,33 @@ T8 **accepted** (code at `4c696b4`; specification corrected after review). T7a *
 
 **Next Task:**
 T7b review and acceptance, then T9 (secret detection and export confirmation), then T10; MS-C after T10.
+
+### Session: 13 / 2026-11-13
+
+**Phase:**
+Phase 1.1: T7b (warning UI) reviewed, fixed and accepted; T9a (pure secret detector) committed and under Opus review
+
+**Product Owner decisions this session:** "continue" (after two agent runs were stopped by an API rate limit; both were resumed from their saved work, nothing was lost: the T7b fix round had its edits in the working tree and finished, the T9a review restarted from its saved state).
+
+**T7b: the warnings in the UI (commits in order):**
+
+| Commit | What |
+|---|---|
+| `eb166b1` | Sonnet implementer: `store/warnings.ts` (pure helpers and a per-workflow cache), `store/useWarnings.ts`, a muted node badge (`TriangleAlert` icon, accessible name "N warnings"), `app/WarningsMenu.tsx` (toolbar count and a non-modal disclosure list whose entries select the node), a "Warnings for this node" config-panel section, `e2e/warnings.e2e.ts` (12 tests). No live region, no modal, export unchanged. 1122 unit tests, 51 e2e. |
+| `5fd6687` | Sonnet implementer, review fixes (below). 1320 unit tests (includes T9a's), 56 e2e. |
+
+**Independent review (Opus 5.5, read-only) of `eb166b1`: PASS WITH FINDINGS, no blockers, one major (performance).** The reviewer ran the e2e suite three times (0 flakes), took accessibility-tree snapshots, computed contrast (muted text 5.80:1 light, 6.26:1 dark on the node background), tested 120 warnings and a narrow viewport, and ran 16 mutants (10 killed, 6 survived). Findings and triage (all fixed in `5fd6687` unless stated):
+
+| # | Finding | Disposition |
+|---|---|---|
+| Major M-1 | **Every node, the config panel and the toolbar list re-rendered on every workflow change** (each drag frame, each keystroke in the workflow name), because `useWarnings` subscribed to the whole document and every store update creates a new workflow object. The reviewer measured a 500-node drag (store `moveNode` x30 per animation frame): median 86 to 105 ms before T7b, 497 to 635 ms at `eb166b1` (under 2 frames per second); linting itself cost 0.6 to 0.9 ms, the cost was React rendering | **Fixed**: one previous result kept at module level, so a structurally equal warning list returns the SAME view object and the same per-node arrays; per-node subscriptions (`useNodeWarnings`) so a drag or a name edit re-renders no node whose warnings did not change; list entries rendered only while the list is open; unit tests pin identity (`Object.is`); a source guard that components never import `lintWorkflow`. **Implementer's measurement (reported; not repeated by Claude; noisy Windows dev-server run): 500 nodes, median about 270 ms before T7b, about 440 ms at `eb166b1` (1.6x), about 270 ms after the fix (1.0x)** |
+| Minors | six mutation survivors (an entry always selecting the first warning's node; the config section showing the first node's warnings; the list not closing at count 0; warnings leaked into the export under a key; one lint per component; badge number off by one); e2e tests pinned the exact message wording although WARNINGS.md allows rewording; focus lost when the focused entry disappears, `key={i}`, Delete or Backspace inside the list deleting the selected node; long labels | **Fixed**: non-first-entry, collapse-after-zero, `metadata` equals `{}` and exact key-set tests; wording-independent matching (labels plus exact counts); stable keys, focus moves to the toggle when the focused entry disappears, Delete and Backspace stopped inside the list; wrapping and a shortened badge `title`. *Accepted, not changed:* no click-outside-to-close (Escape and the toggle close it); the aliased-role source-guard bypass (the e2e catches it at runtime); no arrow-key navigation |
+| UX judgement | A fresh LLM Prompt shows "2 warnings" (empty prompt plus an unconnected output) and an unconnected trigger, LLM and output chain shows 5 | **Accepted**: matches the plan ("new nodes warn immediately, visually subdued"); the badge is a muted grey pill, not red |
+
+**Verification by the Principal Architect (commands actually run, `frontend/`):** at `5fd6687` `npm run verify` **exit 0, 20 test files, 1320 unit tests, 56 e2e passed**; `git show --stat` (9 files, +381/-95, none outside the T7b scope); no stray debug file in `frontend/e2e`. The reviewer's mutation, contrast and drag measurements and the implementer's before/after drag numbers are reports, not repeated by Claude. **Process notes:** the T7b implementer disclosed one shell here-doc (a temporary debug spec, deleted at once, never staged), against the project's tool rules; every other edit used Write and Edit. One review run hit port 5174 contention with another implementer's e2e run (the e2e server does not reuse an existing server by design); runs were repeated. The fix commit has only the Principal Architect's verification, no second Opus pass.
+
+**Status:**
+T7 (T7a and T7b) **accepted**. T9a (pure secret detector, `secret-likely` and `secret-suspected` lint codes, `secrets` fixtures with run-time token placeholders, `contracts/SECRETS.md`; `33740c3`; 1313 unit tests, 51 e2e) is committed and under Opus review. Lesson L11 (T7b) with the tutor.
+
+**Next Task:**
+T9a review and acceptance, then T9b (the export confirmation dialog, node and toolbar indicators, never-echo browser tests), then T10; MS-C after T10.
