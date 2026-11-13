@@ -287,6 +287,11 @@ describe('source-text guards for the secret UI', () => {
     expect(/onClose=\{onClose\}/.test(dialog)).toBe(true)
   })
 
+  test('the node view is memoised on the workflow node and the selection (large graphs: a drag frame must not render every node)', () => {
+    const source = text('/src/nodes/WorkflowNode.tsx')
+    expect(/export const WorkflowNodeView = memo\(WorkflowNodeViewImpl, \(a, b\) => a\.data\.node === b\.data\.node && a\.selected === b\.selected\)/.test(source)).toBe(true)
+  })
+
   test('the secret indicator is a status text, not an alert or a live region', () => {
     for (const file of ['/src/app/ConfirmDialog.tsx', '/src/nodes/WorkflowNode.tsx']) {
       expect(/aria-live|role\s*=\s*["']?(alert|status)/.test(text(file)), file).toBe(false)

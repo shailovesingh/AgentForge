@@ -4,6 +4,7 @@ import { parseConfigInput } from './configSchema'
 import { ERROR_CODES } from './errors'
 import type { JsonSchema } from './jsonSchema'
 import { MIGRATIONS, migrate } from './migrate'
+import { echoSafePointer, isCredentialShaped } from './secrets'
 import { INTERNAL_PARSER_ERROR } from './strictJson'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importWorkflow, serializeWorkflow } from './serialize'
 import configSchemaSource from './configSchema.ts?raw'
@@ -556,6 +557,108 @@ describe('untrusted text in error messages is never echoed when it holds a crede
     )
     expect(errorsOf(withEdit((w) => (w.nodes = [node('a', 'mystery.node')])))[0].message).toBe('nodes[0] ("a"): unknown node type mystery.node@1.')
     expect(errorsOf(withEdit((w) => (w.schemaVersion = '9.9')))[0].message).toBe('Unsupported schemaVersion "9.9"; this editor supports 1.0.')
+  })
+})
+
+describe('every message site checks the RAW text: whitespace after Bearer (final review B2)', () => {
+  // The detector is the oracle: whatever isCredentialShaped says about the raw text, the displayed text must hide. A tab, line
+  // feed, carriage return, form feed or vertical tab is escaped by JSON.stringify into two characters that the Bearer shape
+  // no longer sees, so a check that runs after any escaping or cutting misses it. U+0085 is not \s: the detector does not
+  // call it credential-shaped, so nothing is asserted for it. Built at run time: no token-shaped literal in a source file.
+  const PART = 'QwErTyUiOpAsDfGhJkLzXcVb'
+  const GAPS: number[] = [9, 10, 13, 12, 11, 0x85, 0xa0, 0x2028, 0x2029, 0xfeff, 32]
+  const raws = GAPS.map((code) => 'Bea' + 'rer' + String.fromCharCode(code) + PART).filter((raw) => isCredentialShaped(raw))
+  const windows = (s: string): string[] => Array.from({ length: s.length - 7 }, (_, i) => s.slice(i, i + 8))
+  const leaked = (text: string): boolean => windows(PART).some((w) => text.includes(w))
+  const messages = (errors: { message: string }[]): string => errors.map((e) => e.message).join('\n')
+
+  test('the oracle is not vacuous: ten of the eleven separators make a credential-shaped text', () => {
+    expect(raws).toHaveLength(10)
+  })
+
+  test('schemaVersion as a string, in an object, in an array, in nested containers, and as a key', () => {
+    for (const raw of raws) {
+      for (const version of [raw, { a: raw }, [raw], [{ deep: [raw] }], { [raw]: 1 }]) {
+        const errors = errorsOf(withEdit((w) => ((w as unknown as Record<string, unknown>).schemaVersion = version)))
+        expect(errors[0].code).toBe('doc.unsupported-version')
+        expect(errors[0].message, JSON.stringify(version).length + ' chars of JSON').toBe('Unsupported schemaVersion (hidden: may contain a credential); this editor supports 1.0.')
+        expect(leaked(messages(errors))).toBe(false)
+      }
+    }
+  })
+
+  test('node ids (duplicate), edge ids (duplicate and in a connection error), types, and a newer version of a known type', () => {
+    for (const raw of raws) {
+      const twice = errorsOf(withEdit((w) => (w.nodes = [node(raw, 'trigger.manual', { payload: {} }), node(raw, 'output.result', { format: 'text' })])))
+      expect(twice[0].code).toBe('node.duplicate-id')
+      expect(leaked(messages(twice))).toBe(false)
+
+      const type = errorsOf(withEdit((w) => (w.nodes = [node('a', raw)])))
+      expect(type[0].code).toBe('node.unknown-type')
+      expect(leaked(messages(type))).toBe(false)
+
+      const newer = errorsOf(withEdit((w) => (w.nodes = [{ ...node(raw, 'llm.prompt', { provider: 'ollama', prompt: 'p' }), typeVersion: 99 }])))
+      expect(newer[0].code).toBe('node.version-newer')
+      expect(leaked(messages(newer))).toBe(false)
+
+      const edgeTwice = errorsOf(
+        withEdit((w) => {
+          w.edges = [
+            { id: raw, source: { nodeId: 't', port: 'data' }, target: { nodeId: 'l', port: 'input' } },
+            { id: raw, source: { nodeId: 'l', port: 'text' }, target: { nodeId: 'o', port: 'input' } },
+          ]
+        }),
+      )
+      expect(edgeTwice[0].code).toBe('edge.duplicate-id')
+      expect(leaked(messages(edgeTwice))).toBe(false)
+
+      const unknownNode = errorsOf(withEdit((w) => (w.edges = [{ id: raw, source: { nodeId: 'nope', port: 'data' }, target: { nodeId: 'l', port: 'input' } }])))
+      expect(unknownNode[0].code.startsWith('connection.')).toBe(true)
+      expect(leaked(messages(unknownNode))).toBe(false)
+    }
+  })
+
+  test('a typeVersion that is a string is a fixed malformed-node message; nothing of it is echoed', () => {
+    for (const raw of raws) {
+      const errors = errorsOf(withEdit((w) => (w.nodes = [{ ...node('a', 'trigger.manual'), typeVersion: raw as unknown as number }])))
+      expect(errors[0].code).toBe('node.malformed')
+      expect(leaked(messages(errors))).toBe(false)
+    }
+  })
+
+  test('an unknown config key: the message AND the displayed path hide it; the structured path stays exact', () => {
+    for (const raw of raws) {
+      const errors = errorsOf(withEdit((w) => (w.nodes = [node('h', 'http.request', { method: 'GET', url: 'u', headers: {}, body: '', [raw]: 1 })])))
+      const e = errors.find((x) => x.code === 'schema.additionalProperties')!
+      expect(e.message).toBe('nodes[0] ("h"): config "(hidden: may contain a credential)" is not a known setting.')
+      expect(leaked(e.message)).toBe(false)
+      expect(e.path.includes(PART), 'the path is exact (a contract value)').toBe(true)
+      expect(leaked(echoSafePointer(e.path, 200))).toBe(false) // what the panel shows
+    }
+  })
+
+  test('a duplicate key: JSON escapes inside the key are DECODED before the check', () => {
+    for (const raw of raws) {
+      const key = JSON.stringify(raw) // the file text holds the escaped form (a tab is backslash, t)
+      const text = `{"metadata":{${key}:1,${key}:2}}`
+      const errors = errorsOf(text)
+      expect(errors[0].code).toBe('doc.duplicate-key')
+      expect(errors[0].message).toBe('Duplicate object key (hidden: may contain a credential).')
+      expect(leaked(messages(errors))).toBe(false)
+      expect(leaked(echoSafePointer(errors[0].path, 200))).toBe(false)
+
+      const field = parseConfigInput(nodeDefinitions.find((d) => d.type === 'trigger.manual')!.configSchema.properties!.payload, `{${key}:1,${key}:2}`)
+      expect(field.ok).toBe(false)
+      if (!field.ok) expect(leaked(field.error)).toBe(false)
+    }
+  })
+
+  test('a short key with = or whitespace is hidden in the duplicate-key message too, like in the path next to it', () => {
+    for (const key of ['pw=hunter2', 'a b', 'x:y']) {
+      const e = errorsOf(`{"metadata":{${JSON.stringify(key)}:1,${JSON.stringify(key)}:2}}`)[0]
+      expect(e.message, key).toBe('Duplicate object key (hidden: may contain a credential).')
+      expect(echoSafePointer(e.path, 200), key).toBe('(hidden: may contain a credential)')
+    }
   })
 })
 

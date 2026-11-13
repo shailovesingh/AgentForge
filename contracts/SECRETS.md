@@ -260,9 +260,18 @@ check the same. **Echoed text (T9b second review).** An error message or path of
 key, an id, a type or a version of the file. The shared helpers `echoSafe(text, max, kind)` and `echoSafePointer(pointer, max)`
 in `secrets.ts` run their test on the **FULL text before any cutting** (a cut can leave a prefix of a token that is no longer
 credential-shaped) and return the fixed marker `(hidden: may contain a credential)` when the full text is credential-shaped;
-for a KEY also when it is longer than 40 UTF-16 code units or longer than 12 characters with `=`, `:` or whitespace; for a JSON
-Pointer when any of its keys is one that display paths redact (credential-shaped, longer than 40, or any `=`, `:` or
-whitespace). Otherwise the text is cut as before. `strictJson`, `validate`, `nodeMigrations` and `migrate` route every
+for a KEY also when `isRedactedKey` hides it (longer than 40 UTF-16 code units, or any `=`, `:` or whitespace at ANY length:
+ONE rule for messages and display paths); for a JSON Pointer when the whole pointer is credential-shaped or any of its keys is
+one that `isRedactedKey` hides. Otherwise the text is cut as before. **The general rule (final review): a credential check
+runs on the RAW text, never on escaped or otherwise transformed text.** `JSON.stringify` turns a tab or a line break into two
+characters, and the Bearer shape needs real whitespace, so a check after the escaping misses `Bearer`, a tab and a token.
+Therefore the check runs on the decoded string (a duplicate key is checked as the parser decoded it), on the raw id, type or
+key, and, for a value of any JSON kind (a `schemaVersion` that is a string, an object, an array or has a credential as a key),
+`echoValue` / `holdsCredential` look at EVERY string and key inside it (iteratively, at most 10,000 values: a bigger value
+cannot be checked and is hidden) BEFORE it is written as JSON text. The error panel's own display functions are only a last
+line of defence for text that was already escaped upstream. A unit test uses the detector as the oracle for the whitespace
+characters tab, line feed, carriage return, form feed, vertical tab, U+00A0, U+2028, U+2029, U+FEFF and space (U+0085 is not
+whitespace for the detector, so it is not asserted) at every message site. `strictJson`, `validate`, `nodeMigrations` and `migrate` route every
 untrusted fragment of a message through them (duplicate keys, node and edge ids, types, versions, config setting names); the
 import error panel shows messages and paths through them again. **Error codes and the structured `path` stay exact**; only the
 DISPLAYED text is replaced. Unit tests check every prefix length 0 to 120 and several separators for "no 8 consecutive

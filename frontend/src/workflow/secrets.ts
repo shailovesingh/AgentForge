@@ -81,7 +81,8 @@ const ODD_KEY = /[=:\s]/ // a secret typed INTO a key (`token: abc`, `password=x
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const MIN_SHAPE_LENGTH = 15 // the shortest shape is xox?- plus 10 characters; a shorter text cannot match, so skip the nine regexes
-const isCredentialShaped = (text: string): boolean => text.length >= MIN_SHAPE_LENGTH && CREDENTIAL_SHAPES.some(({ pattern }) => pattern.test(text))
+/** True when `text` contains any credential shape (the detector's own test; `text` must be the raw text, never escaped text). */
+export const isCredentialShaped = (text: string): boolean => text.length >= MIN_SHAPE_LENGTH && CREDENTIAL_SHAPES.some(({ pattern }) => pattern.test(text))
 
 /**
  * A node label or id made safe to show next to a secret warning: `[redacted name]` when it is credential-shaped (any shape,
@@ -102,14 +103,52 @@ export function safeDisplayName(text: string): string {
 // imported file could repeat a pasted credential. The test runs on the FULL text BEFORE any cutting: a cut can leave a PREFIX
 // of a token (not itself credential-shaped) that was straddling the cut. Error codes and the structured `path` of an error
 // stay exact; only the DISPLAYED text is replaced.
+// GENERAL RULE (final review): the credential check runs on the RAW text, never on text that was transformed first. JSON.stringify
+// turns a tab into the two characters backslash and t, and the Bearer shape needs REAL whitespace, so a check after the
+// escaping misses it. Decode, then check, then escape and cut. The helpers below take raw strings (or, for echoValue, raw values).
 // ---------------------------------------------------------------------------
 
 /** Shown instead of an echoed piece of untrusted text (a key, an id, a type, a version, a path) that may hold a credential. */
 export const HIDDEN_ECHO = '(hidden: may contain a credential)'
-const ECHO_ODD_MIN_LENGTH = 12 // a short key with a space or `=` is harmless; a long one may be a secret typed INTO the key
 
-/** The display-path rule for ONE key: credential-shaped, longer than MAX_KEY_LENGTH, or holding `=`, `:` or whitespace. */
+/** The display-path rule for ONE key: credential-shaped, longer than MAX_KEY_LENGTH, or holding `=`, `:` or whitespace (any length). */
 export const isRedactedKey = (key: string): boolean => isCredentialShaped(key) || key.length > MAX_KEY_LENGTH || ODD_KEY.test(key)
+
+/** The most values `holdsCredential` looks at; a larger value cannot be checked in bounded time and counts as holding one. */
+const MAX_CHECKED_VALUES = 10_000
+
+/**
+ * True when `value` is a credential-shaped string, or is an array or object that holds one anywhere (every string, and every
+ * key that isRedactedKey hides), or is too big to be checked within MAX_CHECKED_VALUES values. Iterative; looks at the RAW values.
+ */
+export function holdsCredential(value: unknown): boolean {
+  const stack: unknown[] = [value]
+  let visited = 0
+  while (stack.length > 0) {
+    const v = stack.pop()
+    if (++visited > MAX_CHECKED_VALUES) return true
+    if (typeof v === 'string') {
+      if (isCredentialShaped(v)) return true
+    } else if (Array.isArray(v)) {
+      for (const item of v) stack.push(item)
+    } else if (typeof v === 'object' && v !== null) {
+      for (const key of Object.keys(v)) {
+        if (isRedactedKey(key)) return true
+        stack.push((v as Record<string, unknown>)[key])
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * Any JSON value (a schemaVersion, say) as it may be shown: HIDDEN_ECHO when holdsCredential says so, checked on the RAW value
+ * BEFORE it is written as JSON text; otherwise its JSON text cut to `max` characters.
+ */
+export function echoValue(value: unknown, max: number): string {
+  if (holdsCredential(value)) return HIDDEN_ECHO
+  return echoSafe(String(JSON.stringify(value)), max)
+}
 
 /** Cuts to `max` characters plus `...` (never half of a surrogate pair). */
 function cutText(text: string, max: number): string {
@@ -119,13 +158,12 @@ function cutText(text: string, max: number): string {
 }
 
 /**
- * `text` as it may be shown in a message: HIDDEN_ECHO when the FULL text is credential-shaped; for a KEY (`kind` 'key') also
- * when it is longer than MAX_KEY_LENGTH, or longer than 12 characters with `=`, `:` or whitespace in it; otherwise the text
- * cut to `max` characters. The checks never see a cut text.
+ * `text` (RAW, not escaped) as it may be shown in a message: HIDDEN_ECHO when the FULL text is credential-shaped; for a KEY
+ * (`kind` 'key') also when isRedactedKey hides it (the same rule as display paths: longer than MAX_KEY_LENGTH, or any `=`, `:`
+ * or whitespace); otherwise the text cut to `max` characters. The checks never see a cut or escaped text.
  */
 export function echoSafe(text: string, max: number, kind: 'key' | 'text' = 'text'): string {
-  if (isCredentialShaped(text)) return HIDDEN_ECHO
-  if (kind === 'key' && (text.length > MAX_KEY_LENGTH || (text.length > ECHO_ODD_MIN_LENGTH && ODD_KEY.test(text)))) return HIDDEN_ECHO
+  if (kind === 'key' ? isRedactedKey(text) : isCredentialShaped(text)) return HIDDEN_ECHO
   return cutText(text, max)
 }
 

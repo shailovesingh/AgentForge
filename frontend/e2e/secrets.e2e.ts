@@ -689,6 +689,22 @@ test.describe('a duplicate key that straddles the cut is never echoed (T9b secon
   })
 })
 
+test.describe('the import error panel checks the RAW text (final review B2)', () => {
+  test('a schemaVersion with a TAB after Bearer (JSON escapes the tab, which hid it from the check): the panel never shows the token', async ({ editor }) => {
+    const part = randomBytes(12).toString('hex') // 24 token characters
+    const windows = Array.from({ length: part.length - 7 }, (_, i) => part.slice(i, i + 8))
+    const tab = String.fromCharCode(9)
+    const raw = 'Bea' + 'rer' + tab + part
+    for (const version of [raw, { a: raw }, [raw], { [raw]: 1 }]) {
+      await editor.importText(JSON.stringify({ schemaVersion: version, id: 'wf', name: 'n', description: '', nodes: [], edges: [], metadata: {} }))
+      const alert = editor.toolbar.getByRole('alert')
+      await expect(alert.getByText('doc.unsupported-version', { exact: true })).toBeVisible()
+      await expect(alert).toContainText('(hidden: may contain a credential)')
+      expect(await leaksIn(editor.page, windows, null), JSON.stringify(version).length + ' characters of JSON').toEqual([])
+    }
+  })
+})
+
 test.describe('the import error panel and credential-shaped text', () => {
   test('a secret typed INTO a key (a short key with = or whitespace, not credential-shaped) is not echoed in the path or the message', async ({ editor }) => {
     for (const key of ['password=hunter2', 'my password hunter2', 'token: hunter2']) {

@@ -17,7 +17,7 @@ import type { PolicyCode } from './valuePolicy'
 /** The `doc.not-json` message for an unexpected exception inside the parser (never for bad text). */
 export const INTERNAL_PARSER_ERROR = 'Not valid JSON: internal parser error (please report this)'
 
-export type StrictParseResult ={ ok: true; value: unknown } | { ok: false; error: ValidationError }
+export type StrictParseResult = { ok: true; value: unknown } | { ok: false; error: ValidationError }
 
 // 2^53. Written as text because the whole point is to compare number TOKENS as text.
 const TWO_POW_53 = '9007199254740992'

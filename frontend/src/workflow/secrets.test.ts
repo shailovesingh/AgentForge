@@ -16,6 +16,9 @@ import {
   detectSecrets,
   echoSafe,
   echoSafePointer,
+  echoValue,
+  holdsCredential,
+  isCredentialShaped,
   isRedactedKey,
   safeDisplayName,
   scanSecrets,
@@ -501,15 +504,70 @@ describe('echoSafe, echoSafePointer and isRedactedKey (T9b second review: the ch
     expect(echoSafe(`call ${TOKEN} now`, 100)).toBe(HIDDEN_ECHO)
   })
 
-  test('kind key: also hidden when longer than 40 units, or longer than 12 characters with =, : or whitespace', () => {
+  test('kind key: ONE rule with display paths (isRedactedKey): hidden when longer than 40 units, or with =, : or whitespace at ANY length', () => {
     expect(echoSafe('Content-Type', 100, 'key')).toBe('Content-Type')
     expect(echoSafe('k'.repeat(40), 100, 'key')).toBe('k'.repeat(40))
     expect(echoSafe('k'.repeat(41), 100, 'key')).toBe(HIDDEN_ECHO)
-    expect(echoSafe('a b', 100, 'key')).toBe('a b') // short and harmless
+    for (const key of ['a b', 'pw=hunter2', 'a:b', 'password = hunter2', 'token:' + 'x'.repeat(10), 'a'.repeat(6) + ' ' + 'b'.repeat(6)]) {
+      expect(echoSafe(key, 100, 'key'), key).toBe(HIDDEN_ECHO)
+      expect(echoSafePointer('/' + key, 100), `the path next to the message: ${key}`).toBe(HIDDEN_ECHO) // the message and the path agree
+      expect(isRedactedKey(key), key).toBe(true)
+    }
     expect(echoSafe('x'.repeat(12), 100, 'key')).toBe('x'.repeat(12))
-    expect(echoSafe('password = hunter2', 100, 'key')).toBe(HIDDEN_ECHO)
-    expect(echoSafe('token:' + 'x'.repeat(10), 100, 'key')).toBe(HIDDEN_ECHO)
-    expect(echoSafe('a'.repeat(6) + ' ' + 'b'.repeat(6), 100, 'key')).toBe(HIDDEN_ECHO) // 13 characters with a space
+  })
+
+  describe('the check runs on the RAW value, never on JSON-escaped text (final review B2)', () => {
+    const PART = 'QwErTyUiOpAsDfGhJkLzXcVb' // 24 token characters; its 8-character windows occur nowhere else
+    // Every character a person could put after "Bearer": JavaScript's \s treats most of them as whitespace, U+0085 is not one.
+    const GAPS: [string, string][] = [
+      ['tab', String.fromCharCode(9)], ['line feed', String.fromCharCode(10)], ['carriage return', String.fromCharCode(13)],
+      ['form feed', String.fromCharCode(12)], ['vertical tab', String.fromCharCode(11)],
+      ['U+0085', String.fromCharCode(0x85)], ['U+00A0', String.fromCharCode(0xa0)], ['U+2028', String.fromCharCode(0x2028)],
+      ['U+2029', String.fromCharCode(0x2029)], ['U+FEFF', String.fromCharCode(0xfeff)], ['space', ' '],
+    ]
+    const bearer = (gap: string): string => 'Bea' + 'rer' + gap + PART
+    const leaked = (text: string): boolean => windows(PART).some((w) => text.includes(w))
+
+    test('the detector is the oracle: whatever it calls credential-shaped is hidden by every helper, whole or inside a value', () => {
+      let shaped = 0
+      for (const [name, gap] of GAPS) {
+        const raw = bearer(gap)
+        if (!isCredentialShaped(raw)) continue // U+0085 is not \s: not a credential for the detector, so not hidden
+        shaped++
+        for (const value of [raw, { a: raw }, [raw], [[{ deep: raw }]], { [raw]: 1 }, { k: { [raw]: 'v' } }]) {
+          expect(holdsCredential(value), `${name}: ${JSON.stringify(value).length} characters of JSON`).toBe(true)
+          const shown = echoValue(value, 100)
+          expect(shown, name).toBe(HIDDEN_ECHO)
+          expect(leaked(shown), name).toBe(false)
+        }
+        expect(echoSafe(raw, 100)).toBe(HIDDEN_ECHO)
+        expect(echoSafe(raw, 100, 'key')).toBe(HIDDEN_ECHO)
+        expect(echoSafePointer('/' + raw.replace(/~/g, '~0').replace(/\//g, '~1'), 100), name).toBe(HIDDEN_ECHO)
+      }
+      expect(shaped, 'all but U+0085 are credential-shaped').toBe(GAPS.length - 1)
+    })
+
+    test('the bug itself: after JSON.stringify a tab, line feed, carriage return, form feed or vertical tab is no longer whitespace, so the detector misses the escaped text', () => {
+      for (const code of [9, 10, 13, 12, 11]) {
+        const raw = bearer(String.fromCharCode(code))
+        expect(isCredentialShaped(raw), `raw, code ${code}`).toBe(true)
+        expect(isCredentialShaped(JSON.stringify(raw)), `escaped, code ${code}`).toBe(false) // why the check must see the raw text
+        expect(echoValue(raw, 100), `code ${code}`).toBe(HIDDEN_ECHO)
+      }
+    })
+
+    test('a value of another kind is shown as JSON text, cut; a huge value is hidden, not walked forever', () => {
+      expect(echoValue('9.9', 100)).toBe('"9.9"')
+      expect(echoValue(undefined, 100)).toBe('undefined')
+      expect(echoValue(null, 100)).toBe('null')
+      expect(echoValue({ a: [1, 2, 'three'] }, 100)).toBe('{"a":[1,2,"three"]}')
+      expect(echoValue('L'.repeat(150), 100)).toBe('"' + 'L'.repeat(99) + '...')
+      expect(holdsCredential(Array.from({ length: 10_001 }, () => 1))).toBe(true) // over the bound: unverifiable, so hidden
+      expect(holdsCredential(Array.from({ length: 9_000 }, () => 1))).toBe(false)
+      let deep: unknown = 'x'
+      for (let i = 0; i < 100_000; i++) deep = [deep]
+      expect(holdsCredential(deep)).toBe(true) // 100,000 levels (built without recursion): hidden, and no stack overflow
+    })
   })
 
   test('isRedactedKey is the display-path rule: credential-shaped, longer than 40, or any = : or whitespace', () => {

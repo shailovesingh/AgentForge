@@ -1,6 +1,7 @@
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
 import { ShieldAlert, TriangleAlert } from 'lucide-react'
+import { memo } from 'react'
 import { shorten } from '../app/shorten'
 import { getNodeDefinition } from '../catalog'
 import type { FlowNode } from '../canvas/flowMapping'
@@ -17,8 +18,14 @@ const MAX_TITLE = 200
 // so none of them can quote a label that is itself a pasted token.
 const titleOf = (warnings: readonly Warning[]): string => warnings.map((w) => shorten(w.message, MAX_TITLE)).join('\n')
 
-/** The single node component for every catalog type. Ports and icon come from the catalog. */
-export function WorkflowNodeView({ data, selected }: NodeProps<FlowNode>) {
+/**
+ * The single node component for every catalog type. Ports and icon come from the catalog. Memoised on what it reads (the workflow
+ * node object and the selection): the canvas hands React Flow new `data` objects on every store update, so without this every
+ * node of a large graph would render again on every drag frame and keystroke. Its warnings come from its own subscription.
+ */
+export const WorkflowNodeView = memo(WorkflowNodeViewImpl, (a, b) => a.data.node === b.data.node && a.selected === b.selected)
+
+function WorkflowNodeViewImpl({ data, selected }: NodeProps<FlowNode>) {
   const { node } = data
   const def = getNodeDefinition(node.type, node.typeVersion)
   const warnings = useNodeWarnings(node.id) // only this node's warnings: a drag of another node does not re-render this one

@@ -1,6 +1,6 @@
 import { jsonPointer } from './errors'
 import type { ValidationError } from './errors'
-import { echoSafe } from './secrets'
+import { echoValue } from './secrets'
 import { SCHEMA_VERSION } from './types'
 
 // Each step upgrades a document from the version it is keyed by to the next version.
@@ -34,8 +34,9 @@ export function migrate(input: unknown, migrations: Record<string, Migration> = 
           {
             code: 'doc.unsupported-version',
             path: jsonPointer('schemaVersion'),
-            // the version is untrusted (any JSON value): the credential test runs on the full text, then it is cut
-            message: `Unsupported schemaVersion ${echoSafe(String(JSON.stringify(version)), 100)}; this editor supports ${SCHEMA_VERSION}.`,
+            // the version is untrusted (any JSON value): the credential test runs on the RAW value (a string, or every string
+            // and key inside an array or object), BEFORE it is written as JSON text (which would escape a tab) and cut
+            message: `Unsupported schemaVersion ${echoValue(version, 100)}; this editor supports ${SCHEMA_VERSION}.`,
           },
         ],
       }
