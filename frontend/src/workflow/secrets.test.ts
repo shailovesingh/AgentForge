@@ -1,7 +1,21 @@
 import { describe, expect, test } from 'vitest'
 import { nodeDefinitions } from '../catalog'
 import { lintWorkflow } from './lint'
-import { CREDENTIAL_SHAPES, HEADER_NAMES, KEY_WORDS, MAX_KEY_LENGTH, REDACTED_KEY, detectNodeSecrets, detectSecrets } from './secrets'
+import {
+  CREDENTIAL_SHAPES,
+  HEADER_NAMES,
+  KEY_WORDS,
+  MAX_FINDINGS_PER_SCAN,
+  MAX_KEY_LENGTH,
+  MAX_NAME_LENGTH,
+  MAX_PATH_LENGTH,
+  REDACTED_KEY,
+  REDACTED_NAME,
+  detectNodeSecrets,
+  detectSecrets,
+  safeDisplayName,
+  scanSecrets,
+} from './secrets'
 import type { SecretConfidence, SecretFinding, SecretReason } from './secrets'
 import type { Workflow } from './types'
 
@@ -11,6 +25,7 @@ const T = {
   sk: (n: number) => 'sk' + '-' + 'x'.repeat(n),
   gsk: (n: number) => 'gs' + 'k_' + 'x'.repeat(n),
   ghp: (n: number) => 'gh' + 'p_' + 'A'.repeat(n),
+  gh: (letter: string, n: number) => 'gh' + letter + '_' + 'A'.repeat(n),
   pat: (n: number) => 'github' + '_pat_' + 'A'.repeat(n),
   akia: (n: number) => 'AK' + 'IA' + 'Q'.repeat(n),
   xox: (letter: string, n: number) => 'xo' + 'x' + letter + '-' + '1'.repeat(n),
@@ -43,10 +58,14 @@ const SHAPE_CASES: { shape: string; yes: string[]; no: string[] }[] = [
   {
     shape: 'sk',
     yes: [T.sk(20), T.sk(40), 'sk' + '-ant-' + 'api03-' + 'x'.repeat(30), 'sk' + '-' + 'a_b-' + 'c'.repeat(18)],
-    no: [T.sk(19), 'task' + '-' + 'x'.repeat(24), 'risk-assessment-of-something-long', 'sk' + ' ' + 'x'.repeat(24), 'sk' + '-' + 'x'.repeat(10) + ' ' + 'x'.repeat(10)],
+    no: [T.sk(19), 'task' + '-' + 'x'.repeat(24), 'ri' + 'sk-' + 'assessment-of-something-long', 'sk' + ' ' + 'x'.repeat(24), 'sk' + '-' + 'x'.repeat(10) + ' ' + 'x'.repeat(10)],
   },
   { shape: 'gsk', yes: [T.gsk(20), T.gsk(30)], no: [T.gsk(19), 'gs' + 'k_' + 'x'.repeat(10) + '-' + 'x'.repeat(10)] },
-  { shape: 'ghp', yes: [T.ghp(36), T.ghp(40)], no: [T.ghp(35), 'gh' + 'p_' + 'A'.repeat(18) + '_' + 'A'.repeat(18)] },
+  {
+    shape: 'gh',
+    yes: [T.ghp(36), T.ghp(40), ...['o', 'u', 's', 'r'].map((l) => T.gh(l, 36))],
+    no: [T.ghp(35), T.gh('o', 35), T.gh('x', 36), 'gh' + 'p_' + 'A'.repeat(18) + '_' + 'A'.repeat(18)],
+  },
   { shape: 'github_pat', yes: [T.pat(22), 'github' + '_pat_' + 'A_b'.repeat(10)], no: [T.pat(21)] },
   { shape: 'akia', yes: [T.akia(16), T.akia(20)], no: [T.akia(15), 'AK' + 'IA' + 'q'.repeat(16)] },
   { shape: 'xox', yes: ['b', 'a', 'p', 'r', 's'].map((l) => T.xox(l, 10)), no: [T.xox('z', 10), T.xox('b', 9)] },
@@ -58,7 +77,13 @@ const SHAPE_CASES: { shape: string; yes: string[]; no: string[] }[] = [
   {
     shape: 'pem',
     yes: [T.pem(), T.pem('RSA '), T.pem('OPENSSH '), T.pem('ENCRYPTED '), 'x ' + T.pem('EC ') + ' y'],
-    no: ['-----' + 'BEGIN ' + 'PUBLIC KEY' + '-----', '-----' + 'BEGIN ' + 'CERTIFICATE' + '-----', 'PRIVATE KEY'],
+    no: [
+      '-----' + 'BEGIN ' + 'PUBLIC KEY' + '-----',
+      '-----' + 'BEGIN ' + 'CERTIFICATE' + '-----',
+      'PRIVATE KEY',
+      '-----' + 'BEGIN ' + 'rsa ' + 'PRIVATE KEY' + '-----', // lowercase in the gap: not a match
+      '-----' + 'BEGIN ' + 'PRIVATE KEY', // without the trailing dashes: not a match
+    ],
   },
   {
     shape: 'bearer',
@@ -70,6 +95,12 @@ const SHAPE_CASES: { shape: string; yes: string[]; no: string[] }[] = [
 describe('credential shapes', () => {
   test('the cases cover every shape exactly once', () => {
     expect(SHAPE_CASES.map((c) => c.shape).sort()).toEqual(CREDENTIAL_SHAPES.map((s) => s.name).sort())
+  })
+
+  test('no shape can match a text shorter than 15 characters (the detector skips the regexes for shorter text)', () => {
+    const shortest = Math.min(...SHAPE_CASES.flatMap((c) => c.yes.map((text) => text.length)))
+    expect(shortest).toBe(15) // xox?- plus 10: exactly at the limit, so the skip is tight and still finds it
+    expect(shaped(T.xox('b', 10))).toBe(true)
   })
 
   for (const c of SHAPE_CASES) {
@@ -90,11 +121,39 @@ describe('credential shapes', () => {
 
   test('found anywhere inside a longer string, with a boundary on the left', () => {
     const tok = T.sk(24)
-    for (const text of [`prefix ${tok} suffix`, `${tok} first`, `last ${tok}`, `key=${tok}`, `"${tok}"`, `line one\n${tok}\nline three`, `${'lorem ipsum '.repeat(2000)}${tok}${' dolor'.repeat(2000)}`]) {
-      expect(shaped(text), text.slice(0, 20)).toBe(true)
-    }
-    // glued to a letter, digit, hyphen or underscore on the left: not the start of a token
+    const texts = [`prefix ${tok} suffix`, `${tok} first`, `last ${tok}`, `key=${tok}`, `"${tok}"`, `line one\n${tok}\nline three`, `${'lorem ipsum '.repeat(2000)}${tok}${' dolor'.repeat(2000)}`]
+    texts.forEach((text, i) => expect(shaped(text), `text ${i}`).toBe(true))
+    // glued to a letter, digit, hyphen or underscore on the left: not the start of a token (the generic sk- shape)
     for (const glued of ['a', '9', '-', '_']) expect(shaped(glued + tok), glued).toBe(false)
+  })
+
+  test('the boundary is ASCII letters only: a non-ASCII letter before the token does not hide it', () => {
+    const eAcute = String.fromCharCode(0xe9)
+    expect(shaped(eAcute + T.sk(24))).toBe(true)
+    expect(shaped(eAcute + T.akia(16))).toBe(true)
+  })
+
+  test('the distinctive prefixes are found after _ or - (NAME_ghp_..., key-ghp_...); only a letter or digit hides them', () => {
+    const tokens = { gh: T.ghp(36), gho: T.gh('o', 36), gsk: T.gsk(20), pat: T.pat(22), akia: T.akia(16), xox: T.xox('b', 10) }
+    for (const [name, tok] of Object.entries(tokens)) {
+      expect(shaped('NAME_' + tok), `_ before ${name}`).toBe(true)
+      expect(shaped('key-' + tok), `- before ${name}`).toBe(true)
+      expect(shaped('x' + tok), `letter before ${name}`).toBe(false)
+      expect(shaped('7' + tok), `digit before ${name}`).toBe(false)
+    }
+  })
+
+  test('the generic shapes keep the strict boundary: NAME_sk-... and key-sk-... are documented misses', () => {
+    expect(shaped('OPENAI_API_KEY_' + T.sk(24))).toBe(false)
+    expect(shaped('key-' + T.sk(24))).toBe(false)
+    expect(shaped('x' + T.bearer(24))).toBe(false) // a glued Bearer
+  })
+
+  test('a dot before a token is allowed: the boundary does not include `.`', () => {
+    for (const c of SHAPE_CASES) {
+      if (c.shape === 'pem') continue
+      expect(shaped('config.' + c.yes[0]), c.shape).toBe(true)
+    }
   })
 
   test('a shape as an OBJECT KEY is found, at the path of its value, whatever the value', () => {
@@ -122,8 +181,12 @@ describe('header names', () => {
   const mixed = (s: string) => s.split('').map((c, i) => (i % 2 ? c.toUpperCase() : c)).join('')
 
   test.each(HEADER_NAMES)('%s: found in any case and with surrounding spaces, at the path of its value', (name) => {
-    for (const key of [name, name.toUpperCase(), mixed(name), '  ' + name + ' ', '\t' + name + '\n']) {
+    for (const key of [name, name.toUpperCase(), mixed(name)]) {
       expect(find({ headers: { [key]: 'v' } }), JSON.stringify(key)).toEqual([hit(`headers.${key}`, 'header-name')])
+    }
+    // a key with whitespace is still recognised (trim), but its display path is redacted (whitespace in a key)
+    for (const key of ['  ' + name + ' ', '\t' + name + '\n', String.fromCharCode(0xfeff) + name]) {
+      expect(find({ headers: { [key]: 'v' } }), JSON.stringify(key)).toEqual([hit(`headers.${REDACTED_KEY}`, 'header-name')])
     }
   })
 
@@ -213,6 +276,151 @@ describe('display paths', () => {
   test('an empty key and unusual keys never throw', () => {
     expect(() => find({ '': 'v', ' ': { token: 'x' }, '.': ['a'], '[0]': 'y' })).not.toThrow()
     expect(find({ '': { password: 'x' } })).toEqual([hit('.password', 'key-name', 'medium')])
+  })
+})
+
+describe('display path: more redaction, the length cap, and the medium rule', () => {
+  const NEL = String.fromCharCode(0x85)
+  const FS = String.fromCharCode(0x1c)
+  const FEFF = String.fromCharCode(0xfeff)
+
+  test('a key holding =, : or whitespace is redacted: a secret typed INTO a key never reaches a path', () => {
+    for (const key of ['token: abc123xyz789', 'password=hunter2', 'my password', 'a:b', 'a=b', 'tab\there', 'line\nbreak']) {
+      const f = find({ headers: { [key]: { password: 'p' } } })
+      expect(f.map((x) => x.path), JSON.stringify(key.length)).toEqual([`headers.${REDACTED_KEY}.password`])
+      expect(JSON.stringify(f)).not.toContain('hunter2')
+      expect(JSON.stringify(f)).not.toContain('abc123')
+    }
+    expect(find({ headers: { ['token: abc123xyz789']: 'v' } }).map((x) => x.path)).toEqual([`headers.${REDACTED_KEY}`])
+  })
+
+  test('documented limit: a Stripe-style parent key is not credential-shaped, so it is shown (formats outside the list are not detected)', () => {
+    const key = 'sk_' + 'live_' + 'x'.repeat(24)
+    expect(find({ [key]: { password: 'p' } }).map((x) => x.path)).toEqual([`${key}.password`])
+  })
+
+  test('a path of exactly 200 characters is kept whole; a longer one is cut after the last whole step, with ...', () => {
+    expect(MAX_PATH_LENGTH).toBe(200)
+    const lens = [40, 39, 39, 39, 39] // 40 + 4 * (1 + 39) = 200
+    const keys = lens.map((n, i) => (i === lens.length - 1 ? 'token' + 'z'.repeat(n - 5) : String.fromCharCode(97 + i).repeat(n)))
+    const nest = (ks: string[]): Record<string, unknown> => ks.reduceRight<Record<string, unknown>>((inner, k, i) => (i === ks.length - 1 ? { [k]: 'v' } : { [k]: inner }), {})
+    const whole = find(nest(keys))
+    expect(whole.map((x) => x.path.length)).toEqual([200])
+    expect(whole[0].path.endsWith('...')).toBe(false)
+    const longer = find(nest(['q', ...keys]))
+    expect(longer.length).toBe(1)
+    expect(longer[0].path.length).toBeLessThanOrEqual(MAX_PATH_LENGTH)
+    expect(longer[0].path.endsWith('...')).toBe(true)
+    // what is left before the dots is a whole number of steps: q, then the first keys, joined by dots
+    const kept = longer[0].path.slice(0, -3)
+    const prefix = ['q', ...keys].join('.')
+    expect(prefix.startsWith(kept)).toBe(true)
+    expect(kept === prefix || prefix[kept.length] === '.').toBe(true)
+  })
+
+  test('the cut never shortens a redaction marker: only whole [redacted key] steps remain', () => {
+    const long = 'a'.repeat(41)
+    let nested: Record<string, unknown> = { token: 'v' }
+    for (let i = 0; i < 30; i++) nested = { [long]: nested }
+    const f = find(nested)
+    expect(f.length).toBe(1)
+    expect(f[0].path.length).toBeLessThanOrEqual(MAX_PATH_LENGTH)
+    expect(f[0].path.endsWith('...')).toBe(true)
+    expect(/^\[redacted key\](\.\[redacted key\])*\.\.\.$/.test(f[0].path), 'whole markers only').toBe(true)
+  })
+
+  test('a medium key-name finding is skipped only for a key whose OWN value is already a high finding (per key, not per path)', () => {
+    // a redacted credential-shaped key and a redacted over-long key share the display path, yet are different keys
+    expect(find({ [T.sk(24)]: 'v', ['password' + 'x'.repeat(40)]: 'v' })).toEqual([hit(REDACTED_KEY, 'credential-shape'), hit(REDACTED_KEY, 'key-name', 'medium')])
+    // the key "a.password" and the nested a.password share a display path, and are different keys
+    expect(find({ 'a.password': 'x', a: { password: T.bearer(24) } })).toEqual([hit('a.password', 'key-name', 'medium'), hit('a.password', 'credential-shape')])
+  })
+
+  test('JavaScript rules a port must copy: trim and \\s, U+0085 and U+001C are not whitespace, U+FEFF is', () => {
+    // a key with a leading U+FEFF before Authorization IS a header-name finding (trim removes it); its path is redacted (\s)
+    expect(find({ [FEFF + 'Authorization']: 'v' })).toEqual([hit(REDACTED_KEY, 'header-name')])
+    // a value made of U+0085 or U+001C is non-empty (JavaScript trim keeps them)
+    expect(find({ Authorization: NEL, 'x-api-key': FS })).toEqual([hit('Authorization', 'header-name'), hit('x-api-key', 'header-name')])
+    expect(find({ password: NEL })).toEqual([hit('password', 'key-name', 'medium')])
+    expect(find({ Authorization: FEFF })).toEqual([])
+    // whitespace after Bearer is \s: U+FEFF counts, U+0085 and U+001C do not
+    expect(shaped('Bea' + 'rer' + FEFF + 't'.repeat(20))).toBe(true)
+    expect(shaped('Bea' + 'rer' + NEL + 't'.repeat(20))).toBe(false)
+    expect(shaped('Bea' + 'rer' + FS + 't'.repeat(20))).toBe(false)
+  })
+
+  test('the key length limit counts UTF-16 code units: 17 emoji after "password" is 42 and redacted, 16 is 40 and shown', () => {
+    const emoji = String.fromCodePoint(0x1f600)
+    const k42 = 'password' + emoji.repeat(17)
+    const k40 = 'password' + emoji.repeat(16)
+    expect(k42.length).toBe(42)
+    expect(find({ headers: { [k42]: 'v' } })).toEqual([hit(`headers.${REDACTED_KEY}`, 'key-name', 'medium')])
+    expect(find({ headers: { [k40]: 'v' } })).toEqual([hit(`headers.${k40}`, 'key-name', 'medium')])
+    expect(find({ headers: { [emoji.repeat(21)]: { password: 'p' } } }).map((x) => x.path)).toEqual([`headers.${REDACTED_KEY}.password`])
+  })
+})
+
+describe('bounded output: scanSecrets, the per-node cap and the omitted counts', () => {
+  const tokens = (n: number): Record<string, unknown> => Object.fromEntries(Array.from({ length: n }, (_, i) => [`token${i}`, 'v']))
+
+  test('at most 50 findings are kept per node, and the rest is counted (an upper bound)', () => {
+    expect(MAX_FINDINGS_PER_SCAN).toBe(50)
+    const scan = scanSecrets(wf([cfgNode('a', tokens(120)), cfgNode('b', tokens(3)), cfgNode('c', {})], tokens(60)))
+    expect(scan.findings.filter((x) => x.nodeId === 'a').length).toBe(50)
+    expect(scan.findings.filter((x) => x.nodeId === 'b').length).toBe(3)
+    expect(scan.findings.filter((x) => x.location === 'metadata').length).toBe(50)
+    expect(scan.omitted.perNode.get('a')).toBe(70)
+    expect(scan.omitted.perNode.has('b')).toBe(false) // only nodes with something omitted
+    expect(scan.omitted.perNode.has('c')).toBe(false)
+    expect(scan.omitted.metadata).toBe(10)
+    // the first 50 in walk order are the ones kept
+    expect(scan.findings.filter((x) => x.nodeId === 'a').map((x) => x.path)).toEqual(Array.from({ length: 50 }, (_, i) => `token${i}`))
+  })
+
+  test('exactly 50 keeps all and omits nothing; 51 omits one', () => {
+    expect(scanSecrets(wf([cfgNode('a', tokens(50))])).omitted.perNode.size).toBe(0)
+    const s = scanSecrets(wf([cfgNode('a', tokens(51))]))
+    expect(s.findings.length).toBe(50)
+    expect(s.omitted.perNode.get('a')).toBe(1)
+  })
+
+  test('detectSecrets returns exactly the findings of scanSecrets; nodes with one id add up their omitted counts', () => {
+    const w = wf([cfgNode('a', tokens(60)), cfgNode('a', tokens(70))])
+    expect(detectSecrets(w)).toEqual(scanSecrets(w).findings)
+    expect(scanSecrets(w).omitted.perNode.get('a')).toBe(10 + 20)
+    expect(scanSecrets(wf([])).omitted.metadata).toBe(0)
+  })
+
+  test('a malformed workflow gives an empty scan', () => {
+    for (const w of [null, 5, [], { nodes: 3 }]) {
+      const s = scanSecrets(w as unknown as Workflow)
+      expect(s.findings).toEqual([])
+      expect(s.omitted.perNode.size).toBe(0)
+    }
+  })
+})
+
+describe('safeDisplayName', () => {
+  test('a credential-shaped name, or one with a token inside, is redacted; any other name is shown', () => {
+    expect(safeDisplayName(T.sk(24))).toBe(REDACTED_NAME)
+    expect(safeDisplayName(`call with ${T.ghp(36)} now`)).toBe(REDACTED_NAME)
+    expect(safeDisplayName(T.pem())).toBe(REDACTED_NAME)
+    expect(safeDisplayName(T.bearer(24))).toBe(REDACTED_NAME)
+    expect(safeDisplayName('Fetch users')).toBe('Fetch users')
+    expect(safeDisplayName('')).toBe('')
+    expect(safeDisplayName(T.sk(19))).toBe(T.sk(19)) // one short of the shape
+  })
+
+  test('a name is cut to 60 characters with ... appended only when it is cut', () => {
+    expect(MAX_NAME_LENGTH).toBe(60)
+    expect(safeDisplayName('n'.repeat(60))).toBe('n'.repeat(60))
+    expect(safeDisplayName('n'.repeat(61))).toBe('n'.repeat(60) + '...')
+    const emoji = String.fromCodePoint(0x1f600)
+    expect(safeDisplayName('n'.repeat(59) + emoji + 'tail')).toBe('n'.repeat(59) + '...') // never half a pair
+  })
+
+  test('the shape is checked on the whole text first, so a token past the cut is still redacted', () => {
+    expect(safeDisplayName('n'.repeat(100) + ' ' + T.sk(24))).toBe(REDACTED_NAME)
   })
 })
 
@@ -332,8 +540,43 @@ describe('scale and linear time', () => {
     const all: Record<string, unknown> = {}
     for (let i = 0; i < 60_000; i++) all[`token${i}`] = 'v'
     const [many, ms2] = timed(() => find(all))
-    expect(many.length).toBe(60_000)
+    expect(many.length, 'kept at most the cap').toBe(MAX_FINDINGS_PER_SCAN)
     expect(ms2).toBeLessThan(LIMIT_MS)
+  }, 30_000)
+
+  test('a 120,000-finding file keeps 50 and counts the rest, in time and with small output', () => {
+    const [scan, ms] = timed(() => scanSecrets(wf([cfgNode('n', Object.fromEntries(Array.from({ length: 120_000 }, (_, i) => [`token${i}`, 'v'])))])))
+    expect(scan.findings.length).toBe(MAX_FINDINGS_PER_SCAN)
+    expect(scan.omitted.perNode.get('n')).toBe(120_000 - MAX_FINDINGS_PER_SCAN)
+    expect(ms).toBeLessThan(LIMIT_MS)
+  }, 30_000)
+
+  test('the 2 MB blow-up shape at 20,000 keys: 58 nested levels of 40-character keys over tokenN keys stay small and fast', () => {
+    const key40 = (d: number) => 'k'.repeat(36) + String(d).padStart(4, '0')
+    let inner: Record<string, unknown> = {}
+    for (let i = 0; i < 20_000; i++) inner[`token${i}`] = 'v'
+    for (let d = 0; d < 58; d++) inner = { [key40(d)]: inner }
+    const w = wf([cfgNode('n', inner)])
+    const [scan, scanMs] = timed(() => scanSecrets(w))
+    const [warnings, lintMs] = timed(() => lintWorkflow(w, nodeDefinitions))
+    expect(scan.findings.length).toBeLessThanOrEqual(MAX_FINDINGS_PER_SCAN)
+    expect(scan.omitted.perNode.get('n'), 'every finding past the cap is only counted').toBe(20_000 - MAX_FINDINGS_PER_SCAN)
+    expect(scan.findings.every((x) => x.path.length <= MAX_PATH_LENGTH)).toBe(true)
+    expect(scan.findings.reduce((sum, x) => sum + x.path.length, 0)).toBeLessThan(300_000)
+    const secret = warnings.filter((x) => x.code.startsWith('secret'))
+    expect(secret.length).toBeLessThanOrEqual(MAX_FINDINGS_PER_SCAN)
+    expect(secret.reduce((sum, x) => sum + x.message.length + (x.field?.length ?? 0), 0)).toBeLessThan(300_000)
+    expect(scanMs + lintMs, `scan ${scanMs.toFixed(0)} ms, lint ${lintMs.toFixed(0)} ms`).toBeLessThan(1500)
+  }, 30_000)
+
+  test.each([2_000, 10_000, 20_000])('a %i-level single-key chain with a finding at every level stays bounded', (levels) => {
+    let chain: Record<string, unknown> = { token: 'v' }
+    for (let i = 1; i < levels; i++) chain = { token: 'v', n: chain }
+    const [scan, ms] = timed(() => scanSecrets(wf([cfgNode('n', chain)])))
+    expect(scan.findings.length).toBe(MAX_FINDINGS_PER_SCAN)
+    expect(scan.omitted.perNode.get('n')).toBe(levels - MAX_FINDINGS_PER_SCAN)
+    expect(scan.findings.every((x) => x.path.length <= MAX_PATH_LENGTH)).toBe(true)
+    expect(ms, `${ms.toFixed(0)} ms`).toBeLessThan(LIMIT_MS)
   }, 30_000)
 
   test('a 200,000-level deep value (built without recursion) does not overflow the stack', () => {
@@ -341,8 +584,9 @@ describe('scale and linear time', () => {
     for (let i = 0; i < 200_000; i++) nested = { n: nested }
     const [objects, ms1] = timed(() => find(nested))
     expect(objects.length).toBe(1)
-    expect(objects[0].path.endsWith('n.n.password')).toBe(true)
-    expect(objects[0].path.length).toBe('n.'.length * 200_000 + 'password'.length)
+    expect(objects[0].path.startsWith('n.n.n.')).toBe(true)
+    expect(objects[0].path.length).toBeLessThanOrEqual(MAX_PATH_LENGTH) // the cap: the full path would be 400,008 characters
+    expect(objects[0].path.endsWith('...')).toBe(true)
     expect(ms1).toBeLessThan(LIMIT_MS)
 
     let inArrays: unknown = T.ghp(36)
@@ -369,10 +613,17 @@ const fnv = (s: string): number => {
   }
   return h >>> 0
 }
-const NEEDLES = [SENTINEL, SENTINEL.slice(0, 8), SENTINEL.slice(-8), fnv(SENTINEL).toString(16), String(fnv(SENTINEL))]
+// Labelled, so that a failing assertion prints WHICH needle leaked and never the needle itself (a token would reach the log).
+const NEEDLES: [string, string][] = [
+  ['sentinel', SENTINEL],
+  ['first 8 characters', SENTINEL.slice(0, 8)],
+  ['last 8 characters', SENTINEL.slice(-8)],
+  ['hash (hex)', fnv(SENTINEL).toString(16)],
+  ['hash (decimal)', String(fnv(SENTINEL))],
+]
 const leaked = (value: unknown): string[] => {
   const text = JSON.stringify(value)
-  return NEEDLES.filter((needle) => text.includes(needle))
+  return NEEDLES.filter(([, needle]) => text.includes(needle)).map(([label]) => label)
 }
 
 describe('never echo', () => {
@@ -387,11 +638,13 @@ describe('never echo', () => {
     { name: 'a long prompt', config: { prompt: 'lorem '.repeat(5000) + SENTINEL + ' ipsum' } },
     { name: 'a key-name finding', config: { password: SENTINEL } },
     { name: 'a key that is too long', config: { ['password' + SENTINEL]: 'v' } },
+    { name: 'a key with a colon and a space, holding the sentinel', config: { ['token: ' + SENTINEL]: { password: 'p' } } },
+    { name: 'a key with an equals sign, glued to the sentinel', config: { headers: { ['password=' + SENTINEL]: 'v' } } },
   ]
 
   test('the sentinel is detectable by the needles (the check itself works)', () => {
-    expect(leaked({ x: SENTINEL })).toEqual(NEEDLES.slice(0, 3))
-    expect(leaked({ x: `h ${fnv(SENTINEL).toString(16)} ${fnv(SENTINEL)}` })).toEqual(NEEDLES.slice(3))
+    expect(leaked({ x: SENTINEL })).toEqual(['sentinel', 'first 8 characters', 'last 8 characters'])
+    expect(leaked({ x: `h ${fnv(SENTINEL).toString(16)} ${fnv(SENTINEL)}` })).toEqual(['hash (hex)', 'hash (decimal)'])
     expect(leaked({ x: 'clean' })).toEqual([])
   })
 

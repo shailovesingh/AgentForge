@@ -1,10 +1,10 @@
-# Secret detection (`secrets/*.json`, `detectSecrets`, `secret-likely`, `secret-suspected`)
+# Secret detection (`secrets/*.json`, `detectSecrets`, `scanSecrets`, `secret-likely`, `secret-suspected`)
 
 Decisions: D-016 (credentials never in workflow JSON), D-023 (secret detection and export confirmation, as revised by
 the Product Owner), D-017 and D-018 (warnings are derived and never block; `validateWorkflow` stays errors-only).
 
-**Status: TypeScript only.** The implementation is `frontend/src/workflow/secrets.ts` (`detectSecrets`), used by
-`lintWorkflow` in `frontend/src/workflow/lint.ts` and run against the fixtures by
+**Status: TypeScript only.** The implementation is `frontend/src/workflow/secrets.ts` (`detectSecrets`, `scanSecrets`,
+`safeDisplayName`), used by `lintWorkflow` in `frontend/src/workflow/lint.ts` and run against the fixtures by
 `frontend/src/contracts/fixtures.test.ts`. **No Python parity is claimed; the Python runner is planned for Phase 2.**
 This task is the pure detector, the two lint codes, the fixtures and this spec. The confirmation dialog, the badge, the
 toolbar indicator and the config-panel notice (T9b) are **planned, not built**.
@@ -21,10 +21,12 @@ negatives** (a real credential in an unfamiliar format, or hidden by encoding). 
 guarantee**. The real fix is a credential reference (`credentialRef`), which does not exist yet: it arrives with backend
 credential management.
 
-## The function
+## The functions
 
 ```ts
-detectSecrets(workflow: Workflow): SecretFinding[]
+scanSecrets(workflow: Workflow): { findings: SecretFinding[]; omitted: { perNode: Map<string, number>; metadata: number } }
+detectSecrets(workflow: Workflow): SecretFinding[]      // = scanSecrets(workflow).findings
+safeDisplayName(text: string): string
 interface SecretFinding {
   confidence: 'high' | 'medium'
   location: 'config' | 'metadata'
@@ -38,13 +40,20 @@ interface SecretFinding {
 separate. It is the same scan.)
 
 It scans **every string value and every object key**, at any depth, in **every node's `config`** and in **`metadata`**.
-It uses an explicit stack, not recursion, so a 200,000-level value does not overflow the stack. It does **not** scan:
+It uses an explicit stack, not recursion, so a 200,000-level value does not overflow the stack.
 
-- node **labels**, the workflow **name** and the workflow **description**, nor
-- anything that is not a string value or an object key (numbers, booleans, null are never matched).
+**What is NOT scanned (a documented limit):** node **labels**, node **ids**, node **types**, **edges**, the workflow
+**id**, **name** and **description**, and anything that is not a string value or an object key (numbers, booleans and null
+are never matched). A credential typed into one of those is not found.
 
-(Those three are a **documented limit**: `sec-label-name-description-not-scanned`. A credential typed into a label is not
-found, and a lint warning message does quote the node label, as every warning message does.)
+**Consequence for every surface that reports a secret** (the T9b dialog, the toolbar indicator, `aria-label`s, lint
+messages): a label or an id could itself be a pasted token, so node names are shown **only through `safeDisplayName`**, and
+a raw `Warning.message` of the other five rules (which quotes the label) is **never** rendered there. `Warning.nodeId` is an
+identifier, not display text: show a node through `safeDisplayName(label or id)`.
+
+`safeDisplayName(text)` returns **`[redacted name]`** when the text is credential-shaped (any shape below, anywhere in
+it, checked on the whole text before cutting), and otherwise the text cut to **60 characters** with `...` appended when it
+was cut (never half of a surrogate pair). The messages of `secret-likely` and `secret-suspected` use it for the node name.
 
 ## The rules
 
@@ -52,34 +61,54 @@ found, and a lint warning message does quote the node label, as every warning me
 |---|---|---|---|
 | **high** | `header-name` | an object **key**, trimmed and compared case-insensitively, is one of `authorization`, `proxy-authorization`, `cookie`, `x-api-key`, `api-key`, `x-auth-token`, `x-access-token`, and its **value is a string that is not empty after trim** | A longer name does not match (`Authorization-like`, `X-Authorization`, `Cookies`). An empty or whitespace-only value, or a value that is not a string, is **no finding**. |
 | **high** | `credential-shape` | any string **value** or any object **key** contains one of the shapes below | Found **anywhere** inside a longer string (a prompt with a pasted key matches). A key match is reported at the path of that key's value, whatever the value is. |
-| **medium** | `key-name` | an object **key**, case-insensitive, **contains** `secret`, `password`, `passwd`, `token`, `apikey` or `api_key`, its value is a string that is not empty after trim, and the path is **not already a high finding** | A path that is both high and medium reports **only the high one**. An empty or whitespace-only value, or a value that is not a string, is no finding. |
+| **medium** | `key-name` | an object **key**, case-insensitive, **contains** `secret`, `password`, `passwd`, `token`, `apikey` or `api_key`, and its value is a string that is not empty after trim | **Not reported for a key whose own value is already a `header-name` or `credential-shape` finding** (the rule is per KEY, one step of the walk, not per display path). An empty or whitespace-only value, or a value that is not a string, is no finding. |
 
-One finding per distinct **(location, nodeId, path, reason)**. A header named `Authorization` that holds a Bearer token is
-therefore **two** findings at one path (`header-name` and `credential-shape`), and two different credential-shaped keys
-under one parent are **one** finding (their display path is the same).
+**What "one finding" means.** Findings are deduplicated per scan (one node's config, or the metadata) on
+**(location, nodeId, path, reason)** over the findings that are kept. Consequences, all intended:
+
+- A header named `Authorization` that holds a Bearer token is **two** findings at one path (`header-name` and
+  `credential-shape`): different reasons.
+- Two different credential-shaped keys under one parent have the same display path (`[redacted key]`) and the same reason:
+  **one** finding.
+- Because the medium rule is per key and a display path is not an address, two different keys can share a path and both be
+  reported. A credential-shaped key and an over-long key containing `password`, side by side, give a high `credential-shape`
+  **and** a medium `key-name`, both at `[redacted key]` (`sec-medium-per-key-redacted-collision`). The key `a.password` and
+  the nested `a` then `password` share the path `a.password`: a medium finding for the first key and a high finding for the
+  second (`sec-medium-per-key-dotted-key`).
+- With **duplicate node ids** two identical findings can occur (the scan is per node). Validation rejects duplicate ids
+  before an import, so this cannot happen in the app.
+- The reasons for one path come in the order the walk finds them (below), not sorted.
 
 ### The credential shapes
 
-| Name | Shape (case-sensitive) |
-|---|---|
-| `sk` | `sk-` followed by 20 or more of `A-Z a-z 0-9 _ -` (covers `sk-ant-...`) |
-| `gsk` | `gsk_` followed by 20 or more letters or digits |
-| `ghp` | `ghp_` followed by 36 or more letters or digits |
-| `github_pat` | `github_pat_` followed by 22 or more of `A-Z a-z 0-9 _` |
-| `akia` | `AKIA` followed by 16 or more of `0-9 A-Z` |
-| `xox` | `xox`, one of `b a p r s`, `-`, then 10 or more of `A-Z a-z 0-9 -` |
-| `jwt` | `eyJ` and 5 or more base64url characters (`A-Z a-z 0-9 _ -`), a dot, 5 or more, a dot, 5 or more |
-| `pem` | `-----BEGIN`, up to 30 uppercase letters or spaces, `PRIVATE KEY-----` (the plain, RSA, EC, OPENSSH and ENCRYPTED forms; a PUBLIC KEY header is not a match) |
-| `bearer` | `Bearer`, one or more whitespace characters, then 20 or more of `A-Z a-z 0-9 . _ ~ + / = -` (case-sensitive: a lowercase `bearer` is a documented false negative) |
+| Name | Shape (case-sensitive) | Left boundary |
+|---|---|---|
+| `sk` | `sk-` followed by 20 or more of `A-Z a-z 0-9 _ -` (covers `sk-ant-...`) | strict |
+| `gsk` | `gsk_` followed by 20 or more letters or digits | relaxed |
+| `gh` | `gh`, one of `p o u s r`, `_`, then 36 or more letters or digits (the GitHub token kinds `ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`) | relaxed |
+| `github_pat` | `github_pat_` followed by 22 or more of `A-Z a-z 0-9 _` | relaxed |
+| `akia` | `AKIA` followed by 16 or more of `0-9 A-Z` | relaxed |
+| `xox` | `xox`, one of `b a p r s`, `-`, then 10 or more of `A-Z a-z 0-9 -` | relaxed |
+| `jwt` | `eyJ` and 5 or more base64url characters (`A-Z a-z 0-9 _ -`), a dot, 5 or more, a dot, 5 or more | strict |
+| `pem` | `-----BEGIN`, up to 30 **uppercase** letters or spaces, `PRIVATE KEY-----` (the plain, RSA, EC, OPENSSH and ENCRYPTED forms; a PUBLIC KEY header, a lowercase gap or a missing closing run of dashes is not a match) | none |
+| `bearer` | `Bearer`, one or more whitespace characters (JavaScript `\s`), then 20 or more of `A-Z a-z 0-9 . _ ~ + / = -` (case-sensitive: a lowercase `bearer` is a documented false negative) | strict |
 
-**The left boundary** (a decision of this task). Every shape except `pem` must start where the character before it is not
-a letter, digit, `_` or `-`. So `task-` followed by 24 characters is not `sk-` followed by 24 characters (`task-...` and
-`risk-assessment-...` are ordinary words), but `key=sk-...`, a quoted token and a token after a space or a newline are.
+**The left boundary** (a decision of T9a, refined by its review). A shape must start where the character before it is not:
+
+- **strict** (`sk-`, `jwt`, `Bearer`): an ASCII letter, a digit, `_` or `-`. So `task-` followed by 24 characters is not
+  `sk-` followed by 24 characters (`task-...` and `risk-assessment-...` are ordinary words), but `key=sk-...`, `config.` then a
+  token, a quoted token and a token after a space or a newline are found.
+- **relaxed** (the distinctive prefixes `gh?_`, `gsk_`, `github_pat_`, `AKIA`, `xox?-`): only an ASCII letter or a digit. So
+  `GITHUB_TOKEN_ghp_...` and `key-ghp_...` are found, while `x` glued before `AKIA...` is not.
+- "Letter" means **ASCII letters only**: an accented letter before a token does **not** hide it (`sec-port-non-ascii-letter-before-token`).
+- `.` is never part of the boundary: `config.` followed by a token is found.
+
 **The right side has no boundary**: more characters than the minimum still match. The lengths are exact counts in the
-patterns (`{20}`), which match the same strings as "20 or more" because only existence matters.
+patterns (`{20}`), which match the same strings as "20 or more" because only existence matters. A text shorter than 15
+characters cannot match any shape (the shortest is `xox?-` plus 10), so the detector skips the regexes for it.
 
 **Linear time.** The patterns have no nested quantifiers; every count is exact or bounded, except the two open-ended runs
-inside `jwt`, which can only start at the beginning of a run (that is what the left boundary also buys). Unit tests run
+inside `jwt`, which can only start at the beginning of a run (that is what the strict boundary buys). Unit tests run
 5,000,000-character adversarial strings (`sk-` plus 4,999,990 letters; `Bearer ` plus millions of spaces; `eyJ` plus
 millions of dots; `eyJ-` repeated; `-----BEGIN ` repeated; and more) and a 60,000-key object, each under two seconds.
 
@@ -90,30 +119,59 @@ metadata) joined as `a.b[2].c`: an object key adds `.key` (no dot for the first 
 
 - A header name such as `Authorization`, and an ordinary key such as `headers` or `payload`, **are not secret and are
   shown**: `headers.Authorization`.
-- A step whose key is **itself credential-shaped** (it matches a shape above) **or longer than 40 characters** is shown as
-  **`[redacted key]`**: `headers.[redacted key]`. (A key of exactly 40 characters is shown.) The same rule covers the middle
-  of a path: `[redacted key].password`.
-- A key that is not credential-shaped and is at most 40 characters is shown as written, **even if it is odd** (spaces,
-  dots, brackets, an empty key). A path is therefore a display aid, **not a unique address**: two keys can share one. A key
-  that hides a secret in a short, non-shaped form (`my password is hunter2`) is shown; that is a documented limit.
+- A step whose key is **redacted** is shown as **`[redacted key]`**: `headers.[redacted key]`, also in the middle of a path
+  (`[redacted key].password`). A key is redacted when it
+  1. is **credential-shaped** (it matches a shape above), or
+  2. is **longer than 40 UTF-16 code units** (a key of exactly 40 is shown; 17 emoji after `password` are 42 units and are
+     redacted), or
+  3. **contains `=`, `:` or whitespace** (JavaScript `\s`: the same 25 code points as `trim`, see `WARNINGS.md`, including
+     U+FEFF): a secret typed INTO a key (`token: abc123`, `password=hunter2`) or a key with spaces is never shown.
+- Any other key is shown as written, **even if it is odd** (dots, brackets, an empty key). A path is therefore a display
+  aid, **not a unique address**: two keys can share one. A key that hides a secret in a short, plain form (a Stripe-style
+  `sk_live_...` key, a bare password used as a key) is shown: a documented limit.
+- **The marker is ambiguous on purpose**: a real key can be literally `[redacted key]`. It is display text only.
+
+**Length cap.** A display path is at most **200 characters**. A longer one is cut **after the last whole step that leaves
+room for `...`**, and `...` is appended. A step is never cut, so a `[redacted key]` marker is never shortened. (Steps are at
+most 40 characters, or the marker, or an array index.) Two long paths cut to the same text collapse into one finding.
 
 The `path` of a value match is the path of the string; the `path` of a key match is the path of that key's value.
+
+## Bounded output (a contract)
+
+A hostile or accidental file can hold hundreds of thousands of findings (a 2 MB file that imports normally gave 120,000
+findings and 288 MB of path text before this cap). So:
+
+- **At most 50 findings are kept per node, and 50 for the metadata** (`MAX_FINDINGS_PER_SCAN`). The first 50 in the
+  walk order are kept. After that the scan **keeps walking but only counts**: no path string and no dedup key is built for an
+  omitted finding.
+- `scanSecrets` returns the kept findings and the counts that were left out: `omitted.perNode` (node id to count, only nodes
+  with at least one; nodes that share an id add up) and `omitted.metadata`. The count is an **upper bound**: a duplicate of
+  a kept finding counts too (the cap counts findings met, not distinct ones).
+- `detectSecrets(workflow)` returns `scanSecrets(workflow).findings`.
+- `lintWorkflow` emits one warning per **kept** config finding, so **at most 50 secret warnings per node**. It adds **no**
+  extra warning and **no** count in any message for what was omitted: the list is capped, and **T9b shows "and N more" from
+  `scanSecrets`**.
+- Every path is at most 200 characters (above), so the output is bounded by nodes times 50 times 200.
 
 ## Never echo (a contract)
 
 A finding, a lint warning, a log line or a thrown error **never contains** a value, **a prefix, suffix or any substring of a
 value, a hash of a value, or a credential-shaped key**. `reason` says why a finding matched without saying what. The lint
-message names the node, the display path and says that a credential may be present. Tests plant a sentinel token in many
-places (a header value, a nested value, an array item, metadata, as a key, inside a long prompt) and in 1,200 seeded random
-configs, and check that the sentinel, its first and last 8 characters and a simple hash of it appear in **no finding field
-and no lint warning field**. The one place a value legitimately exists is the field in which the user typed it.
+message names the node (through `safeDisplayName`), the display path, and says that a credential may be present. Tests plant
+a sentinel token in many places (a header value, a nested value, an array item, metadata, as a key, inside a long prompt, in
+a key with `:` or `=`) and in 1,200 seeded random configs, and check that the sentinel, its first and last 8 characters and a
+simple hash of it appear in **no finding field and no lint warning field**. The one place a value legitimately exists is
+the field in which the user typed it. **Test failure messages** print lengths, names and indexes, never a synthetic token.
 
 ## Order
 
-Nodes in array order (each node's `config`), then `metadata`. Inside one scan the walk is depth-first and keys come in
-`Object.keys` order (integer-like keys first, then insertion order). For one path the reasons come in the order
-`header-name`, `credential-shape`, `key-name`. **High before medium is not guaranteed** by the detector. Fixtures compare
-findings as a **multiset**, so order is a contract that only the TypeScript unit tests check.
+Nodes in array order (each node's `config`), then `metadata`. Inside one scan the walk is **depth-first, with each object's
+own keys in `Object.keys` order (integer-like keys first, in ascending order, then the other keys in insertion order)**.
+For one key the reasons come in the order `header-name`, `credential-shape`, `key-name`. **High before medium is not
+guaranteed** by the detector. Inside a node, lint emits all `secret-likely` and then all `secret-suspected`, each in the
+detector's depth-first traversal order. Fixtures compare findings as a **multiset**, so order is a contract that only the
+TypeScript unit tests check.
 
 ## Own properties, purity, totality
 
@@ -123,25 +181,39 @@ changed (a deep-frozen workflow works). The function never throws for a JSON-sha
 and proxies are out of scope. An object reached a second time (a cycle, or a shared sub-object in memory) is walked **once**,
 so the function ends; a JSON document has neither.
 
+## Rules a port must copy exactly (JavaScript, not Python, defaults)
+
+These are the places where a Python implementation would silently differ; fixtures `sec-port-*` pin the ones a fixture can
+express (placeholders `@@FEFF@@`, `@@NEL@@`, `@@FS@@`, `@@E9@@` and `@@EMOJI:n@@` build the characters at run time).
+
+- **Trimming is JavaScript `String.prototype.trim`**, the 25 code points of `WARNINGS.md`. A key with a leading U+FEFF before
+  `Authorization` **is** a header-name finding (U+FEFF is trimmed; Python's `strip()` keeps it). A value made of U+0085 or
+  U+001C counts as **non-empty** (filled; Python's `strip()` removes them). A value made only of U+FEFF is blank.
+- **Whitespace after `Bearer` is JavaScript `\s`**: U+FEFF counts, U+0085 and U+001C do not.
+- **The key length limit 40 counts UTF-16 code units**, not code points or bytes (17 emoji after `password` is 42 and is redacted).
+- **"Letter" in the left boundary means ASCII letters only** (an `e` with an acute accent before `sk-...` still matches).
+- **Key order**: integer-like keys first (the order is only unit-tested; fixtures compare multisets).
+
 ## How it fits with lint (T9a, done) and the UI (T9b, planned)
 
-`lintWorkflow` adds **one warning per config finding**, after the five rules of the same node, for every node (a node of an
-unknown type is scanned too, because it is exported all the same):
+`lintWorkflow` adds **one warning per kept config finding**, after the five rules of the same node, for every node (a node of
+an unknown type is scanned too, because it is exported all the same):
 
 | Code | From | `field` |
 |---|---|---|
 | `secret-likely` | high findings | the display path |
 | `secret-suspected` | medium findings | the display path |
 
-Order inside a node: the five rules, then every `secret-likely` in path order, then every `secret-suspected` in path order.
-**Metadata findings are not warnings**: a warning needs a node (`Warning.nodeId` is a required string). The T9b UI reads
-`detectSecrets` directly for them. Details of the lint function: `WARNINGS.md`.
+Order inside a node: the five rules, then every `secret-likely`, then every `secret-suspected`, each in the detector's
+depth-first traversal order. **Metadata findings are not warnings**: a warning needs a node (`Warning.nodeId` is a required
+string). The T9b UI reads `scanSecrets` directly for them and for the omitted counts. Details of the lint function: `WARNINGS.md`.
 
 **T9b (planned, not built):** a distinct node badge and a toolbar indicator for `secret-likely`, a notice in the config
 panel, and a confirmation dialog on **every export** when a high finding exists (Cancel is the default focus, Escape
-cancels, no "do not ask again"; the dialog lists nodes and display paths only, and explains that credential references are
-not available yet). The export is never blocked: the user can always confirm (decision D-023, `docs/PHASE1_1_PLAN.md`
-section 3.7). Import is never blocked either.
+cancels, no "do not ask again"; the dialog lists nodes and display paths only, shows "and N more" from the omitted counts,
+and explains that credential references are not available yet). Node names appear there only through `safeDisplayName`. The
+export is never blocked: the user can always confirm (decision D-023, `docs/PHASE1_1_PLAN.md` section 3.7). Import is never
+blocked either.
 
 ## Fixtures (`fixtures/secrets/*.json`) and the placeholder method
 
@@ -162,18 +234,20 @@ A fixture is `{ "name", "description", "workflow", "expect" }`:
 whose secret scanning and push protection reject token-shaped strings. A fixture holds a **placeholder**, and the runner
 replaces every placeholder, in **every string and every object key** of the workflow, with a synthetic token built **from
 parts at run time**, before the workflow is imported and scanned. The syntax is `@@NAME@@` (the default size) or
-`@@NAME:n@@` (the length n of the part the shape counts; for `JWT` the length of each of the three parts). An unknown name
-fails the run. The placeholder table:
+`@@NAME:n@@` (the length n of the part the shape counts; for `JWT` the length of each of the three parts; for the
+special characters, the repeat count). **Anything shaped like `@@...@@` is a placeholder**: an unknown name, a lowercase
+name, an empty name or a bad size fails the run, naming only the placeholder. Two keys that become one after
+substitution also fail the run (a finding must not be hidden by a collision). The placeholder table:
 
 | Placeholder | Default size | Builds | Matches shape |
 |---|---|---|---|
 | `@@SK@@` | 24 | `sk-` + n letters | `sk` |
 | `@@SKANT@@` | 30 | `sk-ant-api03-` + n letters | `sk` |
 | `@@GSK@@` | 24 | `gsk_` + n letters | `gsk` |
-| `@@GHP@@` | 36 | `ghp_` + n letters | `ghp` |
+| `@@GHP@@`, `@@GHO@@` | 36 | `ghp_` or `gho_` + n letters | `gh` |
 | `@@GHPAT@@` | 30 | `github_pat_` + n letters | `github_pat` |
 | `@@AKIA@@` | 16 | `AKIA` + n uppercase letters | `akia` |
-| `@@XOXB@@`, `@@XOXA@@`, `@@XOXP@@`, `@@XOXR@@`, `@@XOXS@@` | 12 | `xox<letter>-` + n digits | `xox` |
+| `@@XOXA@@`, `@@XOXB@@`, `@@XOXP@@`, `@@XOXR@@`, `@@XOXS@@` | 12 | `xox<letter>-` + n digits | `xox` |
 | `@@XOXZ@@` | 12 | `xoxz-` + n digits | none (a letter outside `a b p r s`) |
 | `@@JWT@@` | 10 | `eyJ` + n letters, a dot, n letters, a dot, n letters | `jwt` |
 | `@@JWT2@@` | 10 | the same with only two parts | none |
@@ -181,28 +255,46 @@ fails the run. The placeholder table:
 | `@@PEMRSA@@` | (none) | the RSA PRIVATE KEY header | `pem` |
 | `@@PEMPUBLIC@@` | (none) | a PUBLIC KEY header | none |
 | `@@BEARER@@` | 24 | `Bearer ` + n letters | `bearer` |
+| `@@FEFF@@`, `@@NEL@@`, `@@FS@@` | 1 | U+FEFF, U+0085, U+001C, repeated n times | (a character, not a token) |
+| `@@E9@@` | 1 | U+00E9, repeated n times | (a character) |
+| `@@EMOJI:n@@` | 1 | U+1F600, repeated n times (2 UTF-16 units each) | (a character) |
 
 (The table above describes the **result**; the table in the runner builds each token by concatenating separate pieces, so
-no source file holds a token-shaped literal.) The runner **checks this**: one test reads every file under `fixtures/` and
-every source file of the detector, its tests and the runner, and fails if the detector finds a token-shaped string in the
-raw text. Another checks that every placeholder in the table is used by at least one fixture and that no fixture uses an
-unknown one.
+no source file holds a token-shaped literal.) A test checks that every placeholder in the table is used by at least one
+fixture and that no fixture uses an unknown one.
+
+**The repository-wide guard.** One test walks every **text file of the working tree** (the repository root; it skips
+`node_modules`, `.git`, `dist`, `test-results`, `playwright-report`, `.kilo` and binary files), with a plain file walk and no
+git subprocess, and fails on any match of these patterns, **with no boundary on purpose**: `gh[pousr]_` + 20 letters or
+digits, `github_pat_` + 20, `gsk_` + 20, `sk-` + 20 token characters, `sk_live_`, `sk_test_` or `rk_live_` + 20, `AKIA` or
+`ASIA` + 16 uppercase letters or digits, `xox[baprs]-` + 10, `AIza` + 35, `npm_` + 36, a JWT-like `eyJ` value, a PEM
+private key header and `Bearer` + whitespace + 20 token characters. The failure message prints the file path, the line number and the
+pattern name, **never the matched text**. A self-test builds a synthetic token for every pattern at run time. **Scope,
+honestly:** it checks the files in the tree when the tests run; it does not cover git history, files outside the tree, or the
+documents of future commits until they exist and the tests run again.
 
 **Coverage guards** (in the runner): every credential shape is found by at least one positive fixture; every header name
 and every medium key word appears in a positive fixture; every reason, both confidences and both locations are expected
 somewhere; there are at least 12 negative fixtures; the family has a minimum count (`MIN_COUNTS.secrets`), never lowered.
 The fixtures also document the **limits** as cases: a prompt that merely says "use a Bearer token here" (no finding),
 `token_count: "5"` (a documented false positive), an unfamiliar header name (`Authorization-like`: a documented false
-negative), a lowercase `bearer` (a documented false negative), base64 of a key (no finding), and labels, names and
-descriptions (not scanned).
+negative), a lowercase `bearer` (a documented false negative), base64 of a key (no finding), `OPENAI_API_KEY_` followed by
+an `sk-` key (a documented false negative), and labels, names and descriptions (not scanned).
 
 ## Honest limits, in one place
 
 - Heuristic. False positives: a harmless key such as `token_count`, an example key in a prompt. False negatives: an
   unfamiliar format, an obfuscated or encoded value, a credential under a header name not in the list, a lowercase
   `bearer` scheme, a credential in a JSON **string** that holds a header object as text, a credential typed into a label,
-  a name or a description.
+  a node id, a name or a description.
+- **Formats that are NOT detected** (the list of shapes above is the whole list, approved by the Product Owner): Stripe
+  `sk_live_` and `sk_test_` keys, Google `AIza` keys, npm tokens, SendGrid keys, Slack webhook URLs, AWS secret access
+  keys, database URLs with a password, and any other format.
+- **Known misses from the strict boundary:** `OPENAI_API_KEY_sk-...` and `key-sk-...` (an `sk-` key glued after an
+  underscore or a hyphen) are not found; the distinctive prefixes after `_` or `-` are.
 - It reads names and shapes, not meaning, and it never contacts a service to test a credential.
 - It protects against **accidents**; it does not stop a determined user and is not a server-side control.
-- The display path can show a short key that itself describes a secret; only credential-shaped and long keys are redacted.
+- The display path can show a short plain key that itself describes a secret; only credential-shaped, long and odd keys
+  (`=`, `:`, whitespace) are redacted. The marker `[redacted key]` can also be a real key.
+- Findings are capped at 50 per node and 50 for metadata; the rest is only counted.
 - TypeScript only; the Python runner is planned for Phase 2; backend enforcement is decision X10 and is not implemented.

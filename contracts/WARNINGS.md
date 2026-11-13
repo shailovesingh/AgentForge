@@ -45,12 +45,15 @@ for `secret-likely` and `secret-suspected`, the display path of the finding insi
 | 3 | `trigger-not-connected` | a `Triggers` node that has outputs and **none** of whose outputs has an outgoing edge. | A trigger with at least one connected output. |
 | 4 | `node-unreachable` | every node whose category is not `Triggers` that is not reachable from any `Triggers` node, **only evaluated when the graph contains at least one Trigger**. | Suppressed for a node that already has a `required-input-unconnected` warning **and** has no incoming edge at all (one cause, one warning). A graph with no Trigger gets no `node-unreachable` warnings. |
 | 5 | `result-unused` | every node whose category is neither `Output` nor `Triggers`, that has at least one output port, where **no** output port has an outgoing edge. | A Condition with only one of its two branch outputs wired does **not** warn: every Condition output is a `branch` port, and this single rule already gives that. A node without outputs never warns. |
-| 6 | `secret-likely` | a **high-confidence** finding of the secret detector in the node's `config` (a credential header name with a value, or a well-known credential shape in a value or a key). One warning per finding; `field` is the display path. | Every node is scanned, **known type or not**. Metadata findings are not warnings (a warning needs a node): the UI reads `detectSecrets` for them. |
-| 7 | `secret-suspected` | a **medium-confidence** finding in the node's `config` (a key containing `secret`, `password`, `passwd`, `token`, `apikey` or `api_key` with a non-empty string value). One warning per finding; `field` is the display path. | A path that is also high reports only `secret-likely`. |
+| 6 | `secret-likely` | a **high-confidence** finding of the secret detector in the node's `config` (a credential header name with a value, or a well-known credential shape in a value or a key). One warning per finding; `field` is the display path. | Every node is scanned, **known type or not**. Metadata findings are not warnings (a warning needs a node): the UI reads `scanSecrets` for them. **At most 50 warnings per node**: the detector keeps 50 findings per node and counts the rest; no extra warning and no count appears in any message (the UI shows "and N more" from `scanSecrets`). |
+| 7 | `secret-suspected` | a **medium-confidence** finding in the node's `config` (a key containing `secret`, `password`, `passwd`, `token`, `apikey` or `api_key` with a non-empty string value). One warning per finding; `field` is the display path. | Not reported for a key whose own value is already a high finding (`SECRETS.md`). Same cap of 50 per node. |
 
-Rules 6 and 7 come **after** rules 1 to 5 of the same node: all `secret-likely` in display-path order, then all
-`secret-suspected`. Their messages name the node and the display path and **never a value or a credential-shaped key**
-(`SECRETS.md`, "Never echo"). Rules 1 to 5 skip a node whose definition is unknown; rules 6 and 7 do not.
+Rules 6 and 7 come **after** rules 1 to 5 of the same node: all `secret-likely`, then all `secret-suspected`, each in the
+detector's depth-first traversal order (own keys in `Object.keys` order, integer-like keys first). Their messages name the
+node (its label or id through `safeDisplayName`: a credential-shaped name shows as `[redacted name]`, a long one is cut to
+60 characters) and the display path, and **never a value or a credential-shaped key** (`SECRETS.md`, "Never echo"). The
+messages of rules 1 to 5 are unchanged: they quote the label as it is, so a surface that reports secrets must not render them.
+Rules 1 to 5 skip a node whose definition is unknown; rules 6 and 7 do not.
 
 An edge only counts when both of its nodes exist, and, for a node whose definition is known, its port exists in the
 right direction (the source port among the node's outputs, the target port among its inputs). An edge to a missing node
@@ -84,7 +87,7 @@ default strip. Fixtures pin both sides (`warn-unicode-spaces-only-prompt`, `warn
 ## Order, determinism and comparison
 
 - The result order is **node array order, then rule order (1 to 7), then port or field in catalog order** (for rules 6 and 7,
-  the display path in the detector's order). The same
+  the detector's depth-first traversal order). The same
   input always gives the same output; the order of the edge array does not matter.
 - The function is **pure** (it does not change its input; a deep-frozen workflow and catalog work) and **never throws for
   any JSON-shaped value** (a workflow made of own data properties: unknown types, edges to nowhere, duplicate node ids,
@@ -96,7 +99,10 @@ default strip. Fixtures pin both sides (`warn-unicode-spaces-only-prompt`, `warn
   an integration node that share an id are both reached. The definition of the **first** node with that id decides which
   ports an edge may use. Validation rejects duplicate ids before an import, so this is unreachable in the app; it is
   defined only so that the function stays deterministic. No fixture covers it (a fixture must import); a unit test does.
-- It runs in about linear time in nodes plus edges (a unit test compares the cost of a 5,000-node and a 50,000-node chain).
+- It runs in time **linear in the size of the workflow** (nodes, edges, and every string and key in the configs, which the
+  secret rules scan). A unit test compares the cost of a 5,000-node and a 50,000-node chain. The secret rules keep at most 50
+  findings (and so 50 warnings) per node, each path at most 200 characters, so the output stays small however large a config
+  is; the scan itself still reads the whole config (`SECRETS.md`, "Bounded output").
 - Fixtures compare warnings as a **multiset** of `{ code, nodeId, port, field }` (order does not matter, duplicates
   count, `message` is never compared), like the error families. **The order of the result is therefore a contract that
   only the TypeScript unit tests check**: a port gets no fixture signal for it.

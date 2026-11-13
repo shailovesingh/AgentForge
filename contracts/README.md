@@ -309,8 +309,10 @@ X10) and is not implemented. This family uses neither error codes nor JSON Point
   GitHub, whose secret scanning rejects token-shaped strings. A fixture holds a **placeholder** such as `@@GHP@@` or
   `@@SK:19@@` (the part the shape counts has 19 characters), and the runner replaces every placeholder, in every string
   **and every object key** of the workflow, with a synthetic token built from parts at run time. The placeholder table is
-  in `SECRETS.md` ("Fixtures and the placeholder method"); an unknown name fails the run. A test scans every fixture file and
-  every detector source file and fails if one holds a literal token.
+  in `SECRETS.md` ("Fixtures and the placeholder method"); anything shaped like `@@...@@` that is not in the table (an unknown or
+  lowercase name, a bad size) fails the run, and so does a substitution that makes two keys collide. A repository-wide
+  test walks every text file in the working tree and fails if one holds a literal token (it prints file, line and pattern
+  name, never the text; scope and patterns in `SECRETS.md`).
 - Guards: every credential shape, every header name and every key word has a positive fixture; every reason, both
   confidences and both locations are expected somewhere; at least 12 negative fixtures; a minimum count (`MIN_COUNTS.secrets`).
 

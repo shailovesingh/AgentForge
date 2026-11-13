@@ -376,6 +376,36 @@ describe('rules 6 and 7: secret-likely and secret-suspected (contracts/SECRETS.m
     const w = wf([http('h', { 'Content-Type': 'application/json' })])
     expect(lint(w, nodeDefinitions).filter((x) => x.code.startsWith('secret'))).toEqual([])
   })
+
+  test('a token-shaped label or node id never appears in a secret warning message (labels and ids are shown through safeDisplayName)', () => {
+    const asLabel = wf([node('h', 'http.request', { headers: { Authorization: 'x', db_password: 'y' } }, `call ${SK} now`)])
+    const asId = wf([node(SK, 'http.request', { headers: { Authorization: 'x', db_password: 'y' } }, '   ')]) // a blank label falls back to the id
+    for (const w of [asLabel, asId]) {
+      const secret = lint(w, nodeDefinitions).filter((x) => x.code.startsWith('secret'))
+      expect(secret.map((x) => x.code)).toEqual(['secret-likely', 'secret-suspected'])
+      for (const x of secret) {
+        expect(x.message.includes(SK), 'message holds the token').toBe(false)
+        expect(x.message.includes(SK.slice(0, 8)), 'message holds the first 8 characters').toBe(false)
+        expect(x.message).toContain('[redacted name]')
+      }
+    }
+  })
+
+  test('a long label is cut in a secret warning message; a short one is shown', () => {
+    const long = 'L'.repeat(100)
+    const [likely] = lint(wf([node('h', 'http.request', { headers: { Authorization: 'x' } }, long)]), nodeDefinitions).filter((x) => x.code === 'secret-likely')
+    expect(likely.message.startsWith(`"${'L'.repeat(60)}..." `)).toBe(true)
+    const [short] = lint(wf([node('h', 'http.request', { headers: { Authorization: 'x' } }, 'Fetch')]), nodeDefinitions).filter((x) => x.code === 'secret-likely')
+    expect(short.message.startsWith('"Fetch" ')).toBe(true)
+  })
+
+  test('at most 50 secret warnings per node, the rest is not a warning (the UI reads the omitted count from scanSecrets)', () => {
+    const payload = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`token${i}`, 'v']))
+    const secret = lint(wf([node('t', 'trigger.manual', { payload })]), nodeDefinitions).filter((x) => x.code === 'secret-suspected')
+    expect(secret.length).toBe(50)
+    expect(secret[0].field).toBe('payload.token0')
+    expect(secret.some((x) => /more|omitted|\d{3}/.test(x.message))).toBe(false)
+  })
 })
 
 // ---------------------------------------------------------------------------

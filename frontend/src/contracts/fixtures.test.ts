@@ -847,6 +847,7 @@ const TOKEN_BUILDERS: Record<string, { size: number; build: (n: number) => strin
   SKANT: { size: 30, build: (n) => 'sk' + '-ant-' + 'api03-' + 'x'.repeat(n) },
   GSK: { size: 24, build: (n) => 'gs' + 'k_' + 'x'.repeat(n) },
   GHP: { size: 36, build: (n) => 'gh' + 'p_' + 'A'.repeat(n) },
+  GHO: { size: 36, build: (n) => 'gh' + 'o_' + 'A'.repeat(n) },
   GHPAT: { size: 30, build: (n) => 'github' + '_pat_' + 'A'.repeat(n) },
   AKIA: { size: 16, build: (n) => 'AK' + 'IA' + 'Q'.repeat(n) },
   ...Object.fromEntries(['A', 'B', 'P', 'R', 'S', 'Z'].map((l) => ['XOX' + l, { size: 12, build: (n: number) => 'xo' + 'x' + l.toLowerCase() + '-' + '1'.repeat(n) }])),
@@ -856,22 +857,39 @@ const TOKEN_BUILDERS: Record<string, { size: number; build: (n: number) => strin
   PEMRSA: { size: 0, build: () => '-----' + 'BEGIN ' + 'RSA ' + 'PRIVATE KEY' + '-----' },
   PEMPUBLIC: { size: 0, build: () => '-----' + 'BEGIN ' + 'PUBLIC KEY' + '-----' },
   BEARER: { size: 24, build: (n) => 'Bea' + 'rer ' + 't'.repeat(n) },
+  // Special characters, built at run time (a file-writing tool can decode a backslash-u escape, so none is ever written):
+  // U+FEFF and U+0085 and U+001C test JavaScript trim and \s; U+00E9 is a non-ASCII letter; the emoji count is UTF-16 units / 2.
+  FEFF: { size: 1, build: (n) => String.fromCharCode(0xfeff).repeat(n) },
+  NEL: { size: 1, build: (n) => String.fromCharCode(0x85).repeat(n) },
+  FS: { size: 1, build: (n) => String.fromCharCode(0x1c).repeat(n) },
+  E9: { size: 1, build: (n) => String.fromCharCode(0xe9).repeat(n) },
+  EMOJI: { size: 1, build: (n) => String.fromCodePoint(0x1f600).repeat(n) },
 }
-const PLACEHOLDER = /@@([A-Z0-9]+)(?::([0-9]+))?@@/g
+// ANYTHING shaped like @@...@@ is a placeholder attempt: a lowercase name, an empty name or a bad size fails the run
+// (with the name only, cut short), so a typo can never leave text that silently tests nothing.
+const PLACEHOLDER = /@@([^@\s:]*)(?::([^@\s]*))?@@/g
 
 export function fillPlaceholders(text: string): string {
   return text.replace(PLACEHOLDER, (_all, name: string, size?: string) => {
-    if (!Object.hasOwn(TOKEN_BUILDERS, name)) throw new Error(`unknown placeholder @@${name}@@`)
+    if (!Object.hasOwn(TOKEN_BUILDERS, name) || (size !== undefined && !/^[0-9]+$/.test(size))) {
+      throw new Error(`bad placeholder (name "${name.slice(0, 24)}")`)
+    }
     const { size: dflt, build } = TOKEN_BUILDERS[name]
     return build(size === undefined ? dflt : Number(size))
   })
 }
 
-/** Placeholders replaced in every string AND every object key. */
+/** Placeholders replaced in every string AND every object key. Two keys that become one would hide a finding, so that fails. */
 function fillDeep(v: unknown): unknown {
   if (typeof v === 'string') return fillPlaceholders(v)
   if (Array.isArray(v)) return v.map(fillDeep)
-  if (isObject(v)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [fillPlaceholders(k), fillDeep(x)]))
+  if (isObject(v)) {
+    const entries = Object.entries(v)
+    const filled = Object.fromEntries(entries.map(([k, x]) => [fillPlaceholders(k), fillDeep(x)]))
+    const after = Object.keys(filled).length
+    if (after !== entries.length) throw new Error(`placeholders made keys collide (${entries.length} keys became ${after})`)
+    return filled
+  }
   return v
 }
 
@@ -903,7 +921,8 @@ describe('secrets fixtures (secret detector, contracts/SECRETS.md)', () => {
     test(c.name, () => {
       // Placeholders become tokens here, in memory; the workflow then goes through the real importer like any other.
       const imported = importWorkflow(JSON.stringify(fillDeep(c.workflow)), nodeDefinitions)
-      expect(imported.ok, `${c.file}: the workflow must import, got ${JSON.stringify(imported.ok ? [] : imported.errors)}`).toBe(true)
+      // on failure print the error codes only: an error path or message could hold a synthetic token
+      expect(imported.ok, `${c.file}: the workflow must import, error codes: ${imported.ok ? '' : imported.errors.map((e) => e.code).join(', ')}`).toBe(true)
       if (!imported.ok) return
       const findings = detectSecrets(imported.workflow)
       expect(asSecretMultiset(findings), `${c.file}: findings ({confidence, location, nodeId, path, reason}, order-insensitive)`).toEqual(asSecretMultiset(c.expect))
@@ -946,11 +965,24 @@ describe('secrets fixtures (secret detector, contracts/SECRETS.md)', () => {
     for (const c of corpus.secrets) for (const m of JSON.stringify(c.workflow).matchAll(PLACEHOLDER)) used.add(m[1])
     expect([...used].filter((n) => !Object.hasOwn(TOKEN_BUILDERS, n)), 'unknown placeholders').toEqual([])
     expect(Object.keys(TOKEN_BUILDERS).filter((n) => !used.has(n)), 'placeholders no fixture uses').toEqual([])
-    expect(() => fillPlaceholders('@@NOPE@@')).toThrow('unknown placeholder')
+  })
+
+  test('a malformed or unknown placeholder fails the runner, naming only the placeholder (never more text)', () => {
+    for (const bad of ['@@NOPE@@', '@@ghp@@', '@@Sk@@', '@@@@', '@@GHP:@@', '@@GHP:x@@', '@@GHP:-1@@']) {
+      expect(() => fillPlaceholders(`before ${bad} after`), bad).toThrow('bad placeholder')
+    }
+    expect(() => fillPlaceholders('@@' + 'x'.repeat(100) + '@@')).toThrow(/^bad placeholder \(name "x{24}"\)$/) // cut short
+    expect(() => fillPlaceholders('plain text, an e-mail like a@@b is not a placeholder, and one @@ is not either')).not.toThrow()
+    expect(fillPlaceholders('@@SK:3@@')).toBe('sk' + '-' + 'xxx')
+  })
+
+  test('a placeholder that makes two keys collide fails (a hidden finding must not look like a pass)', () => {
+    expect(() => fillDeep({ '@@SK@@': 'a', ['sk' + '-' + 'x'.repeat(24)]: 'b' })).toThrow('collide')
+    expect(() => fillDeep({ a: { '@@SK:5@@': 1, '@@SK:6@@': 2 } })).not.toThrow()
   })
 
   test('the placeholders build tokens the detector recognises, and a fixture in memory holds one', () => {
-    for (const name of ['SK', 'SKANT', 'GSK', 'GHP', 'GHPAT', 'AKIA', 'XOXB', 'JWT', 'PEM', 'PEMRSA', 'BEARER']) {
+    for (const name of ['SK', 'SKANT', 'GSK', 'GHP', 'GHO', 'GHPAT', 'AKIA', 'XOXB', 'JWT', 'PEM', 'PEMRSA', 'BEARER']) {
       expect(detectSecrets({ nodes: [{ id: 'n', config: { t: fillPlaceholders(`x @@${name}@@ y`) } }], metadata: {} } as unknown as Workflow).length, name).toBe(1)
     }
     for (const name of ['PEMPUBLIC', 'JWT2', 'XOXZ']) {
@@ -958,22 +990,106 @@ describe('secrets fixtures (secret detector, contracts/SECRETS.md)', () => {
     }
   })
 
-  // Push protection: no fixture file and no source file of the detector holds a literal token. The check uses the detector
-  // itself on the raw text (a whole file is one string, and a shape is found anywhere inside a string).
-  const holdsToken = (raw: string): boolean => detectSecrets({ nodes: [{ id: 'f', config: { text: raw } }], metadata: {} } as unknown as Workflow).length > 0
+})
 
-  test('no fixture file holds a literal token-shaped string (only placeholders)', () => {
-    const files = readdirSync(FIXTURES_DIR, { withFileTypes: true, recursive: true }).filter((d) => d.isFile())
-    expect(files.length).toBeGreaterThan(100)
-    const offenders = files.map((d) => join(d.parentPath, d.name)).filter((p) => holdsToken(readFileSync(p, 'utf8'))).map((p) => relative(FIXTURES_DIR, p))
-    expect(offenders, 'fixture files with a literal token (use a placeholder, see contracts/SECRETS.md)').toEqual([])
+// ---------------------------------------------------------------------------
+// Push protection: no text file of the repository holds a literal token
+// ---------------------------------------------------------------------------
+
+// The repository is pushed to GitHub, whose secret scanning and push protection reject token-shaped strings. This guard walks
+// the TEXT FILES OF THE WORKING TREE (the repository root, with a plain file walk: no git subprocess; it skips node_modules,
+// .git, dist, test-results, playwright-report, .kilo and binary files) and fails on any match of the patterns below, which have
+// NO boundary on purpose (the detector's own patterns do). SCOPE, honestly: it checks what is in the tree when the tests run.
+// It does not cover git history, files outside the tree, or the docs of FUTURE commits until they are written and the tests
+// run again. A pattern here is a class with a count, never a literal run, so this file and the detector do not trigger it.
+// A failure prints the file path, the line number and the pattern NAME only, never the matched text.
+const LITERAL_TOKEN_PATTERNS: [string, RegExp][] = [
+  ['github token (gh?_)', /gh[pousr]_[A-Za-z0-9]{20}/g],
+  ['github fine-grained token', /github_pat_[A-Za-z0-9_]{20}/g],
+  ['groq key', /gsk_[A-Za-z0-9]{20}/g],
+  ['sk- key', /sk-[A-Za-z0-9_-]{20}/g],
+  ['stripe key', /(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20}/g],
+  ['aws access key id', /AKIA[0-9A-Z]{16}/g],
+  ['aws temporary key id', /ASIA[0-9A-Z]{16}/g],
+  ['slack token', /xox[baprs]-[A-Za-z0-9-]{10}/g],
+  ['google api key', /AIza[0-9A-Za-z_-]{35}/g],
+  ['npm token', /npm_[A-Za-z0-9]{36}/g],
+  ['jwt', /eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5}/g],
+  ['pem private key header', /-----BEGIN[A-Za-z ]{0,30}PRIVATE KEY-----/g],
+  ['bearer token', /Bearer\s+[A-Za-z0-9._~+/=-]{20}/g],
+]
+
+/** Where a literal token sits in `text`: line numbers and pattern names, never the text. */
+export function findTokenLiterals(text: string): { line: number; pattern: string }[] {
+  const hits: { line: number; pattern: string }[] = []
+  for (const [pattern, regex] of LITERAL_TOKEN_PATTERNS) {
+    regex.lastIndex = 0
+    for (let m = regex.exec(text); m !== null; m = regex.exec(text)) {
+      hits.push({ line: text.slice(0, m.index).split('\n').length, pattern })
+    }
+  }
+  return hits
+}
+
+const REPO_ROOT = resolve(import.meta.dirname, '../../..')
+const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'test-results', 'playwright-report', '.kilo'])
+const BINARY_EXTENSIONS = /\.(png|jpe?g|gif|ico|webp|woff2?|ttf|otf|eot|pdf|zip|gz|mp4|webm|mp3|wasm)$/i
+
+/** Every text file under `root`, as [relative path, content]. */
+function textFilesOf(root: string): [string, string][] {
+  const found: [string, string][] = []
+  const pending = [root]
+  while (pending.length > 0) {
+    const dir = pending.pop() as string
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (!SKIPPED_DIRECTORIES.has(entry.name)) pending.push(path)
+      } else if (entry.isFile() && !BINARY_EXTENSIONS.test(entry.name)) {
+        const bytes = readFileSync(path)
+        if (!bytes.subarray(0, 8000).includes(0)) found.push([relative(root, path).split(sep).join('/'), bytes.toString('utf8')])
+      }
+    }
+  }
+  return found
+}
+
+describe('push protection: no text file of the repository holds a literal token', () => {
+  test('no file in the working tree matches a token pattern (use a placeholder, see contracts/SECRETS.md)', () => {
+    const files = textFilesOf(REPO_ROOT)
+    expect(files.length, 'the walk found the repository').toBeGreaterThan(200)
+    for (const must of ['CLAUDE.md', 'contracts/SECRETS.md', 'frontend/src/workflow/secrets.ts', 'frontend/e2e', 'docs/DECISIONS.md']) {
+      expect(files.some(([p]) => p.startsWith(must)), `${must} is in the walk`).toBe(true)
+    }
+    expect(files.some(([p]) => p.startsWith('node_modules') || p.includes('/node_modules/') || p.startsWith('.git/')), 'skipped directories are skipped').toBe(false)
+    const offenders = files.flatMap(([path, text]) => findTokenLiterals(text).map((h) => `${path}:${h.line} (${h.pattern})`))
+    expect(offenders, 'literal tokens: file:line (pattern); the text is never printed').toEqual([])
   })
 
-  test('no source file of the detector, its tests or the runner holds a literal token-shaped string', () => {
-    for (const rel of ['../workflow/secrets.ts', '../workflow/secrets.test.ts', '../workflow/lint.ts', '../workflow/lint.test.ts', './fixtures.test.ts']) {
-      expect(holdsToken(readFileSync(resolve(import.meta.dirname, rel), 'utf8')), `${rel} holds a literal token`).toBe(false)
+  test('the scanner flags a synthetic token of every pattern, built at run time, and reports no token text', () => {
+    const synthetic: Record<string, string> = {
+      'github token (gh?_)': 'gh' + 'o_' + 'A'.repeat(36),
+      'github fine-grained token': 'github' + '_pat_' + 'A'.repeat(30),
+      'groq key': 'gs' + 'k_' + 'x'.repeat(24),
+      'sk- key': 'sk' + '-' + 'x'.repeat(24),
+      'stripe key': 'sk' + '_live_' + 'x'.repeat(24),
+      'aws access key id': 'AK' + 'IA' + 'Q'.repeat(16),
+      'aws temporary key id': 'AS' + 'IA' + 'Q'.repeat(16),
+      'slack token': 'xo' + 'xb-' + '1'.repeat(12),
+      'google api key': 'AI' + 'za' + 'x'.repeat(35),
+      'npm token': 'npm' + '_' + 'A'.repeat(36),
+      jwt: 'ey' + 'J' + 'a'.repeat(8) + '.' + 'b'.repeat(8) + '.' + 'c'.repeat(8),
+      'pem private key header': '-----' + 'BEGIN ' + 'RSA ' + 'PRIVATE KEY' + '-----',
+      'bearer token': 'Bea' + 'rer ' + 't'.repeat(24),
     }
-    expect(holdsToken('see ' + fillPlaceholders('@@GHP@@')), 'the check itself works').toBe(true)
+    expect(Object.keys(synthetic).sort(), 'one synthetic token per pattern').toEqual(LITERAL_TOKEN_PATTERNS.map(([name]) => name).sort())
+    for (const [name, token] of Object.entries(synthetic)) {
+      const hits = findTokenLiterals(`line one\nkey = ${token}\n`)
+      expect(hits.map((h) => h.pattern), name).toContain(name)
+      expect(hits.every((h) => h.line === 2), name).toBe(true)
+      expect(JSON.stringify(hits).includes(token.slice(0, 8)), `${name}: the report holds token text`).toBe(false)
+    }
+    expect(findTokenLiterals('nothing here, just sk- and ghp_ and @@GHP@@ and Bearer token')).toEqual([])
   })
 })
 

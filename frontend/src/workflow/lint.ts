@@ -1,4 +1,4 @@
-import { detectNodeSecrets } from './secrets'
+import { detectNodeSecrets, safeDisplayName } from './secrets'
 import type { NodeDefinition, PortDefinition, Workflow } from './types'
 
 // Editor warnings (decisions D-017, D-018; contracts/WARNINGS.md). Pure and total: derived from a workflow
@@ -193,14 +193,18 @@ export function lintWorkflow(workflow: Workflow, catalog: NodeDefinition[]): War
     }
 
     // 6 and 7. a credential in the config (contracts/SECRETS.md): every node counts, known type or not, because it is exported
-    // either way. The message names the display path, which never holds a value or a credential-shaped key. Metadata findings
-    // are not warnings (no node): the UI reads detectSecrets for them.
+    // either way. The message names the display path, which never holds a value or a credential-shaped key, and the node
+    // through safeDisplayName (a label or an id is not scanned, so it could itself be a pasted token). Metadata findings are
+    // not warnings (no node): the UI reads scanSecrets for them. At most 50 findings are kept per node, so at most 50 secret
+    // warnings per node; the omitted count is not in any message (the UI reads it from scanSecrets).
     const found = detectNodeSecrets(item.id, item.config)
+    const secretWarn = (code: 'secret-likely' | 'secret-suspected', path: string, message: string) =>
+      warnings.push({ code, severity: 'warning', nodeId: item.id, field: path, message: `"${safeDisplayName(item.name)}" ${message}` })
     for (const f of found.filter((s) => s.confidence === 'high')) {
-      warn('secret-likely', item, `may hold a credential at "${f.path}". Remove it from the workflow: anyone with the exported file could use it.`, { field: f.path })
+      secretWarn('secret-likely', f.path, `may hold a credential at "${f.path}". Remove it from the workflow: anyone with the exported file could use it.`)
     }
     for (const f of found.filter((s) => s.confidence === 'medium')) {
-      warn('secret-suspected', item, `has a setting at "${f.path}" that may hold a credential.`, { field: f.path })
+      secretWarn('secret-suspected', f.path, `has a setting at "${f.path}" that may hold a credential.`)
     }
   }
   return warnings
