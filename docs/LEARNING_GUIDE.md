@@ -3,7 +3,7 @@
 > **For the Product Owner.** Part 1 is a plain-language **primer** (reference material: what we are building and how the code is organised). Part 2 is the **teaching record** (lessons actually taught and what you demonstrated).
 > The **curriculum and statuses** are in `docs/LEARNING.md`. Learning progress is tracked separately from implementation progress.
 > **Living document.** The Principal Architect updates it at the end of every task (D-028). The primer describes the project **as it is today**; where something is planned but not built, it says so.
-> Last updated: 2026-11-12, after Phase 1.1 T7a, the pure editor-warning function `lintWorkflow` (Lesson L10, commits `62041bf` and `b472579`; the UI that shows the warnings, T7b, `eb166b1`, is under review and not yet taught). Before that: T8, the branching specification (Lesson L9).
+> Last updated: 2026-11-13, after Phase 1.1 T7b, showing the editor warnings in the UI without slowing the editor (Lesson L11, commits `eb166b1` and `5fd6687`). Before that: T7a, the pure editor-warning function `lintWorkflow` (Lesson L10, commits `62041bf` and `b472579`) and T8, the branching specification (Lesson L9). T9a, the secret detector, is committed and under review and is not taught yet.
 
 # Part 1: Primer
 
@@ -28,8 +28,8 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | A catalog of 6 node types | AI models, agents, tools (Phase 4) |
 | Old files keep working: a file saved with an older version of a node is upgraded in memory and the editor tells you (the original file is never rewritten) | Natural-language workflow generation (Phase 5) |
 | The rules for conditional branching, skipped nodes and joins are written down as a binding specification (`docs/ARCHITECTURE.md` section 6.1); the only code is a small marker on the Condition's output ports | |
-| The pure function that works out the editor warnings (an unconnected required input, an empty required setting, a trigger leading nowhere, a node nothing starts, a result nobody uses); it is built and tested (Lesson L10); showing it in the editor, T7b, is committed and still under review | |
-| 1122 unit tests in 19 test files and 51 browser tests (at commit `eb166b1`, which includes T7b's tests) | |
+| The editor warnings (an unconnected required input, an empty required setting, a trigger leading nowhere, a node nothing starts, a result nobody uses): a pure function that works them out (Lesson L10) and, since T7b, a small badge on each node, a count and list in the toolbar and a section in the settings panel (Lesson L11); they never block anything and are never saved in the file | |
+| 1320 unit tests in 20 test files and 56 browser tests (at commit `5fd6687`; the unit count includes the tests of T9a, the secret detector, which is committed and under review and is not taught yet) | |
 | A CI workflow that runs the checks on GitHub | The backend server, database, saving to a server (Phase 2) |
 
 **Important:** today everything runs **in your browser only**. There is no server. Nothing runs a workflow yet. The editor produces a *description* of a workflow; later phases will execute it.
@@ -37,7 +37,7 @@ A tiny example workflow: *Manual Trigger → LLM Prompt ("summarise this") → O
 | Phase | What it delivers | Status |
 |---|---|---|
 | 1 | The visual editor | Done and accepted |
-| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 6, T8 and T7a of 10 done, with task 5 in two halves, T5a and T5b; T6, upgrading old files, T8, the branch rules, and T7a, the warning function, are done; T7b, showing the warnings in the editor, is committed and under review) |
+| 1.1 | Hardening: stricter file format rules, better settings forms, upgrades for old files, warnings, browser tests | In progress (tasks 1 to 6, T8 and T7 of 10 done, with task 5 in two halves, T5a and T5b, and task 7 in two halves, T7a and T7b; T6, upgrading old files, T8, the branch rules, and T7, the warning function and showing the warnings in the editor, are done; T9, secret detection, has its first half T9a committed and under review) |
 | 2 | Backend server and database; save/load workflows | Planned, not approved |
 | 3 | Execution engine: actually run workflows | Planned |
 | 4 | AI runtime: LLM and Agent nodes | Planned |
@@ -104,7 +104,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **Migration.** Upgrading an old file to the current format *in memory*, without overwriting the original. Built in Phase 1.1 task T6 (Lesson L8): when you import a file, each node whose `typeVersion` is older than the catalog's is upgraded by a chain of small steps (`frontend/src/workflow/nodeMigrations.ts`); the Agent node's `maxIterations` became a whole number in version 2, so a version 1 value such as 2.5 is rounded half up to 3 with a note. A banner tells you what changed. A node *newer* than the editor, or older with no path, is an error (`node.version-newer`, `node.no-migration-path`). Writing the upgraded file to a server is planned (Phase 2), not built.
 
-**Validation (errors) vs warnings.** *Errors* mean the file is structurally wrong (unknown node type, impossible connection); it is rejected. *Warnings* mean "this looks incomplete" (an empty required setting, an unconnected node); they never stop you from working. We keep them strictly separate (decision D-018). The warnings come from a separate pure function, `lintWorkflow` in `frontend/src/workflow/lint.ts` (T7a, Lesson L10): they are worked out again from the workflow and the catalog whenever needed, never stored in the file, never blocking.
+**Validation (errors) vs warnings.** *Errors* mean the file is structurally wrong (unknown node type, impossible connection); it is rejected. *Warnings* mean "this looks incomplete" (an empty required setting, an unconnected node); they never stop you from working. We keep them strictly separate (decision D-018). The warnings come from a separate pure function, `lintWorkflow` in `frontend/src/workflow/lint.ts` (T7a, Lesson L10): they are worked out again from the workflow and the catalog whenever needed, never stored in the file, never blocking. Since T7b (Lesson L11) the editor shows them: a muted count badge on each node, a count in the toolbar that opens a list (click an entry to select that node) and a "Warnings for this node" section in the settings panel. Nothing is announced to a screen reader automatically, and each node re-renders only when its own warnings change.
 
 **DAG and "no cycles".** A *directed acyclic graph*: arrows that never loop back. The workflow engine will run nodes in dependency order, which only works if there are no loops. Anything that needs looping (an agent thinking in steps) happens *inside* the Agent node using a library called LangGraph. The editor already refuses a connection that would create a cycle.
 
@@ -116,7 +116,7 @@ The most important idea in the whole project: **the workflow is a JSON document*
 
 **Provider.** Which AI service a node uses: Ollama (local), OpenAI, Anthropic or Groq. We design so adding one does not change the file format. Groq was added in T5b; the one `PROVIDERS` list in `frontend/src/catalog/nodes.ts` feeds both the LLM Prompt and the Agent node.
 
-**Incomplete drafts (decision C1, built in T5b, Lesson L7).** A file whose node is missing a *required* setting (for example an LLM Prompt with no `provider`) still imports. The editor must be able to hold half-finished work. A wrong type, a value outside the allowed list or range, or an unknown setting are still errors. A missing required setting is a *warning* in the editor (`required-field-empty`, computed by `lintWorkflow`, T7a, Lesson L10; showing it in the editor is T7b, under review) and an *error only when the workflow is run* (Phase 3, planned).
+**Incomplete drafts (decision C1, built in T5b, Lesson L7).** A file whose node is missing a *required* setting (for example an LLM Prompt with no `provider`) still imports. The editor must be able to hold half-finished work. A wrong type, a value outside the allowed list or range, or an unknown setting are still errors. A missing required setting is a *warning* in the editor (`required-field-empty`, computed by `lintWorkflow`, T7a, Lesson L10, and shown in the editor since T7b, Lesson L11) and an *error only when the workflow is run* (Phase 3, planned).
 
 **Strict parsing (built in task T4a, Lesson L4).** Reading an imported file with our own small parser instead of the browser's built-in one, so that problems the built-in parser hides (a repeated key, a number too big to store exactly, a file that is not valid UTF-8) become clear errors. It also enforces AgentForge's limits: numbers no larger than 2^53 - 1 in magnitude, nesting at most 64 levels, files at most 5,000,000 bytes. See `frontend/src/workflow/strictJson.ts` and `valuePolicy.ts`.
 
@@ -146,6 +146,7 @@ frontend/src/
     errors.ts         the error codes and JSON Pointer paths (T2)
   catalog/       the six node types (nodes.ts) and lookups (index.ts)
   store/         editorStore.ts: the single source of truth for the workflow being edited
+                 warnings.ts and useWarnings.ts: the cached, shared warning view and the two selectors that connect it to the store (T7b)
   canvas/        the drawing surface (React Flow) and flowMapping.ts, the only place that
                  translates our workflow into React Flow's objects
   nodes/         WorkflowNode.tsx: one component that draws every node type from the catalog
@@ -174,8 +175,8 @@ Outside `frontend/`, the top-level `contracts/` folder holds the language-neutra
 
 | Kind | Tool | What it does | Command |
 |---|---|---|---|
-| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the warning function, the catalog and the shared fixtures in `contracts/`). 1122 in 19 test files at commit `eb166b1` (the Principal Architect's `npm run verify`). | `npm test` |
-| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import (and, since T7b, the warnings). 51 at commit `eb166b1`. | `npm run test:e2e` |
+| **Unit tests** | Vitest | Small, fast tests of single functions (the connection rules, the store, import/export, the strict parser, the two JSON writers, the JSON Schema subset validator, the warning function, the catalog and the shared fixtures in `contracts/`). 1320 in 20 test files at commit `5fd6687` (the Principal Architect's `npm run verify`; the count includes the tests of T9a, the secret detector, which is under review). | `npm test` |
+| **Browser tests** | Playwright | A real browser clicks through the app: drag, connect, edit, export, import (and, since T7b, the warnings). 56 at commit `5fd6687`. | `npm run test:e2e` |
 | **Type check** | TypeScript | Catches mismatched data shapes before running | part of `npm run build` |
 | **Lint** | Oxlint | Catches suspicious code patterns | `npm run lint` |
 | **Everything** | | All of the above, in order | `npm run verify` |
@@ -228,7 +229,7 @@ npm run dev              # open http://localhost:5173
 
 ## 10. What happens next
 
-Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (done, Lesson L8; its review fixes are committed); **T8** the branch rules written down (done, Lesson L9; the specification is in `docs/ARCHITECTURE.md` section 6.1, no engine); **T7a** the pure warning function (done, Lesson L10); **T7b** showing the warnings in the editor (committed, under review); **T9** secret detection; **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
+Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error codes (done); **T3** shared fixtures (done); **T4a** strict parsing and the policy limits (done, Lesson L4); **T4b** repeatable (canonical) JSON export (done, Lesson L5; its review fixes are committed); **T5a** the JSON Schema subset validator, explicit defaults and the `schema` fixtures (done, Lesson L6); **T5b** switching the catalog, the settings panel and the importer to it, plus the Groq provider (done, Lesson L7; its review fixes are committed); **T6** upgrading old files with node migrations (done, Lesson L8; its review fixes are committed); **T8** the branch rules written down (done, Lesson L9; the specification is in `docs/ARCHITECTURE.md` section 6.1, no engine); **T7a** the pure warning function (done, Lesson L10); **T7b** showing the warnings in the editor (done, Lesson L11; its review fixes are committed); **T9** secret detection (the first half, T9a, a pure detector, is committed and under review; the second half, T9b, the export confirmation and indicators, is next); **T10** final documentation and review. Then, if you approve it, Phase 2: the backend server and database.
 
 ## 11. Glossary, quick reference
 
@@ -267,6 +268,7 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | **L8** | Phase 1.1 T6 (commits `2baee23`, `be43319`): versioned node migrations, `agent.autonomous` version 2, the upgrade banner | 3 (main), 7, 2, 12 | 2026-11-05 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L9** | Phase 1.1 T8 (code `4c696b4`; specification `ARCHITECTURE.md` section 6.1 and D-034, corrected in `32066b2`): branching, skipping and joins; the `branch` marker; reviewing a specification | 6 and 5 (main, for the specification only: no engine exists), 7, 12, 3 | 2026-11-12 | 6 (answered at the end of the project) | Explained; evaluation pending |
 | **L10** | Phase 1.1 T7a (commits `62041bf`, `b472579`): editor warnings as a pure, derived function (`lintWorkflow`), the five rules, the whitespace contract and the review stories (the UI that shows them, T7b, is not covered) | 3 (main), 7, 6, 12 | 2026-11-12 | 6 (answered at the end of the project) | Explained; evaluation pending |
+| **L11** | Phase 1.1 T7b (commits `eb166b1`, `5fd6687`): showing derived warnings in the UI (node badge, toolbar list, settings section) without slowing the editor: reference identity, selectors, structural sharing, measuring rendering cost, and the review stories | 2 (main), 3, 12 | 2026-11-13 | 6 (answered at the end of the project) | Explained; evaluation pending |
 
 ## Concept index
 
@@ -378,6 +380,20 @@ Phase 1.1, in order: **T1** browser tests and CI (done); **T2** structured error
 | Scaling tests: compare 5,000 with 50,000 nodes, a ratio instead of milliseconds, two graph shapes (chain and star) because a test detects only what its input exercises | 12 | L10 | Explained (no evidence) |
 | Documenting a boundary honestly (never throws for JSON-shaped values; duplicate ids) instead of over-engineering for an unreachable case | 12, 3 | L10 | Explained (no evidence) |
 | A specification can contradict the code it describes (ARCHITECTURE 6.1 rule 4 versus the suppression rule); a file-tool hazard with Unicode escapes and the byte check | 12 | L10 | Explained (no evidence) |
+| Immutable store updates and reference identity: a new workflow object after every edit, unchanged nodes keep their object (`moveNode`); React and Zustand decide "changed?" by `Object.is` | 2, 3 | L11 | Explained (no evidence) |
+| Selectors and subscriptions: what a component selects decides when it re-renders (`useWarnings` versus `useNodeWarnings`); the first version subscribed every node to the whole workflow | 2 | L11 | Explained (no evidence) |
+| Structural sharing: keep the previous result when the new one is equal, and keep an unchanged per-node array (`getWarnings`, `toView`); a shared frozen empty array (`NO_WARNINGS`) | 2, 3 | L11 | Explained (no evidence) |
+| A `WeakMap` cache per object saves the logic but not the rendering; logic cost and rendering cost are separate questions | 2, 12 | L11 | Explained (no evidence) |
+| Measure, do not guess: the reviewer's 500-node drag numbers and the implementer's timings (reports; lint 0.6 to 0.9 ms, the cost was rendering) | 12 | L11 | Explained (no evidence) |
+| A source-text guard checks a name, not a behaviour; no React testing library and no render test exist in the project; no test measures drag speed (honest limit) | 12, 2 | L11 | Explained (no evidence) |
+| Derived data that is not stored: warnings never enter the document or the export; tests pin exact key sets and `metadata` equal to `{}`, not a word search | 3, 12 | L11 | Explained (no evidence) |
+| Mutation survivors and what tests must pin: a non-first list entry, the right node's section, the badge number, the collapse after zero, exact shapes (reviewer's 16 mutants, 6 survived: a report) | 12 | L11 | Explained (no evidence) |
+| Assert on what the contract fixes (counts, accessible names, node labels), not on message wording the contract leaves free | 12, 3 | L11 | Explained (no evidence) |
+| The disclosure pattern (`aria-expanded`, `aria-controls`, a non-modal list) versus a dialog; real buttons as entries | 2 | L11 | Explained (no evidence) |
+| Live regions: why there is none for a count that changes while typing; the badge as `role=img` with an accessible name and a shortened tooltip | 2 | L11 | Explained (no evidence) |
+| Keyboard and focus: Escape returns focus to the toggle, Delete and Backspace stopped inside the list, focus moved only when it was really lost, stable keys | 2 | L11 | Explained (no evidence) |
+| Accessibility judgement and its limits: contrast ratios from the reviewer (5.80 and 6.26 to 1; reports), accessibility-tree snapshots, no real screen-reader test | 2, 12 | L11 | Explained (no evidence) |
+| A UX decision recorded: a fresh node warns at once, visually subdued | 2 | L11 | Explained (no evidence) |
 | Primer concepts (workflow, node, port, edge, catalog, config schema, `schemaVersion` vs `typeVersion`, validation vs warnings, DAG, credentials) | 1, 2, 3, 6, 7 | Primer (Part 1) | Explained as reference (no evidence, no lesson) |
 
 ---
@@ -2032,3 +2048,186 @@ The reviewer (Opus 5.5, read-only) found **no blockers and no majors** in `62041
 4. A Python backend will implement the same warnings in Phase 2. List everything in `contracts/WARNINGS.md` and the fixtures that lets it agree with the TypeScript code on "empty", on "which port counts", and on the suppression rule. Give two behaviours that the fixtures do **not** check, say which test (if any) checks them today, and what you would add so that a port could not get them wrong. Why is "use the language's strip function" not an acceptable implementation of "blank"?
 5. In review, the claim "never throws, whatever the object holds" was found to be false for a getter or a proxy, and the fix was to change the wording, not to add a `try/catch`. Defend that decision. Name a place in AgentForge where input does cross a trust boundary and a defensive check is the right tool (hint: Lessons L2 and L4), and say what makes it different from the input of `lintWorkflow`.
 6. The repository has an in-test `reference()` implementation compared with `lintWorkflow` on 1,500 random graphs, and the reviewer also wrote its own implementation and compared 80,000 graphs. What does each comparison prove, what can neither prove, and why can the in-repo property test not catch a regression in how U+2028 or U+3000 is treated (look at the value pool the generator draws from)? What would you add to the generator?
+
+---
+
+## Lesson L11: A feature that is cheap in logic can still make the editor slow (showing derived warnings in the UI: identity, selectors and rendering)
+
+**Task:** Phase 1.1 T7b (decisions D-017 and D-018; plan section 3.6, the UI paragraph and the "Not-blocking guarantees"), commits `eb166b1` (the first version) and `5fd6687` (the review fixes). **Modules:** 2 (Frontend and React Flow: selectors, subscriptions, re-rendering, the disclosure pattern, live regions, focus), 3 (Workflow JSON and State Management: derived data is not stored; immutable updates and reference identity), 12 (Security, Testing and Deployment: measuring performance, mutation testing, what a test must pin).
+
+*Status of what this lesson describes, and what I checked.* T7b is built, reviewed, fixed and accepted (`docs/DEVELOPMENT_LOG.md`, Session 13). T9 adds secret warnings later; this lesson does not cover them. **What I read myself at HEAD:** `frontend/src/store/warnings.ts`, `useWarnings.ts` and `warnings.test.ts`; `frontend/src/app/WarningsMenu.tsx`, `WarningsMenu.module.css` and `shorten.ts`; `frontend/src/nodes/WorkflowNode.tsx` and its CSS; the warnings parts of `frontend/src/config-panel/ConfigPanel.tsx`; `frontend/e2e/warnings.e2e.ts` in full; the store updates in `frontend/src/store/editorStore.ts` (`moveNode`, `updateNodeLabel`, `setWorkflowName`); `frontend/src/canvas/Canvas.tsx` (how the canvas reads nodes); `.claude/rules/frontend.md`; `docs/PHASE1_1_PLAN.md` section 3.6; `contracts/WARNINGS.md` (messages may be reworded). I also read the **first version** of `warnings.ts`, `useWarnings.ts`, `WorkflowNode.tsx`, `ConfigPanel.tsx` and `WarningsMenu.tsx` with `git show eb166b1:<path>`, which is how I know exactly what the slow version did. `git show --stat`: `eb166b1` is 11 files (+560), `5fd6687` is 9 files (+381/-95). **What I ran:** `npm test -- src/store/warnings.test.ts` in `frontend/`: **1 file, 16 tests passed**. I counted 17 tests in `frontend/e2e/warnings.e2e.ts` (counted, not run by me). I checked that no React testing library is installed (`frontend/node_modules/@testing-library` does not exist; `package.json` lists none) and that no test renders a component (the only file that creates a React root is `src/main.tsx`). **Reports, not repeated by me:** the project totals at `5fd6687` (**20 test files, 1320 unit tests, 56 end-to-end tests; the Principal Architect's `npm run verify`, exit 0; the unit count includes T9a's tests**); the Opus reviewer's drag measurements, contrast ratios, 16 mutants and accessibility-tree snapshots; the implementer's before/after timings. **Not done by anyone:** no test with a real screen reader.
+
+### 1. The problem
+
+T7a (Lesson L10) gave us `lintWorkflow`, a pure function that returns a list of warnings. Nobody can see that list yet. T7b shows it in three places, and the rules from the plan say it must never get in the way:
+
+- a small **badge** on each node ("2 warnings");
+- a **count and a list** in the toolbar (click the count, see every warning, click an entry to select that node);
+- a **section** "Warnings for this node" in the settings panel.
+
+Two constraints from the plan and D-017/D-018: warnings are **derived** (never stored in the document, never changing it) and **never block** (no modal, no disabled button, no stolen focus, the count updates silently).
+
+The first version met every rule in the plan and still had a serious defect, found by the independent reviewer: **dragging a node in a 500-node workflow became slow**. The warning logic took under a millisecond. The slowness was somewhere else, and finding out where is the main lesson.
+
+### 2. The concept
+
+**Immutability and reference identity.** The editor store never edits an object in place. Every action builds a *new* object and keeps the old pieces that did not change. Look at `moveNode` in `frontend/src/store/editorStore.ts`: it returns `{ ...workflow, nodes: workflow.nodes.map(n => n.id === nodeId ? { ...n, position } : n) }`. The `workflow` object is new, the `nodes` array is new, the moved node is new, **and every other node object is the same object as before**. Why this matters: React and Zustand decide "did this change?" by asking "is it the very same object?" (reference identity, `Object.is`), not by comparing contents. A new object means "changed", the same object means "no change, do nothing". This is cheap, and it is the reason immutable updates exist.
+
+**Selectors and subscriptions.** A component that calls `useEditorStore(selector)` is *subscribed*: after every store update Zustand runs the selector again and re-renders the component only if the selector's result is a different object from last time (the `Object.is` rule is general knowledge of Zustand, and it is exactly what `warnings.test.ts` relies on). So *what you select decides when you re-render*. Select the whole workflow and you re-render on every edit. Select one small thing and you re-render only when that thing changes. The project rule says so too (`.claude/rules/frontend.md`: components read the store through selectors so they do not subscribe to the whole store).
+
+**Structural sharing.** When a new result is *equal in content* to the old one, return the **old object**. Then everything downstream that compares by identity sees "no change". `getWarnings` does this for warnings.
+
+**Derived data, again.** Warnings are recomputed from the workflow, never stored (L10). That choice creates the performance trap: the workflow object changes on every edit, so "derived from the workflow" means "recomputed, and a brand-new result object, on every edit", unless you are careful.
+
+**Logic cost versus rendering cost.** These are two separate questions. Linting 500 nodes takes under a millisecond (the reviewer measured 0.6 to 0.9 ms: a report). Rendering 500 React components takes hundreds of milliseconds. A feature can be perfect on the first and ruinous on the second.
+
+### 3. Why we selected this approach
+
+1. **Keep the logic pure and in `store/warnings.ts`** (no React; a test guards that it imports none). It is tested with plain data, including the identity behaviour.
+2. **One lint per workflow object, shared by everyone** (a `WeakMap`), so 500 node badges do not mean 500 lints.
+3. **Keep the previous result when the new one is equal** (structural sharing), so an edit that changes no warning changes no identity.
+4. **Each node subscribes only to its own warnings** (`useNodeWarnings(nodeId)`), so a warning change on node A does not re-render node B.
+5. **A shared frozen empty array** for "no warnings", so "this node has none" is always the *same* object (a fresh `[]` each time would look like a change every time).
+6. **The list entries exist only while the list is open**, so a closed list costs nothing per warning.
+7. **Accessibility and the not-blocking rules shape the UI**: a disclosure (not a dialog), no live region, real buttons, focus handled explicitly (section 4).
+
+### 4. How it works internally
+
+**The data flow.** The diagram follows `frontend/src/store/warnings.ts`, `useWarnings.ts`, `WorkflowNode.tsx`, `ConfigPanel.tsx` and `WarningsMenu.tsx`.
+
+```mermaid
+flowchart TD
+  STORE["Store: a NEW workflow object after every edit<br/>(drag frame, keystroke in the name, a setting)"] --> GW["getWarnings(workflow)"]
+  GW --> HIT{"WeakMap has THIS<br/>workflow object?"}
+  HIT -- "yes: another caller asked for the same object" --> VIEW
+  HIT -- "no" --> LINT["lintWorkflow(workflow, catalog)<br/>(L10: pure, linear, well under a millisecond for 500 nodes: reviewer's report)"]
+  LINT --> SAME{"toView: is the new list equal in content<br/>to the PREVIOUS view's list?<br/>(code, nodeId, port, field, message)"}
+  SAME -- "yes (position-only edit, name edit)" --> KEEP["return the PREVIOUS view object:<br/>same view, same warnings array, same per-node arrays"]
+  SAME -- "no (a warning really changed)" --> NEW["group by node into a new Map;<br/>a node whose own list is equal keeps its OLD array"]
+  KEEP --> VIEW["the view: warnings (total list) and byNode (Map)"]
+  NEW --> VIEW
+  VIEW --> TOTAL["useWarnings(): the whole view<br/>WarningsMenu (toolbar count and list)"]
+  VIEW --> PERNODE["useNodeWarnings(nodeId): byNode.get(nodeId),<br/>or the shared frozen empty array"]
+  PERNODE --> BADGE["WorkflowNode badge: one subscription per node"]
+  PERNODE --> PANEL["ConfigPanel: 'Warnings for this node'<br/>(the selected node only)"]
+```
+
+*One honest note on the diagram.* The brief for this lesson expected the settings panel to read the total view; the code does not: `ConfigPanel.tsx` calls `useNodeWarnings(selectedId)` (and a source-text guard in `warnings.test.ts` checks that both `WorkflowNode.tsx` and `ConfigPanel.tsx` call `useNodeWarnings(` and never `useWarnings(`). Only the toolbar menu needs the total, so only it calls `useWarnings()`.
+
+**Step by step, for one drag frame.**
+
+1. The canvas calls `moveNode`; the store builds a new `workflow` object (see section 2).
+2. Zustand runs every subscribed selector. For each node's badge that is `getNodeWarnings(s.workflow, node.id)`.
+3. The first selector to ask reaches `getWarnings(newWorkflow)`. The `WeakMap` has no entry for this new object, so `lintWorkflow` runs once (cheap). `toView` compares the new list with `previous`: equal, so it returns the *previous* view. The `WeakMap` now maps the new workflow object to that old view.
+4. Every other selector finds the `WeakMap` entry (no second lint) and reads `byNode.get(id)`, which is the *same array* as last frame.
+5. Same array, so `Object.is` says "no change" and **no warning-related component re-renders**.
+
+**When a warning really changes** (you type a prompt into an LLM Prompt node): the new list is not equal, so `toView` builds a new view. It groups by node and then, for every node whose own list is equal to its old list, puts the **old array back**. So only the node whose warnings changed gets a new array, and only that node's badge re-renders. This is checked by the test "a node keeps its own array when only ANOTHER node's warnings change" in `warnings.test.ts`.
+
+**What was wrong in the first version (`git show eb166b1:...`).** `useWarnings()` was `getWarnings(useEditorStore((s) => s.workflow))`. Read that closely: the *selector* returns the whole workflow object, which is a new object after every edit. So the component re-renders on every edit, and only afterwards looks up the warnings. `WorkflowNode` called `useWarnings().byNode.get(node.id)`, so **every node component re-rendered on every store update**. `ConfigPanel` did the same, and `WarningsMenu` re-rendered and also built a hidden list entry (with `key={i}`) for every warning, even while the list was closed. The `WeakMap` cache only saved the *lint*; it could not save the *rendering*, because a new workflow object is a new key.
+
+**What re-renders on one drag frame (500 nodes, one node dragged).** This table comes from reading the code of both versions; the numbers measured by others are below it.
+
+| What | First version (`eb166b1`) | Fixed version (`5fd6687`) |
+|---|---|---|
+| Each of the 500 node components, because of the warnings subscription | Selects the whole workflow, a new object: **re-renders every frame** | Selects its own warnings array: the same array, **no re-render from warnings** |
+| The settings panel | Re-renders every frame | Selects the selected node's array: no re-render from warnings |
+| The toolbar menu | Re-renders every frame; builds every list entry even while closed | Selects the view: the same object; entries are rendered only while open |
+| `lintWorkflow` | Once per new workflow object | Still once per new workflow object (cheap and shared) |
+| The view object | A new one every frame | The previous one, returned again |
+
+*Caveat.* A node component can still re-render for reasons that have nothing to do with warnings (React Flow passes it new props, and the dragged node really changed). The fix removes the *extra* cost this feature added. It does not claim the rest of the canvas is free.
+
+**The measurements (reports: I did not repeat them).** The Opus reviewer dragged a node in a 500-node workflow (store `moveNode`, 30 updates per animation frame): median about **86 to 105 ms before T7b, 497 to 635 ms at `eb166b1`** (under 2 frames per second), with linting itself at 0.6 to 0.9 ms. The implementer measured, with a different and noisy Windows dev-server setup, about 270 ms before T7b, about 440 ms at `eb166b1` and about 270 ms after the fix. The two harnesses give different absolute numbers; compare the *ratios* inside each: roughly 5 to 6 times slower in the reviewer's run and 1.6 times in the implementer's, back to the baseline after the fix. The Principal Architect did not repeat either measurement (Session 13). Treat both as evidence that the cause was rendering, not as precise figures.
+
+**Measure, do not guess.** Someone who guessed would have optimised the lint (it is the only code with the word "warnings" in it). The measurement showed the lint was well under 1 percent of the cost (under 1 ms against hundreds of milliseconds, by the reviewer's numbers).
+
+**The other parts of the UI.**
+
+- **The badge** (`WorkflowNode.tsx`): a `role="img"` with `aria-label="2 warnings"` (the visible number is the same), a muted pill (no danger colour; a fresh LLM Prompt node shows "2 warnings" at once, by design: the plan says "new nodes warn immediately, visually subdued"). The `title` tooltip lists the messages, each cut by `shorten` (`frontend/src/app/shorten.ts`) to 200 characters so a huge node label cannot flood it. A tooltip is not a dependable way to read text with a keyboard or a screen reader (general knowledge), which is why the full messages are also in the toolbar list and the settings panel.
+- **The toolbar menu** (`WarningsMenu.tsx`): a button with `aria-expanded` and `aria-controls` (the *disclosure pattern*: a button that shows or hides a region; it is **not** a dialog, so nothing covers the page or traps focus). The `<ul>` stays mounted so `aria-controls` always points at something, and gets `hidden` while closed. Each entry is a real `<button>` that calls `setSelection([nodeId], [])`. **There is no live region** (`aria-live`, `role="alert"` or `role="status"`): a live region makes a screen reader announce changes, and the count changes while you type, so it would interrupt you constantly. A guard test in `warnings.test.ts` fails if the warning files contain those attributes, and the e2e test checks that the app's existing status region (the upgrade banner's, L8) stays empty.
+- **The settings-panel section** (`ConfigPanel.tsx`): "Warnings for this node", a `<section>` labelled by its heading, rendered *after* the fields, so a warning that appears while you are typing does not move the field you are typing in (an e2e test types into the prompt and checks the focus stays).
+- **Keyboard and focus details.** Escape in the list closes it and returns focus to the toggle. **Delete and Backspace inside the list call `stopPropagation`**: with a node selected the canvas would delete it, and an e2e test checks both that the node stays and that the same key on the canvas still deletes. When the entry that has focus disappears because its warning was fixed, the browser would drop focus to the page; the component remembers the focused entry's key and moves focus to the toggle, **only if focus really was lost** (it never steals focus from a field you moved to; two e2e tests cover both cases). Entries use **stable keys** (`warningKeys`: node id, code and port or field, with a counter on a collision) instead of the array index, so React keeps the right element when the list changes.
+
+### 5. How it communicates with other components
+
+- **Input.** The store's `workflow` (the editor's current document) and the catalog, through `lintWorkflow` (L10). Nothing else.
+- **Output.** Only to the screen. The warnings never go into the store, the document, the export or an event. `warnings.test.ts` has a source-text guard that `serialize.ts`, `canonicalJson.ts` and `Toolbar.tsx` do not mention the warning API, and the e2e test "export and import still work with warnings; the file has no warning data" exports a workflow that has a warning and checks the **exact key set** of the document, of every node and of every edge, and that `metadata` equals `{}`.
+- **Selection.** A list entry calls the store's existing `setSelection`; the canvas and settings panel already react to the selection. The warnings UI invents no new channel.
+- **One caller of the linter.** A guard test asserts that outside `src/workflow/` the only production file that mentions `lintWorkflow` is `store/warnings.ts`. No component lints on its own.
+- **Pure helpers, thin hooks.** `warnings.ts` has no React (guarded). `useWarnings.ts` is the only place where the pure view is connected to the store (two small hooks).
+- **Planned.** T9 adds secret warnings later; T9b adds an export confirmation (plan section 3.7) and node and toolbar indicators for them.
+
+### 6. Important classes, functions and code paths
+
+| Where | What it does |
+|---|---|
+| `frontend/src/store/warnings.ts`: `getWarnings` | The shared cache: a `WeakMap` per workflow object plus one `previous` view; returns the previous view when the new list is equal |
+| `warnings.ts`: `toView`, `sameWarning`, `sameList` | Structural equality of warnings (`code`, `nodeId`, `port`, `field`, `message`) and reuse of unchanged per-node arrays |
+| `warnings.ts`: `getNodeWarnings`, `NO_WARNINGS` | One node's array, or the one shared frozen empty array for a null or unknown id or a node without warnings |
+| `warnings.ts`: `groupByNode`, `warningCountText`, `warningKeys` | A `Map` (ids such as `__proto__` are safe), "1 warning" and "2 warnings", stable React keys |
+| `frontend/src/store/useWarnings.ts`: `useWarnings`, `useNodeWarnings` | The two selectors: the whole view (toolbar) and one node's array (badge, panel) |
+| `frontend/src/app/WarningsMenu.tsx` | The toolbar count, the disclosure list, Escape, Delete and Backspace, the focus rule |
+| `frontend/src/nodes/WorkflowNode.tsx` | The badge (`role="img"`, accessible name, shortened `title`) |
+| `frontend/src/config-panel/ConfigPanel.tsx` | The "Warnings for this node" section, after the fields |
+| `frontend/src/store/warnings.test.ts` | 16 tests (I ran them): grouping, text, keys, one lint per workflow object, **identity with `Object.is`** for position-only and name-only edits, per-node reuse, the shared empty array, five source-text guards |
+| `frontend/e2e/warnings.e2e.ts` | 17 browser tests (counted): badge, list, selection (including a non-first entry), keyboard, focus, Delete, the export shape, no live region |
+
+### 7. Alternatives and trade-offs
+
+| Option | Good | Costs |
+|---|---|---|
+| **A pure cached view, structural sharing and per-node selectors (chosen)** | Warnings stay derived; a few lines of plain, testable logic; renders only what changed | Identity is subtle: someone can break it by returning a fresh array from a selector, and the tests that protect it look at identity, not at real renders (see the next section) |
+| **Store the warnings in the Zustand store, updated by every action** | Components just select them | Every action must remember to recompute; they can go stale; it adds state to something that is derived data (L10) |
+| **Each component lints for itself** | Simple to write | 500 lints per frame; several implementations that can disagree; the guard test forbids it |
+| **A context provider that holds the warnings** | Familiar pattern | Every consumer of a context re-renders when its value changes: it does not give per-node subscriptions unless you split it up |
+| **`useMemo` in each component** | Looks like caching | Keyed on the workflow object, which changes every edit: it recomputes every time, in every component. It caches nothing useful here |
+| **A library or a custom equality function on the selector** | Less hand-written code | A custom equality function would also work (Zustand supports one; general knowledge, not used here); we preferred identity logic in a tested pure module over a dependency or a rule hidden inside each call |
+| **A modal list** | One place to read | Blocks the page and traps focus; breaks "never block" |
+| **Announce the count in a live region** | A screen-reader user hears the news | It would interrupt on every keystroke that changes the count; the plan says the count updates silently |
+| **Lint on a debounce (a delay after the last edit)** | Fewer lints | The lint was never the cost; a delay shows stale badges and adds a timer to reason about |
+
+### 8. Real-world engineering applications
+
+*From general knowledge, not from this repository.*
+
+- **Memoized selectors** (Redux with `reselect`, Zustand and Jotai equality functions) exist for exactly this: derive data from a big store and return the same object when nothing relevant changed.
+- **The React Profiler and "why did this render" tools** are how teams find unnecessary re-renders; the rule "measure first" is the same everywhere.
+- **Persistent (structurally shared) data structures** in immutable libraries keep unchanged parts, so identity checks are cheap.
+- **The disclosure pattern** is a standard from the WAI-ARIA Authoring Practices; live regions are used sparingly in chat and form apps because over-announcing is a known problem.
+- **Mutation testing tools** (for example Stryker for JavaScript) automate the "break the code and see whether a test fails" check that the reviewer did by hand here.
+
+### What the review found (real examples)
+
+The Opus reviewer found no blockers and one major, and fixed items came back in `5fd6687`. All numbers in this section are reports from Session 13 unless I say I read the code.
+
+**1. The major: rendering, not logic (the main lesson).** See section 4. Four ideas to carry away. (a) *Identity is how a UI decides "changed"*: a new object with the same content is a change as far as React is concerned. (b) *Select as little as you need*: the first version selected everything and filtered afterwards; the fix selects the one value it needs. (c) *Keep the old object when nothing changed* (structural sharing). (d) *Logic cost and render cost are different questions*, and only a measurement tells you which one you have.
+
+**2. An honest limit of how this is tested: no render tests.** The project has **no React testing library and no test that renders a component** (I checked). So the unit tests protect the identity behaviour (`Object.is` on the view and the per-node arrays, which is the mechanism) and a **source-text guard** checks that `WorkflowNode.tsx` and `ConfigPanel.tsx` call `useNodeWarnings(` and not `useWarnings(`. A guard that reads source text checks a *name*, not a *behaviour*: someone could add `useEditorStore((s) => s.workflow)` to `WorkflowNode.tsx` for another reason and bring the slowdown back, and the guard would not notice. The browser tests check that the UI works, not how often it renders, and **no test measures drag speed**, so nothing in the suite would fail if the 500-node drag became slow again (I found no such test). The implementer's before/after timing was a one-time measurement. Adding a render counter (the React Profiler, or a testing library) would close the gap, and it needs a decision about a new dev dependency.
+
+**3. Six mutation survivors (reviewer's 16 mutants, 10 killed: a report).** The reviewer broke the code on purpose in 16 ways and six changes were *not* caught: an entry that always selected the **first** warning's node; the settings section showing the first node's warnings; the badge number off by one; the list not closing when the count reached zero; one lint per component instead of one shared; and warnings leaked into the exported document under a key no test looked for. The common cause: **tests that only exercise the first case, or look for a word instead of pinning a shape.** Every e2e test clicked the *first* list entry, so "always select the first node" looked correct. The fixes are the tests I read: a test that clicks a **non-first** entry and checks the right node is selected, the previous one is not, and the section contains only that node's warnings; a test that the visible badge *text* equals the number, not just its accessible name; a test for the collapse after the count reaches zero; and the export test now pins the **exact key sets** of the document, nodes and edges and `metadata` equal to `{}`. Rule: **pin the exact shape; do not search for a word**. A search for "warning" cannot find a leak under another name.
+
+**4. Tests that pinned wording the contract leaves free.** `contracts/WARNINGS.md` says a message "may be reworded freely". The first e2e tests matched exact message text, so a harmless rewording would have failed them. The fixed tests assert what the contract *fixes* (the counts, the accessible names, the node label that every message names), and not the sentence. Rule: **assert on what the contract guarantees and on nothing more specific**.
+
+**5. Keyboard and focus.** Pressing Delete or Backspace inside the list would have reached the canvas and deleted the selected node; focus fell to the page when the focused entry was fixed; entries used the array index as a key. All fixed (section 4), each with a browser test.
+
+**6. Accessibility judgement.** The reviewer computed the contrast of the muted badge text from the CSS colour tokens: **5.80 to 1 (light) and 6.26 to 1 (dark)** on the node background, above the 4.5 to 1 level that WCAG asks for normal text (the 4.5 figure is general knowledge; the ratios are the reviewer's numbers, not repeated by me). The reviewer took accessibility-tree snapshots. **No one tested with a real screen reader**, so "accessible" here means "uses the right roles and names and passes the browser's accessibility tree checks", not "verified with assistive technology". Accepted and not changed: no click-outside-to-close (Escape and the toggle close it) and no arrow-key navigation in the list.
+
+**7. A UX decision.** A freshly dropped LLM Prompt shows "2 warnings" (empty prompt, unconnected output) and a trigger, an LLM and an Output with no lines show 5. The reviewer questioned it; it was accepted because the plan says "new nodes warn immediately, visually subdued", which is why the badge is a muted grey pill and not red.
+
+**What this teaches, in four lines.**
+1. **A cheap function can have an expensive consequence.** Ask what re-runs, not only what it costs.
+2. **Reference identity is the language between your store and React.** Keep the same object when nothing changed.
+3. **Measure; do not guess.** The lint was never the problem.
+4. **Tests protect what they look at.** A test that only clicks the first item, or searches for a word, lets a bug through; and a source-text guard is a weaker substitute for a render test.
+
+### Knowledge Check / Interview Questions
+
+*Answers are not given here. Study this lesson and `docs/LEARNING.md`, then answer all questions in the dedicated learning session at the end of the project.*
+
+1. In the first version, `useWarnings()` was `getWarnings(useEditorStore((s) => s.workflow))`, and the lint result was cached in a `WeakMap`. Explain precisely why this still re-rendered every node on every drag frame, even though the lint ran only once per workflow object. In your answer say what a Zustand selector's return value is compared by, what `moveNode` creates and what it reuses, and why the `WeakMap` could not help the rendering.
+2. `getWarnings` keeps one `previous` view and returns it when the new warning list is equal in content. Walk through what happens (which objects are new, which are reused, which components re-render) in three cases: dragging a node, typing in the workflow name, and typing a prompt into an LLM Prompt node that removes one warning from that node only. Then name one situation where `previous` being a single module-level variable could be a limit, and what you would change.
+3. A teammate says: "We should wrap the lint in `useMemo` inside each node component, and skip the shared cache." Explain why that does not solve the problem, what it would cost with 500 nodes, and what you would measure to prove it. How would you decide whether the real cost is the logic or the rendering, and what did the reviewer's numbers in this project show?
+4. The project has no React testing library and no test that renders a component. List what protects the "no extra re-render" behaviour today and what each protection can and cannot catch. Describe one realistic change that would bring the slowdown back without failing any test, and what you would add (and what it would cost) to close that gap.
+5. Six mutants survived the first version's tests, including "the list entry always selects the first warning's node" and "warnings leaked into the export under another key". For each of those two, explain why the original tests could not see it and what the fixed tests pin. State the general rule about what a test should look for when checking that nothing leaked.
+6. Why is the warnings list a disclosure (a button with `aria-expanded`) and not a dialog, and why is there no live region? Explain what Delete and Backspace would have done inside the list without the `stopPropagation`, how the component decides when to move focus to the toggle (and when not to), and why the e2e tests do not pin the exact message sentences. What was not tested about accessibility?
