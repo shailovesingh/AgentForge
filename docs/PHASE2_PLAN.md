@@ -16,7 +16,7 @@
 | # | Precondition | Owner | State |
 |---|---|---|---|
 | P1 | PO approves this plan | PO | **Pending** |
-| P2 | D-013 workflow contract final code review completed, and H1–H5 resolved through **Phase 1.1** | Principal Architect + PO | **Pending** (blocks step 2 onward) |
+| P2 | D-013 workflow contract final code review completed, and H1–H5 resolved through **Phase 1.1** | Principal Architect + PO | **D-013 review done in T10 (2026-11-13); H1 to H5 implemented in Phase 1.1 T1 to T10. Phase 1.1 acceptance by the PO (milestone MS-C) is the remaining gate** |
 | P3 | Docker Desktop installed | PO | **Pending** (blocks step 6 onward; steps 1–5 do not need it) |
 | P4 | A GitHub remote exists, only if CI is wanted | PO | **Done** (`origin` = `https://github.com/shailovesingh/AgentForge.git`) |
 
@@ -24,15 +24,15 @@
 
 | # | Decision | Recommendation |
 |---|---|---|
-| X1 | How node configs are modelled in Pydantic (H1) | Keep `configSchema` as catalog data validated by a Python port of `validateConfig`; typed per-node config models arrive with executors in Phase 3 |
-| X2 | Branch-port marker and per-node migration hook (H3, H4) | Add both as additive optional fields while writing the models |
-| X3 | JSONB vs key-order stability (H5) | Sort `config` and `metadata` keys in the frontend `serializeWorkflow`; store JSONB |
+| X1 | How node configs are modelled in Pydantic (H1) | Keep `configSchema` as catalog data validated by a Python port of `validateAgainstSchema` and `checkSchemaSubset` (**the contract was built in Phase 1.1 T5, `contracts/CONFIG_SCHEMA.md`**); typed per-node config models arrive with executors in Phase 3 |
+| X2 | Branch-port marker and per-node migration hook (H3, H4) | **Done in Phase 1.1 (T8: `branch` marker and `ARCHITECTURE.md` 6.1; T6: `nodeMigrations`)**: port them while writing the models |
+| X3 | JSONB vs key-order stability (H5) | **Done in Phase 1.1 (T4)**: the export writes sorted keys (`export-json/1`), the hash form is `canonical-json/1`; store JSONB |
 | X4 | Id ownership (M1) | Server assigns the workflow id on create |
 | X5 | New dev tooling: `ruff` (lint and format), optionally `mypy` | Approve `ruff`; `mypy` optional |
 | X6 | New dependencies: `asyncpg` (driver, implied by D-009), `json-schema-to-typescript` (frontend dev, step 4) | Approve both |
 | X7 | `GET /api/catalog` response envelope | `{ "nodes": [...] }` rather than a bare array, so metadata can be added later |
 | X8 | Contract size limits (M2) | Choose numbers in step 2 (e.g. max nodes, edges, string lengths) |
-| X9 | Whether Playwright (Phase 1.1) lands before step 10 | Recommended yes. **Update:** Playwright is approved as Phase 1.1 task T1 (D-019) |
+| X9 | Whether Playwright (Phase 1.1) lands before step 10 | **Done: Playwright and CI landed in Phase 1.1 T1 (D-019); 71 browser tests at the end of T9b** |
 | X10 | **Backend secret handling** (kept separate from the local export confirmation of D-023): whether `save` refuses or sanitizes high-confidence secret matches, server-side redaction in logs and events, and `credentialRef` resolution | Recommend: reject high-confidence matches on save with a structured 422 and no override, because the server persists what it receives. **Not decided here** |
 
 ## 3. Dependency order
@@ -51,6 +51,16 @@ Step 1 can start after P1 alone. Step 2 needs P2. Steps 6–8 need P3. Step 10 n
 ## 4. Steps
 
 Sizes (S/M/L) are rough engineering estimates, not commitments.
+
+### Phase 1.1 outcomes that change the steps below (added 2026-11-13, Session 13; still a PROPOSAL, Phase 2 is NOT authorized)
+
+Phase 1.1 produced language-neutral specifications and shared fixtures in `contracts/` (558 fixture files at the end of T9: workflow valid 21 and invalid 107, connection 22, config 19, serialization 109, schema 148, migration 10, warnings 39, secrets 83), run today only by TypeScript (Vitest). **No Python exists and no Python parity is claimed.** The steps below are amended as follows (each point is a requirement for the Python side):
+
+- **Step 2 (models).** `Workflow` and its parts are unchanged from v1 (the document did not change in Phase 1.1). The catalog contract DID change, additively: `configSchema` is an `ObjectSchema` in the documented JSON Schema subset (`contracts/CONFIG_SCHEMA.md`); `defaults` is REMOVED (initial values are schema `default`s applied by an explicit `applyDefaults`, never implicitly); a presentation-only `ui` block; an optional `branch` marker on OUTPUT ports only; `PROVIDERS` includes `groq` (order: ollama, openai, anthropic, groq); `agent.autonomous` is version 2 (`maxIterations` an integer). Model input ports and output ports as **separate types** (today one TypeScript interface allows `branch` on an input and `required`/`multiple` on an output; a catalog test enforces it). The parity test uses `contracts/fixtures/catalog/builtin.catalog.json` (a strict drift test exists in the frontend). Accept the strict-parser policy limits (depth 64, 5,000,000 bytes, safe integers, no NUL, no lone surrogates, duplicate keys rejected) as part of the model boundary (`contracts/CANONICAL_JSON.md`).
+- **Step 3 (JSON Schema generation).** The generated schemas must stay inside the flat subset (no `$ref`, `anyOf`, `pattern`: Pydantic emits `$ref` and `anyOf` by default, so the exporter must inline and avoid them), and every catalog `configSchema` must pass `checkSchemaSubset` and, additionally in Python, the official 2020-12 metaschema. `contracts/` already exists at the repository root and holds specs and fixtures: the generated `*.schema.json` files sit beside them.
+- **Step 4 (TypeScript types).** `frontend/src/workflow/types.ts` is the hand-written baseline; the equivalence test compares against it. The editor-only types (`Warning`, secrets findings, `UpgradeReport`) stay hand-written (not part of the backend document).
+- **Step 8 (versions and hash).** The content hash is SHA-256 over the **`canonical-json/1`** compact form (UTF-16 code unit key order, `String(v)` number text, the string escape set; `contracts/CANONICAL_JSON.md`); `export-json/1` (pretty) is never hashed. Python needs its own number formatter (verified hazards: exponent padding and thresholds differ) and an UTF-16 code-unit key sort. Migration happens in memory at read time; an upgraded workflow is persisted only on user save as a NEW immutable version (`contracts/MIGRATIONS.md` rule; stated there as planned, not implemented).
+- **Step 9 (backend validation and conformance).** The Python port must reproduce, and run the shared fixtures for: the strict parser and its limits (`doc.*` and `value.*` codes), `validateWorkflow` and `checkConnection` (order and `MAX_ERRORS`), `validateAgainstSchema` with the mandatory `checkRequired` option (import uses `false`, execution uses `true`; code-point string length; safe-integer rule; boolean never equals a number in enums), `checkSchemaSubset`, `applyDefaults`, the document `migrate` and the per-node `migrateNodes` (**round half up, not Python's `round()`**; two-phase import: version errors are returned alone, D-033), `canonicalJson`/`exportPretty` serialization, and optionally `lintWorkflow` (the `trim` whitespace set must be implemented exactly: 25 code points, not `str.strip()`) and the secret detector (the left-boundary rules, JavaScript `\s`, UTF-16 key length, `[redacted key]`, per-confidence caps). 37 error codes exist today; the fixture runner requires every non-exempt code to appear in a fixture. Warnings and secrets are frontend-only in Phase 2 unless X10 says otherwise.
 
 ### Step 1 — FastAPI scaffold on Python 3.12 with uv (S)
 

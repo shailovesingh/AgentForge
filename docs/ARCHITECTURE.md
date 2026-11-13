@@ -1,8 +1,8 @@
 # ARCHITECTURE — AGENTFORGE
 
 > **Status: APPROVED (Product Owner, 2026-11-03; decisions D-001 to D-011).**
-> **Implemented so far: the frontend portions of §2, §4 and §5 (Phase 1).** Everything else (§3, §6–§12 backend, engine, agents, generation, MCP, persistence, security services) is **planned, not implemented**.
-> Decision IDs (D-xxx) refer to `docs/DECISIONS.md`. Last updated: 2026-11-03 (Session 2).
+> **Implemented so far: the frontend portions of §2, §4 and §5 (Phase 1 and Phase 1.1, including the editor warnings and secret safeguards).** The branching semantics of §6.1 are a binding specification with no engine behind it. Everything else (§3, the §6 engine, §7–§12 backend, agents, generation, MCP, persistence, security services) is **planned, not implemented**.
+> Decision IDs (D-xxx) refer to `docs/DECISIONS.md`. Last updated: 2026-11-13 (Session 13, Phase 1.1 T10: sections 2, 4, 5, 6.1 and 12 brought in line with the code).
 
 ---
 
@@ -64,14 +64,14 @@ frontend/src/
   store/          Zustand editor store
 ```
 
-**As built in Phase 1:** `app/` (shell and toolbar), `canvas/` (including `flowMapping.ts`, the only Workflow-to-React-Flow mapping), `nodes/`, `library/`, `config-panel/`, `catalog/`, `store/`, and `workflow/` (`types`, `configSchema`, `connections`, `migrate`, `validate`, `serialize`). The store holds the canonical `Workflow` document plus selection. `connections.ts` is a single rule set shared by the canvas (live drag feedback), the store (last gate) and the importer (each imported edge is checked as if added). The Phase 1 validator covers shape, known node types, config values and connection rules; "required inputs connected" is deliberately left to run-time validation (Phase 3), because an editor must be able to hold incomplete graphs.
+**As built (Phase 1 and Phase 1.1):** `app/` (shell, toolbar, warnings list, upgrade banner, export confirmation dialog), `canvas/` (including `flowMapping.ts`, the only Workflow-to-React-Flow mapping), `nodes/`, `library/`, `config-panel/` (generated from the node's schema plus its `ui` block), `catalog/`, `store/` (the editor store, plus pure derived-data helpers `warnings.ts` and `secretReport.ts` with identity-stable caches so rendering stays cheap), and `workflow/`, all pure and React-free: `types`, `errors` (structured `{code, path, message}` errors with stable codes), `strictJson` (RFC 8259 parser with policy limits), `canonicalJson` (compact `canonical-json/1` for hashing and pretty `export-json/1`), `valuePolicy`, `jsonSchema` (the schema-subset validator and the explicit `applyDefaults`), `configSchema` (panel input parsing), `connections`, `migrate` (document), `nodeMigrations` (per node type), `validate`, `serialize`, `lint` (editor warnings) and `secrets` (credential detection). The store holds the canonical `Workflow` document plus selection. `connections.ts` is a single rule set shared by the canvas (live drag feedback), the store (last gate) and the importer (each imported edge is checked as if added). **Language-neutral contracts and fixtures live in `contracts/`** (the specifications `CANONICAL_JSON.md`, `CONFIG_SCHEMA.md`, `MIGRATIONS.md`, `WARNINGS.md`, `SECRETS.md`, and the shared fixture families), run by Vitest today and intended to be run by pytest in Phase 2; **no Python implementation exists and no Python parity is claimed.** "Required input connected" and "required setting present" are not validator errors: they are editor warnings now and execution errors in Phase 3 (section 4).
 
 **Principles**
 
 - **React Flow is the view layer only.** The store holds workflow nodes and edges. React Flow's `Node` and `Edge` objects are derived from them, and they never appear in exported JSON (D-003).
 - **One store (Zustand, D-005).** The canvas, config panel, library and import/export all read and write it. React Flow's own `useNodesState` cannot be reached from sibling panels without prop drilling, and React Flow already depends on Zustand internally.
 - **One generic node component.** It renders the icon, label and input/output handles from the node's catalog definition. Adding a node type means adding catalog data, not writing a new component.
-- **Schema-driven config panel.** Forms are rendered from `configSchema`. Phase 1 supports a small JSON-Schema subset (string, text, number, boolean, enum, json). No form library is added.
+- **Schema-driven config panel.** Forms are rendered from the node's `configSchema` (a documented subset of JSON Schema draft 2020-12: `contracts/CONFIG_SCHEMA.md`) plus its separate `ui` block (presentation only: textarea, rows, placeholder, order). Strings, enums, numbers, integers and booleans get controls; arrays and nested objects use a JSON text editor validated against the schema. No form library is added.
 - **Pure logic in `workflow/`** (serialization, validation, connection rules, migrations). This code has no React imports and is unit tested.
 - **Styling:** CSS Modules, which Vite supports natively (D-011). Icons come from Lucide only.
 
@@ -117,7 +117,7 @@ backend/tests/
       "type": "http.request",
       "typeVersion": 1,
       "label": "Fetch page",
-      "config": { "method": "GET", "url": "https://example.com", "credentialRef": null },
+      "config": { "method": "GET", "url": "https://example.com", "headers": {}, "body": "" },
       "position": { "x": 120, "y": 80 }
     }
   ],
@@ -131,7 +131,7 @@ backend/tests/
 **Rules**
 
 - `schemaVersion` versions the document format. `typeVersion` versions each node type's config and ports. They change independently.
-- **Credentials are never stored inline.** Config holds only a `credentialRef` (an opaque ID). Exports therefore never contain secrets.
+- **Credentials are never stored inline (D-016).** The design is that a node's config holds only a `credentialRef` (an opaque ID) so exports never contain secrets. **`credentialRef` does not exist in the catalog yet** (it arrives with backend credential management, Phase 2 and later: no catalog node declares such a setting today, and every catalog schema rejects unknown keys). Until then the editor DETECTS credential-looking text (`contracts/SECRETS.md`), warns prominently and asks for explicit confirmation before every export that contains a high-confidence match; this is a heuristic safeguard, not a guarantee, and backend enforcement is a separate Phase 2 decision (X10).
 - `position` is the only UI data in the document, and the engine ignores it.
 - **Back-compat:** every load runs through `migrate(doc)`, which applies stepwise upgrades of the document (`1.0 → 1.1 → …`), then `migrateNodes`, which upgrades each node to the latest catalog version of its type (`typeVersion`, e.g. `agent.autonomous` 1 → 2; spec `contracts/MIGRATIONS.md`; the upgrade is reported to the user and the saved file is never rewritten). Old documents are never rejected only because their version is old. Breaking changes require a new major `schemaVersion` together with a migration.
 
@@ -140,17 +140,19 @@ backend/tests/
 - **Phase 1:** hand-written TypeScript types in `frontend/src/workflow/types.ts`. The format above is frozen now so that Phase 2 can adopt it without changes.
 - **Phase 2 onward:** Pydantic models are canonical. A script exports their JSON Schema, and the frontend types are generated from that schema and checked in. CI fails if the generated types drift.
 
-**Validation:** the same rules run on every path in, whether a manual save, an import or an AI-generated draft.
+**Validation:** the same rules run on every path in, whether a manual save, an import or an AI-generated draft (as built in the editor: `importWorkflow` = strict parse, document `migrate`, `migrateNodes`, then `validateWorkflow`; node version problems are returned alone before validation, D-033).
 
+- Strict JSON grammar and policy limits (duplicate keys, depth 64, 5,000,000 bytes, safe integers, no NUL or lone surrogates: `contracts/CANONICAL_JSON.md`).
 - Schema shape.
 - Unique IDs.
-- Known `type@typeVersion`.
+- Known `type` and a `typeVersion` that is the latest or can be migrated (`node.version-newer`, `node.no-migration-path`).
 - Ports exist on the referenced nodes.
 - Data types are compatible.
 - Single-connection inputs are respected.
 - No cycles (D-006).
-- Required inputs are connected.
-- Config validates against the node's `configSchema`.
+- Config validates against the node's `configSchema` with `checkRequired: false` (decision C1: an absent required setting is NOT an import error).
+
+**Not structural errors, by design (D-017, D-018, D-025):** "required input connected" and "required setting present" are completeness concerns. In the editor they are **warnings** derived by `lintWorkflow` (`contracts/WARNINGS.md`), never stored in the document and never blocking; the execution engine (Phase 3) enforces them as errors (`checkRequired: true`).
 
 ---
 
@@ -355,9 +357,11 @@ PostgreSQL, accessed through SQLAlchemy 2.0 (async) with Alembic migrations (D-0
 
 | Layer | Tooling | Focus |
 |---|---|---|
-| Frontend logic | Vitest | Serialize/import round-trip, `canConnect` rules, import validation, migrations, store actions |
-| Frontend UI | Vitest + Testing Library (selective) | Config panel form rendering, library search |
-| Frontend E2E | Playwright (**deferred** until a stable end-to-end flow exists) | Drag, connect, configure, export |
+| Frontend logic | Vitest | Serialize/import round-trip, `canConnect` rules, import validation, migrations, store actions, the pure modules (`jsonSchema`, `lint`, `secrets`) with seeded property tests against independent reference implementations |
+| Shared contracts | JSON fixtures in `contracts/fixtures/` (workflow valid/invalid, connection, config, serialization, schema, migration, warnings, secrets), compared as `{code, path}` multisets; run by Vitest today, **by pytest in Phase 2 (planned, not done)** | The cross-language specification. Secret-shaped test values are placeholders built at run time (the repository is pushed to GitHub) |
+| Frontend UI | **No component test library is installed** (no React Testing Library); pure helpers are unit tested, components are covered by Playwright and by source-text guards (a weaker substitute for render tests, recorded as a known limit) | Config panel, warnings, banner, dialog |
+| Frontend E2E | **Playwright (Chromium)**, implemented in Phase 1.1 and run in CI (GitHub Actions, actions pinned to commit SHAs) | Drag, connect, configure, import/export, migrations banner, warnings, secret confirmation and never-echo scans |
+| Mutation checks | By hand, per task (break a rule, confirm a test fails, restore): not automated | Test strength; equivalent mutants are recorded |
 | Backend unit | pytest | Validator, migrations, catalog/registry consistency, credential encryption, SSRF guard |
 | Engine | pytest + fake executors | Ordering, concurrency, branching/skip, timeouts, limits, approval pause |
 | AI | pytest + **fake LLM provider** | Agent loop bounds, generation repair loop, patch application |

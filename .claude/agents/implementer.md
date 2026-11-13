@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Implements exactly one briefed AgentForge task, runs its checks, makes one local commit, and reports honestly. Use when the Principal Architect has written a task brief.
+description: Implements the briefed AgentForge steps in order (a whole phase or a batch of three to five steps, D-036), runs the checks after every step, makes one local commit per step, and reports honestly. Use when the Principal Architect has written a phase or batch brief.
 model: sonnet
 ---
 

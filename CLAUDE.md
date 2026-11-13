@@ -8,8 +8,8 @@ AgentForge is a Visual AI Agent Builder and Workflow Automation Platform, built 
 |---|---|---|
 | **Product Owner (client)** | The user | Decides what is built and why. Owns scope, priorities, cost and risk decisions. Accepts or rejects outcomes. |
 | **Principal Architect** | Claude, the main session (Sonnet 5.5) | Owns architecture and technical decisions. Breaks work into briefed tasks, accepts or rejects reviewed work, keeps the project documents and `docs/LEARNING.md` true, and escalates product-level decisions to the Product Owner. |
-| **Implementation Engineer** | Sonnet 5.5 subagent (`implementer`, `.claude/agents/implementer.md`) | Implements exactly one briefed task, runs its checks, makes the local commit, and reports honestly. |
-| **Reviewer** | Opus 5.5 subagent (`reviewer`, `.claude/agents/reviewer.md`) | Independently reviews each task (read-only) against its brief and the architecture. Never edits files. |
+| **Implementation Engineer** | Sonnet 5.5 subagent (`implementer`, `.claude/agents/implementer.md`) | Implements a whole briefed **phase** (D-036) as ordered steps, one local commit per step, runs the checks after every step, and reports honestly. |
+| **Reviewer** | Opus 5.5 subagent (`reviewer`, `.claude/agents/reviewer.md`) | Independently reviews the **completed phase** once (read-only) against its brief and the architecture (D-036). Never edits files. |
 | **Tutor** | Sonnet 5.5 subagent (`tutor`, `.claude/agents/tutor.md`) | Writes the lessons and keeps the learning documents current, grounded in the real code. Never marks a topic understood without the Product Owner's demonstrated answers (D-028). |
 
 History: ChatGPT acted as Principal AI Architect until 2026-11-03 (D-027). Older documents that mention it are history and stay as written.
@@ -197,7 +197,7 @@ A task is complete only when:
 - Project brain is synchronized.
 - Remaining limitations are reported.
 - A lesson has been prepared for the Product Owner (section 17), and `docs/LEARNING_GUIDE.md`, `docs/LEARNING.md` and the Learning Progress section of `PROJECT_BRAIN.md` are updated.
-- An independent review (section 16) has been done and its findings triaged.
+- An independent review (section 16: the phase-level Opus review once the phase is complete, D-036) has been done and its findings triaged.
 
 ## 13. Important Rule
 
@@ -259,16 +259,19 @@ Keep it concise. The documentation files remain the source of truth; the handoff
 
 ## 16. Team Workflow (D-027)
 
-Every task follows the same loop.
+The loop works per **phase** (D-036, which replaced the per-task review loop of D-027 and D-029 from 2026-11-13 on; Phase 1 and Phase 1.1 were built and reviewed task by task).
 
-1. **Brief.** The Principal Architect writes a brief: goal, scope, files, acceptance criteria, tests, and what is out of scope. Large work is planned in `docs/` first.
-2. **Implement.** The `implementer` (Sonnet 5.5) does exactly the briefed task, runs the project's checks (`npm run verify` for the frontend), makes **one local commit**, and reports files changed, commands run with real results, deviations and unresolved issues. It never claims untested work is tested.
-3. **Review.** The `reviewer` (Opus 5.5) reviews **every** task: it reads the commit read-only and reports findings by severity (blocker, major, minor, nit) with a verdict.
-4. **Triage and accept.** The Principal Architect decides each finding: fix it (a new commit by the implementer), accept it with a recorded reason, or escalate it. A blocker is never overridden silently. After triage the Principal Architect **accepts or rejects the task**.
-5. **Record and report.** The Principal Architect updates `PROJECT_BRAIN.md`, `DEVELOPMENT_LOG.md`, `ROADMAP.md` and `DECISIONS.md`, then reports to the Product Owner in plain language: what changed, what was verified, what was not, and which decisions are needed.
-6. **Teach.** The `tutor` writes a lesson grounded in the code just built, appended to `docs/LEARNING_GUIDE.md`. Every lesson ends with a **Knowledge Check / Interview Questions** section as its very last part. There are no per-lesson questions in conversation: the Product Owner answers everything in one dedicated learning session at the end of the project (section 17).
+1. **Brief.** The Principal Architect writes a **phase brief**: goal, the ordered steps, files, acceptance criteria per step, tests, and what is out of scope. Large work is planned in `docs/` first. A phase of more than about five steps is run in **batches** of three to five steps so that no single implementer run gets too large.
+2. **Implement.** The `implementer` (Sonnet 5.5) implements the briefed steps in order, runs the project's checks after **every step** (`npm run verify` for the frontend, the backend test suite for the backend), makes **one local commit per step**, and reports files changed, commands run with real results, deviations and unresolved issues. It never claims untested work is tested. It stops and reports when a check fails and it cannot fix it, or when a step needs a decision.
+3. **Verify at batch boundaries.** The Principal Architect runs the project's checks itself after each batch (not a full review: the build, the tests, the diff statistics, a read of the risky parts) and decides whether the next batch may start. Defects found here go back to the implementer.
+4. **Review the completed phase once.** When the phase is complete, the `reviewer` (Opus 5.5) reviews the **whole phase** read-only and reports findings by severity (blocker, major, minor, nit) with a verdict.
+5. **Triage and accept.** The Principal Architect decides each finding: fix it (new commits by the implementer), accept it with a recorded reason, or escalate it. A blocker is never overridden silently, and a finding that would narrow a Product Owner decision about security or scope is escalated, never accepted (D-035). After triage the Principal Architect **accepts or rejects the phase**.
+6. **Record and report.** The Principal Architect updates `PROJECT_BRAIN.md`, `DEVELOPMENT_LOG.md`, `ROADMAP.md` and `DECISIONS.md`, then reports to the Product Owner in plain language: what changed, what was verified, what was not, and which decisions are needed.
+7. **Teach.** The `tutor` writes lessons grounded in the code just built, appended to `docs/LEARNING_GUIDE.md` (D-028 is unchanged: lessons keep running in parallel and never block the build). Every lesson ends with a **Knowledge Check / Interview Questions** section as its very last part. There are no per-lesson questions in conversation: the Product Owner answers everything in one dedicated learning session at the end of the project (section 17).
 
-**Product Owner review cadence (D-029).** The Reviewer reviews **every** task. The Principal Architect accepts or rejects each task after that review. The Product Owner reviews at **milestones** (listed in `docs/PHASE1_1_PLAN.md` section 6.4 and in the roadmap) and may stop or redirect at any time. A new phase (for example Phase 2) always needs the Product Owner's explicit approval.
+**Product Owner review cadence.** The Principal Architect accepts or rejects each phase after the Reviewer's review. The Product Owner reviews at **milestones** (the end of each phase, and others named in the plan or the roadmap) and may stop or redirect at any time. A new phase (for example Phase 2) always needs the Product Owner's explicit approval.
+
+**Known risk of the phase-level review (accepted by the Product Owner in D-036).** Defects are found later, so they can cost more rework, and a mistake in an early step can be built upon by later steps. The mitigations are the checks after every step, the Principal Architect's verification at batch boundaries, and the shared fixture suites. **Security exception (approved by the Product Owner, 2026-11-13, D-036):** steps that are security-critical by nature (credential storage and encryption, authentication and authorization, tool authorization and approvals, sandboxing of code or tools, secret handling, and any step that changes who can read or run what) get an **Opus review as soon as the step or its batch lands**, before later steps build on it, in addition to the phase-level review. The Principal Architect marks such steps in the phase brief.
 
 **Git rules (unchanged, D-026).** Local commits only. No push, fetch, pull, remote change, force-push or history rewrite, and no other remote operation, without the Product Owner's explicit permission. Subagents follow the same rules.
 
