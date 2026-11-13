@@ -1,18 +1,22 @@
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
+import { TriangleAlert } from 'lucide-react'
+import { shorten } from '../app/shorten'
 import { getNodeDefinition } from '../catalog'
 import type { FlowNode } from '../canvas/flowMapping'
-import { TriangleAlert } from 'lucide-react'
-import { useWarnings } from '../store/useWarnings'
+import { useNodeWarnings } from '../store/useWarnings'
 import { warningCountText } from '../store/warnings'
 import { NodeIcon } from './NodeIcon'
 import styles from './WorkflowNode.module.css'
+
+// A message longer than this is cut in the badge's tooltip, so a huge node label cannot flood it.
+const MAX_TITLE = 200
 
 /** The single node component for every catalog type. Ports and icon come from the catalog. */
 export function WorkflowNodeView({ data, selected }: NodeProps<FlowNode>) {
   const { node } = data
   const def = getNodeDefinition(node.type, node.typeVersion)
-  const warnings = useWarnings().byNode.get(node.id) ?? []
+  const warnings = useNodeWarnings(node.id) // only this node's warnings: a drag of another node does not re-render this one
 
   if (!def) {
     return (
@@ -33,7 +37,7 @@ export function WorkflowNodeView({ data, selected }: NodeProps<FlowNode>) {
             className={styles.warning}
             role="img"
             aria-label={warningCountText(warnings.length)}
-            title={warnings.map((w) => w.message).join('\n')}
+            title={warnings.map((w) => shorten(w.message, MAX_TITLE)).join('\n')}
           >
             <TriangleAlert size={12} aria-hidden="true" />
             {warnings.length}
