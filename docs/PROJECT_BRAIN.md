@@ -8,7 +8,7 @@
 
 - **Name:** AgentForge
 - **Product:** Visual AI Agent Builder
-- **Status (2026-11-13, Session 13):** Architecture approved (D-001 to D-011). Phase 1 (visual builder) accepted by the Product Owner (D-020). **Phase 1.1 (contract hardening, warnings, secret safeguards, Playwright and CI) is implemented: all ten tasks T1 to T10 are done and accepted by the Principal Architect; the Product Owner approved milestones MS-A and MS-B; the final phase-level Opus review (D-036) found two blockers, which are being fixed; milestone MS-C (the Product Owner's acceptance of Phase 1.1) is NOT yet approved.** The workflow contract review D-013 is complete (Approved, T10). **Phase 2 is proposed only, NOT approved**; no backend exists and no Python exists.
+- **Status (2026-11-13, Session 13):** Architecture approved (D-001 to D-011). Phase 1 (visual builder) accepted by the Product Owner (D-020). **Phase 1.1 (contract hardening, warnings, secret safeguards, Playwright and CI) is implemented: all ten tasks T1 to T10 are done and accepted by the Principal Architect; the Product Owner approved milestones MS-A and MS-B; the final phase-level Opus review (D-036) found two blockers, both fixed in Session 13 (`00db75b` documents, `1816a1f` code); milestone MS-C (the Product Owner's acceptance of Phase 1.1) is NOT yet approved.** The workflow contract review D-013 is complete (Approved, T10). **Phase 2 is proposed only, NOT approved**; no backend exists and no Python exists.
 - **Product Owner:** User
 - **Principal Architect:** Claude (main session, Sonnet 5.5). ChatGPT held this role until 2026-11-03 (D-027).
 - **Implementation Engineer:** Sonnet 5.5 subagent (`implementer`); from 2026-11-13 it implements a whole phase in batches (D-036).
@@ -73,7 +73,7 @@ Full description: `docs/ARCHITECTURE.md`. Summary:
 
 ### Git
 
-Branch `main`, 55 commits at `81310b7`. **`origin/main` is still at `382d6a4`: 46 local commits are not pushed** (D-030: the Product Owner pushes; Claude never pushes, fetches or pulls). The Phase 1 commits are `798ab84`, `2466b26`, `5af36e5`, `35fe3bc`; Phase 1.1 starts at `382d6a4` (T1). Per-task commit lists are in `docs/DEVELOPMENT_LOG.md` Sessions 6 to 13. GitHub remote: `origin` = `https://github.com/shailovesingh/AgentForge.git`. History notes (not rewritten): three documentation commits reached GitHub from outside Claude's shell in Session 5; an early commit has damaged encoding in two documents (repaired later); a 5 MB fixture blob is in the history of `e28483d`. **Before the first push the Product Owner should know:** the repository-wide token scan found no credential-shaped string in the tree or in any commit, but two ordinary words match the project's own `sk-` pattern in history (the fixture name `sec-sk-prefix-word-no-finding`, since renamed, and the literal `risk-assessment-...` in `33740c3`, since removed); they are not credentials, and GitHub's real patterns could not be checked offline.
+Branch `main`, 55 commits at `81310b7`. **`origin/main` is still at `382d6a4`: 46 local commits are not pushed** (D-030: the Product Owner pushes; Claude never pushes, fetches or pulls). The Phase 1 commits are `798ab84`, `2466b26`, `5af36e5`, `35fe3bc`; Phase 1.1 starts at `382d6a4` (T1). Per-task commit lists are in `docs/DEVELOPMENT_LOG.md` Sessions 6 to 13. GitHub remote: `origin` = `https://github.com/shailovesingh/AgentForge.git`. History notes (not rewritten): three documentation commits reached GitHub from outside Claude's shell in Session 5; an early commit has damaged encoding in two documents (repaired later); a 5 MB fixture blob is in the history of `e28483d`. **Before the first push the Product Owner should know:** the repository-wide token scan found no credential-shaped string in the tree or in any commit, but two ordinary-word strings in history match the project's own pattern for an OpenAI-style key (a fixture file name made of the letters s and k, a hyphen and a long run of ordinary words, since renamed in `2a0f501`; and a test string of ordinary words that ended in a risk-like word, added in `33740c3` and since removed); they are not credentials, and GitHub's real patterns could not be checked offline. (This sentence describes them in words on purpose: the repository-wide token guard test scans this document too and flagged the first version of this sentence, which quoted the file name.)
 
 ### Repository layout (actual)
 
@@ -142,7 +142,7 @@ Tool note: in the Bash tool Vitest has failed intermittently with a `config` err
 - [x] **T7a** Pure `lintWorkflow`, five editor warnings, `warnings` fixtures (`62041bf`, `b472579`); **T7b** warning badge, toolbar list, settings-panel section, non-blocking (`eb166b1`, `5fd6687`).
 - [x] **T9a** Pure secret detector, `secret-likely` and `secret-suspected` lint codes, `secrets` fixtures with run-time token placeholders (`33740c3`, `2a0f501`); **T9b** prominent indicators, export confirmation dialog, never-echo browser tests (`23456e6`, `3e4a5a5`, `dbc68a0`).
 - [x] **T10** Documents aligned with the code, D-013 resolved (Principal Architect, `81310b7`).
-- [ ] **Final phase-level Opus review fixes** (two blockers: a credential in `schemaVersion` could still show in the import error panel because the check ran on JSON-escaped text; this file was stale): code fix in progress with the implementer; this file rewritten in Session 13.
+- [x] **Final phase-level Opus review fixes** (two blockers: a credential in `schemaVersion` could still show in the import error panel because the check ran on JSON-escaped text; this file was stale): fixed. This file was rewritten from the repository (`00db75b`); the code fix is `1816a1f` (the check now runs on the raw value before JSON escaping; one key rule; `React.memo` on the node view).
 
 ### Phase 2 — Backend (not started; NOT approved)
 - [ ] FastAPI application
@@ -190,19 +190,19 @@ Tool note: in the Bash tool Vitest has failed intermittently with a `config` err
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1.1 implemented; **in the closing step**: the phase-level Opus review (D-036) returned FAIL with two blockers, being fixed; then the acceptance report for milestone MS-C. Phase 2 is **proposed only** and unauthorized.
+- **Current phase:** Phase 1.1 implemented and fixed after the phase-level Opus review (D-036: FAIL with two blockers, both fixed); the acceptance report for milestone MS-C is the next step. Phase 2 is **proposed only** and unauthorized.
 - **Process:** since 2026-11-13 (D-036) Sonnet implements a whole phase, Opus reviews the completed phase once, and security-critical steps get an early Opus review (approved by the Product Owner).
-- **Last code commit:** `dbc68a0` (T9b second review fixes); the review-fix commit is in progress.
+- **Last code commit:** `1816a1f` (final phase-review fixes).
 
 ### Verification results (actual)
 
 | Check | Result |
 |---|---|
-| `npm run verify` at `dbc68a0` (run by the Principal Architect, Session 13) | **exit 0**: oxlint clean; typecheck of all four tsconfigs; **22 test files, 1429 unit tests passed**; build ok (JS 462.4 kB, 147.8 kB gzip; CSS 23.9 kB; Phase 1 was 431 kB / 137 kB); **87 Playwright (Chromium) tests passed** |
+| `npm run verify` at `1816a1f` (run by the Principal Architect, Session 13) | **exit 0**: oxlint clean; typecheck of all four tsconfigs; **22 test files, 1440 unit tests passed**; build ok (JS about 462 kB, 148 kB gzip at `81310b7`; Phase 1 was 431 kB / 137 kB); **88 Playwright (Chromium) tests passed** |
 | The same by the phase reviewer, from a clean `git archive` of `81310b7` | typecheck, lint, 1429 unit tests; e2e 87 passed three times in a row (reviewer's report) |
 | Fixtures at `dbc68a0` | 559 case files: workflow/valid 21, invalid 107, connection 22, config 19, serialization 109, schema 148, migration 10, warnings 39, secrets 84 (+ `format.json` and the catalog export); `MIN_COUNTS` matches |
 | Error codes | 37 in `ERROR_CODES`; every code appears in a fixture except the documented exemptions (`value.not-json-data`, export only; five schema-only codes) |
-| Progress of the counts | Phase 1: 48 unit; T1: 26 e2e; T2: 83 unit; T3: 185; T4a: 460; T4b: 707 and 30 e2e; T5: 934 and 35; T6: 988 and 39; T7: 1320 and 56; T9: 1429 and 87 |
+| Progress of the counts | Phase 1: 48 unit; T1: 26 e2e; T2: 83 unit; T3: 185; T4a: 460; T4b: 707 and 30 e2e; T5: 934 and 35; T6: 988 and 39; T7: 1320 and 56; T9: 1429 and 87; final fixes: 1440 and 88 |
 | Independent reviews | Opus reviewed every task T1 to T9 once or twice with real defects found and fixed each time (examples: prototype-key bypasses, a lost projection in export, a crash in `checkSchemaSubset`, a UI that showed a provider that was not in the data, a contradictory branching specification, a 500-node drag slowdown, a credential exportable without the dialog, a credential partly shown in an error panel); the phase-level review (Session 13) found two blockers. Reviewer numbers (differentials, mutation runs, timings) are the reviewers' reports and were not repeated by Claude; the mutation proofs are the implementers' reports |
 | Not verified | Python parity (no Python exists); screen-reader behaviour; browsers other than Chromium; CI on Linux for T2 to T10 (only T1 was reported green by the PO); the e2e suite runs against the Vite dev server, not the production build; GitHub's real push-protection patterns |
 
@@ -217,7 +217,7 @@ Full log: `docs/DECISIONS.md`, **D-001 to D-036**, each with a table row and an 
 3. **Python parity is unproven.** All specifications and fixtures are run by TypeScript only. The cross-language hazards (number text, UTF-16 key order and key length, half-up rounding in migrations, the 25-code-point `trim` whitespace set, JavaScript `\s`, code-point string length, strict parsing, enum equality of booleans and numbers) are written down but unverified until a Python runner passes the 559 fixtures (Phase 2).
 4. **Credentials are detected, not stored safely.** `credentialRef` does not exist in the catalog; detection is a heuristic (`contracts/SECRETS.md`: formats not detected, `NAME_sk-...` style misses); the secret scan covers node `config` and `metadata` only: **workflow name, description, node labels and ids are not scanned** (the workflow name is kept out of the download file name when credential-shaped, but is still written into the exported JSON without a dialog: the phase reviewer's finding M2, a decision for the Product Owner under D-035, not yet decided); React Flow's own `data-id` attribute carries node ids. Backend secret policy (X10) is undecided.
 5. **Echoing untrusted text is fragile.** Every place that builds a message from attacker-controlled text must call `echoSafe` itself; two review rounds found cut-before-check and escape-before-check leaks (fixed); the final fix is in progress. Future backends (for example FastAPI validation errors that include the rejected input) must be treated the same way.
-6. **Editor speed at 500 nodes.** The phase reviewer measured, in the dev server, a median per frame vs `35fe3bc` (Phase 1.1 start): moving a node 249.9 vs 317.4 ms (+27%), typing in a config field 182.3 vs 276.2 ms (+52%); lint and secret scans cost about 1 ms, so it is rendering. A production-build measurement and a fix if cheap are part of the final fix round. No CI check measures speed.
+6. **Editor speed at 500 nodes.** The phase reviewer measured, in the dev server, a median per frame vs `35fe3bc` (Phase 1.1 start): moving a node 249.9 vs 317.4 ms (+27%), typing in a config field 182.3 vs 276.2 ms (+52%); lint and secret scans cost about 1 ms, so it is rendering. The final fix round measured the PRODUCTION build at 500 nodes with a 6x CPU throttle (implementer's report): drag +26%, config typing +34%, workflow-name typing +42% versus `35fe3bc`; the cause was the node badge markup re-rendering on every frame; `React.memo` on the node view now makes drag about 24% FASTER and config typing about 30% faster than before the badges (reported), but the workflow-name edit stays +42% (about 2.7 ms per keystroke at 500 nodes) with an unexplained cause. No CI check measures speed.
 7. **UI tests are thin.** No React component test library is installed; components are covered by Playwright (Chromium, dev server) and by source-text guards, which check that text exists, not behaviour.
 8. **Duplicated helpers (debt).** Text cutting exists in four places (`shorten.ts`, a private `shorten` in `strictJson.ts`, `cutText`, the cut inside `safeDisplayName`) and the key-redaction rule is written twice; settings are scanned by both `lintWorkflow` and `scanSecrets`.
 9. **`exportWorkflowText` catches every exception** and reports it as `value.not-json-data` (so a bug in `projectWorkflow` would be hidden); the JSON Pointer in that error is parsed from the writer's message.
@@ -241,16 +241,16 @@ No design question is open for Phase 1.1. **Pending (need the Product Owner):**
 ## 11. Last Session Handoff
 
 - **Date:** 2026-11-13 (Session 13)
-- **Last task:** Phase 1.1 T7b, T9a, T9b and T10 completed and accepted by the Principal Architect; the Product Owner changed the process (D-036) and approved a security exception; the phase-level Opus review of Phase 1.1 returned FAIL with two blockers (stale project memory: fixed by this rewrite; a credential in `schemaVersion` could still show in the import error panel: fix in progress with the implementer).
-- **Tests:** `npm run verify` exit 0 at `dbc68a0` (22 files, 1429 unit, 87 e2e), run by the Principal Architect.
+- **Last task:** Phase 1.1 T7b, T9a, T9b and T10 completed and accepted by the Principal Architect; the Product Owner changed the process (D-036) and approved a security exception; the phase-level Opus review of Phase 1.1 returned FAIL with two blockers (stale project memory: fixed by rewriting this file; a credential in `schemaVersion` could still show in the import error panel because the check ran on JSON-escaped text: fixed in `1816a1f`); the Principal Architect then verified: `npm run verify` exit 0.
+- **Tests:** `npm run verify` exit 0 at `1816a1f` (22 files, 1440 unit, 88 e2e), run by the Principal Architect.
 - **Git:** local commits only (D-030); 46 unpushed.
 - **Learning:** Lessons L1 to L13 delivered, each ending in a Knowledge Check; nothing marked Understood; evaluation at the end of the project.
-- **In flight:** the implementer's final-review fix commit (check raw text before JSON escaping, one key rule, a production-build speed measurement).
-- **Next task:** verify the fix commit, then the MS-C acceptance report with a ready-to-approve Phase 2 brief.
+- **In flight:** nothing; the MS-C acceptance report is being sent.
+- **Next task:** the Product Owner decides MS-C, the secret-scan scope (M2) and the Phase 2 brief; nothing else is pending.
 
 ## 12. Next Recommended Action
 
-1. **Principal Architect:** verify the final-review fix commit, record it, send the MS-C acceptance report.
+1. **Principal Architect:** MS-C acceptance report sent; wait for the Product Owner.
 2. **PO:** review MS-C; decide the secret-scan scope (M2); approve or change the Phase 2 brief (X1 to X10); push when ready and report the CI result.
 3. **PO (housekeeping):** move `Downloads\CLAUDE.md` out of the parent path.
 4. **No Phase 2 or backend work until the PO approves it.**
