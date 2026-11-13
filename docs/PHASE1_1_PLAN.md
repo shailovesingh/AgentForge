@@ -1,6 +1,6 @@
 # PHASE 1.1 PLAN — CONTRACT HARDENING, WARNINGS, PLAYWRIGHT (APPROVED FOR IMPLEMENTATION)
 
-> **Status (2026-11-03, Session 6): APPROVED FOR IMPLEMENTATION** by the Product Owner and Principal Architect (final authorization, D-026). Task order **T1 → T2 → T3 → T4 → T5 → T6 → T8 → T7 → T9 → T10**; one local commit per task; `npm run verify` after each; PO review after each task before the next. **T1 is implemented (Session 6); T2 to T10 are not started.** No push, fetch, pull or remote operation without explicit permission.
+> **Update 2026-11-13 (Session 13): all tasks T1 to T10 are implemented; the review process was changed by D-036 (Opus now reviews a completed phase once); see ROADMAP and DEVELOPMENT_LOG for the results.** **Status (2026-11-03, Session 6): APPROVED FOR IMPLEMENTATION** by the Product Owner and Principal Architect (final authorization, D-026). Task order **T1 → T2 → T3 → T4 → T5 → T6 → T8 → T7 → T9 → T10**; one local commit per task; `npm run verify` after each; PO review after each task before the next. **T1 is implemented (Session 6); T2 to T10 are not started.** No push, fetch, pull or remote operation without explicit permission.
 > **Phase 2 is not started and not authorized.** Application code changes only through the approved tasks (D-026).
 > Inputs: the PO's review decisions (Q1–Q6, H1–H5, P1–P7, S1, W1, V1, G1) · `docs/PHASE1_REVIEW.md` · `docs/DECISIONS.md` (D-012 to D-025).
 > History: Session 4 first draft. Session 5 (this version): P1 explicit defaults, P7 canonical JSON, S1 secret detection revised as the PO required.
@@ -411,7 +411,7 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
 - **Acceptance:** at least 40 cases across `workflow`, `connection`, `config`, `catalog`; the runner fails if a fixture file is malformed; the README documents the format and the multiset rule.
 - **Tests:** the runner is the test; a mutation check (change one rule, a fixture fails) is recorded.
 
-### T4 — Strict parsing, canonical JSON and export JSON (H5, revised P7) (L) — **split (D-031): T4a DONE** (commits `9477df7`, `a0abf63`; Opus-reviewed; accepted by the Principal Architect; results in `docs/DEVELOPMENT_LOG.md` Session 10); **T4b in progress**.
+### T4 — Strict parsing, canonical JSON and export JSON (H5, revised P7) (L) — **split (D-031): T4a DONE** (commits `9477df7`, `a0abf63`; Opus-reviewed; accepted by the Principal Architect; results in `docs/DEVELOPMENT_LOG.md` Session 10); **T4b DONE** (`dd33e84`, `d2ef493`).
 - **Split into T4a and T4b (Principal Architect, D-031):** **T4a** = strict parsing and the policy checks (`strictJson.ts`, import by bytes, the new `doc.*`/`value.*` codes, `valuePolicy.ts` for values typed in the editor, fixtures for parsing and limits). **T4b** = canonical compact JSON, pretty export JSON, the `serializeWorkflow` change and the serialization fixtures. Each part is implemented, Opus-reviewed and accepted separately; the milestone cadence is unchanged (MS-B after T6).
 - **T4a refinements decided by the Principal Architect:** (1) the number policy is stated as one rule, **magnitude <= 2^53 - 1**, decided from the token text before conversion (equivalent to "integers must be safe integers" because every double of magnitude 2^53 or more is an integer), with a post-conversion backstop for tokens that round up to 2^53; (2) values typed in the editor must obey the same policy (`valuePolicy.ts`), otherwise export followed by import would break the round-trip guarantee; (3) the fixture format gains `inputBytesBase64` for invalid-UTF-8 and BOM cases; (4) `importWorkflow` accepts bytes so invalid UTF-8 is detected (a browser `File.text()` would silently replace bad bytes).
 - **Carry-overs from the T4a review into T4b:** (1) the export guard must also check the exported **byte length** (at most 5,000,000 UTF-8 bytes), otherwise a very large pasted text could be exported but not re-imported (D-031 promises a workflow the editor lets you export can always be re-imported); (2) `exportPretty`/`serializeWorkflow` must refuse values that are not valid JSON data (non-finite numbers, unsafe magnitudes, NUL, lone surrogates, depth over 64) and the export UI must show the refusal; this also covers the **workflow name and node labels**, which the config-panel policy does not reach; (3) `parseConfigInput` still uses the built-in `JSON.parse` for typed JSON, so a duplicate key typed into a JSON setting silently collapses: use `strictParse` there so it is flagged instead; (4) an internal parser exception is reported as `doc.not-json`, which keeps the never-throws promise but could hide a bug: consider a distinct internal-error message.
@@ -426,7 +426,7 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
   - `export(parse(export(x))) == export(x)` and `canonical(parse(export(x))) == canonical(x)`; a Phase 1 export still imports; `JSON.parse` is no longer used on untrusted import text (a test greps for it).
 - **Tests:** the fixture runner; a property-style round trip over generated documents; a mutation check (change one rule and a fixture must fail); a lightweight truncation fuzz (a truncated file always produces a structured error, never an exception); updated Playwright import/export checks.
 
-### T5 — JSON Schema subset, UI separation, providers (H1) (L)
+### T5 — JSON Schema subset, UI separation, providers (H1) (L) — **DONE** (`96cc80d`, `a009b20`, `7b09662`, `44bd7f4`; T5a and T5b)
 - **Split (D-032):** **T5a** = pure module `workflow/jsonSchema.ts` (`validateAgainstSchema` with a mandatory `checkRequired` option, explicit `applyDefaults`, `checkSchemaSubset`), four new codes (`schema.minLength`, `schema.maxLength`, `schema.minItems`, `schema.maxItems`), the `schema` fixture family and `contracts/CONFIG_SCHEMA.md`; nothing existing changes behaviour. **T5b** = everything else below (catalog conversion, `defaults` removed, store, ConfigPanel, `PROVIDERS` with `groq`, C1 in the importer, deleting the old validator).
 - **Carry-over from the T2 review / decision C1:** `schema.required` is currently reported as a structural error. When T5 adds the `checkRequired` option (C1, D-025), document import stops reporting it; update `errors.test.ts` and decide whether `schema.required` stays in `ERROR_CODES` for execution-time validation (Phase 3) or moves out. Use own-property lookups (`Object.hasOwn`) for every lookup keyed by imported data.
 - **Dependencies:** T2, T3.
@@ -434,27 +434,27 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
 - **Acceptance:** the validator supports every keyword in §3.1 including `integer`, `array`/`items`, nested objects, `default`, `required`, `additionalProperties`; `multiline` no longer exists in `configSchema`; accepted configs for all existing nodes are unchanged (except the planned `maxIterations` change in T6); catalog tests (unique ports, schema defaults valid against their own schemas, applied only by the explicit `applyDefaults` at creation (no requirement that required properties have defaults, see C1), enums derived from `PROVIDERS`) pass; the config panel behaves as before for existing nodes.
 - **Tests:** config fixtures (types, ranges, code-point length with emoji, nested and array cases, unknown keys, `checkRequired` on and off cases (C1)); catalog consistency tests (unique ports, defaults valid against their schemas, enums derived from `PROVIDERS`); Playwright config-panel checks.
 
-### T6 — Node migrations and the first real migration (H3) (M)
+### T6 — Node migrations and the first real migration (H3) (M) — **DONE** (`2baee23`, `be43319`)
 - **Carry-over from the T2 review:** the comment in `errors.ts` says paths point into "the imported document"; once real migrations exist they point into the **migrated** document, so fix the wording and decide the path semantics. `node.unknown-type` always points at `/nodes/<i>/type`, even for a known type with an unknown version; revisit together with `node.version-newer`.
 - **Dependencies:** T5.
 - **Files:** `workflow/nodeMigrations.ts`, `workflow/migrate.ts` (pipeline), `workflow/serialize.ts` (`importWorkflow` returns upgrades), `catalog/nodes.ts` (`agent.autonomous` to version 2), `store/editorStore.ts` (upgrade report), `app/Toolbar.tsx` or a small `UpgradeBanner`, `contracts/fixtures/migration/*`.
 - **Acceptance:** a v1 agent workflow with `maxIterations: 2.5` imports as v2 with `3`, a visible banner and a note; the original file is byte-unchanged; newer-than-known and gap cases are rejected with `node.version-newer` and `node.no-migration-path` and leave the open workflow untouched; every migration result validates against the new schema. A migration that introduces a property sets it by calling `applyDefaults` explicitly.
 - **Tests:** migration fixtures; round trip after migration; Playwright check for the banner; test that the importer never writes.
 
-### T7 — Editor warnings (Q6, D-017, D-018) (M)
+### T7 — Editor warnings (Q6, D-017, D-018) (M) — **DONE** (`62041bf`, `b472579`, `eb166b1`, `5fd6687`; T7a and T7b)
 - **Carry-over from the T2 review / decision C1:** absent required config keys become `required-field-empty` **warnings** (not errors) in the editor and on import; make sure no structural error path remains for them (see T5).
 - **Dependencies:** T5 (and T8 for `branch`-aware `result-unused`, otherwise a conservative rule is used until T8 lands).
 - **Files:** `workflow/lint.ts`, `workflow/lint.test.ts`, `contracts/fixtures/warnings/*`, `canvas`/`nodes` (badge), `app/Toolbar.tsx` (count and list), `config-panel/ConfigPanel.tsx` (node warnings), CSS modules, e2e spec.
 - **Acceptance:** every rule in §3.6 fires and does not fire in the documented cases; category and direction cases (Trigger without outputs connected, Output without input, Condition with one branch wired, orphan chain) are covered; warnings never block any action (explicit tests); `validateWorkflow` is untouched in meaning.
 - **Tests:** warning fixtures; unit tests per rule; Playwright: warning appears, clears when fixed, and export still works with warnings present.
 
-### T8 — Branch semantics specification and catalog marker (H4) (S)
+### T8 — Branch semantics specification and catalog marker (H4) (S) — **DONE** (`4c696b4`; specification in ARCHITECTURE 6.1)
 - **Dependencies:** none for the document; schedule before T7 if possible.
 - **Files:** `docs/ARCHITECTURE.md` §6 (expanded semantics from §3.4), `workflow/types.ts` (`PortDefinition.branch?`), `catalog/nodes.ts` (Condition outputs), catalog test.
 - **Acceptance:** the specification is merged into ARCHITECTURE; `branch` exists only on output ports; documents are unaffected; the architect signs off the semantics.
 - **Tests:** catalog test; no engine code.
 
-### T9 — Secret detection, warnings and export confirmation (S/M)
+### T9 — Secret detection, warnings and export confirmation (S/M) — **DONE** (`33740c3`, `2a0f501`, `23456e6`, `3e4a5a5`, `dbc68a0`; T9a and T9b)
 - **Dependencies:** T2, T3, T7.
 - **Files:** `workflow/secrets.ts` and test, `contracts/fixtures/secrets/*`, `workflow/lint.ts` (adds `secret-likely` and `secret-suspected`), `app/Toolbar.tsx` (export flow and indicator), `app/ConfirmDialog.tsx` (small accessible dialog), `config-panel/ConfigPanel.tsx` (hint and node notice), Playwright spec.
 - **Acceptance:**
@@ -466,7 +466,7 @@ Sizes (S/M/L) are rough estimates. Each task ends with the full local check (`np
   - False-positive and false-negative examples are fixtures, documenting the heuristic's limits.
 - **Tests:** secrets fixtures (positives, negatives, edge cases); unit tests for the detector and the redacted paths; Playwright: paste an `Authorization` header, see the badge and indicator, export, see the dialog, Cancel gives no download, Export anyway downloads, sentinel absent from the page text outside the editing field and from the console; keyboard-only operation of the dialog.
 
-### T10 — Documentation, decision records and acceptance report (S)
+### T10 — Documentation, decision records and acceptance report (S) — **DONE** (Principal Architect, Session 13; D-013 resolved)
 - **Dependencies:** T1 to T9.
 - **Files:** `docs/{PROJECT_BRAIN,ROADMAP,DECISIONS,DEVELOPMENT_LOG,ARCHITECTURE}.md`, `.claude/rules/frontend.md` (contracts, canonical JSON, warnings vs errors), `docs/PHASE2_PLAN.md` (update steps 2, 3, 4, 8, 9 to the Phase 1.1 outcomes).
 - **Acceptance:** documents match the repository; D-013 resolved by the architect's final code review; full verification evidence recorded; remaining limitations listed.

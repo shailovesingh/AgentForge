@@ -8,11 +8,12 @@
 
 - **Name:** AgentForge
 - **Product:** Visual AI Agent Builder
-- **Status:** Architecture approved (D-001 to D-011). Phase 1 (visual builder) **accepted as functionally complete by the PO (D-020), subject to Phase 1.1**. Workflow contract **pending final code review** (D-013). **Phase 1.1 is APPROVED for implementation (final authorization 2026-11-03, D-026). T1 to T6 are implemented and committed locally (T6 under review fixes; MS-B follows); T8, T7, T9 and T10 are not started.** **Phase 2 is proposed only, not approved**; no backend exists.
+- **Status (2026-11-13, Session 13):** Architecture approved (D-001 to D-011). Phase 1 (visual builder) accepted by the Product Owner (D-020). **Phase 1.1 (contract hardening, warnings, secret safeguards, Playwright and CI) is implemented: all ten tasks T1 to T10 are done and accepted by the Principal Architect; the Product Owner approved milestones MS-A and MS-B; the final phase-level Opus review (D-036) found two blockers, which are being fixed; milestone MS-C (the Product Owner's acceptance of Phase 1.1) is NOT yet approved.** The workflow contract review D-013 is complete (Approved, T10). **Phase 2 is proposed only, NOT approved**; no backend exists and no Python exists.
 - **Product Owner:** User
 - **Principal Architect:** Claude (main session, Sonnet 5.5). ChatGPT held this role until 2026-11-03 (D-027).
-- **Implementation Engineer:** Sonnet 5.5 subagent (`implementer`)
-- **Reviewer:** Opus 5.5 subagent (`reviewer`)
+- **Implementation Engineer:** Sonnet 5.5 subagent (`implementer`); from 2026-11-13 it implements a whole phase in batches (D-036).
+- **Reviewer:** Opus 5.5 subagent (`reviewer`); from 2026-11-13 it reviews a completed phase once, plus an early review of security-critical steps (D-036).
+- **Tutor:** Sonnet 5.5 subagent (`tutor`), lessons per D-028.
 
 ## 2. Product Vision
 
@@ -44,14 +45,15 @@ Build a platform that allows users to create AI agents and automation workflows 
 
 Record changes in `docs/DECISIONS.md`.
 
-**Versions actually installed in `frontend/` (resolved by npm on 2026-11-03):** React 19.3, Vite 8.3, TypeScript 7.0, Vitest 5.1, @xyflow/react 12.12, zustand 5.0, lucide-react 1.66, oxlint 1.x. See Known Issue 8.
+**Versions actually installed in `frontend/` (resolved by npm):** React 19.3, Vite 8.3, TypeScript 7.0, Vitest 5.1, @xyflow/react 12.12, zustand 5.0, lucide-react 1.66, oxlint 1.x; Phase 1.1 added only the dev dependencies `@playwright/test`, `playwright` and `playwright-core` 1.64.1 (no runtime dependency changed; verified by the phase review). See Known Issue 12.
 
 ## 4. Core Architecture
 
 Full description: `docs/ARCHITECTURE.md`. Summary:
 
-- **Frontend:** visual canvas, node library, config panel, editor store. Implemented in Phase 1.
-- **Backend:** API layer, workflow manager, validation, node catalog/registry, DAG execution engine, agent runtime, integrations. **Not started.**
+- **Frontend:** visual canvas, node library, config panel generated from the catalog schema, editor store, derived warnings and secret safeguards. Implemented (Phase 1 and 1.1).
+- **Contracts:** language-neutral specifications and shared fixtures in `contracts/` (canonical JSON, config schema, migrations, warnings, secrets). Run by TypeScript only; **no Python parity is claimed**.
+- **Backend:** API layer, workflow manager, validation, node catalog/registry, DAG execution engine, agent runtime, integrations. **Not started.** The branching and skipping semantics of the future engine are a binding specification (ARCHITECTURE section 6.1, D-034); no engine code exists.
 - **AI layer:** workflow generation, NL editing, LLM node, agent node, memory, tool calling. **Not started.**
 
 ## 5. Architecture Rules
@@ -67,47 +69,39 @@ Full description: `docs/ARCHITECTURE.md`. Summary:
 
 ## 6. Actual Repository Status
 
-*Last updated 2026-11-03 (Session 2).*
+*Last updated 2026-11-13 (Session 13), from the repository at `81310b7` plus the review-fix work in progress.*
 
 ### Git
 
-Branch `main`. Commits:
+Branch `main`, 55 commits at `81310b7`. **`origin/main` is still at `382d6a4`: 46 local commits are not pushed** (D-030: the Product Owner pushes; Claude never pushes, fetches or pulls). The Phase 1 commits are `798ab84`, `2466b26`, `5af36e5`, `35fe3bc`; Phase 1.1 starts at `382d6a4` (T1). Per-task commit lists are in `docs/DEVELOPMENT_LOG.md` Sessions 6 to 13. GitHub remote: `origin` = `https://github.com/shailovesingh/AgentForge.git`. History notes (not rewritten): three documentation commits reached GitHub from outside Claude's shell in Session 5; an early commit has damaged encoding in two documents (repaired later); a 5 MB fixture blob is in the history of `e28483d`. **Before the first push the Product Owner should know:** the repository-wide token scan found no credential-shaped string in the tree or in any commit, but two ordinary words match the project's own `sk-` pattern in history (the fixture name `sec-sk-prefix-word-no-finding`, since renamed, and the literal `risk-assessment-...` in `33740c3`, since removed); they are not credentials, and GitHub's real patterns could not be checked offline.
 
-| Commit | Content |
-|---|---|
-| `798ab84` | Initial commit: documentation and Claude rules |
-| `2466b26` | Phase 1 step 1: scaffold frontend |
-| `5af36e5` | Phase 1 steps 2–3: Workflow v1 types, catalog, store |
-| `35fe3bc` | Phase 1 steps 4–9: canvas, library, config panel, connection rules, import/export |
-
-Latest commit when this was written: **`382d6a4`** (Claude's Phase 1.1 T1 commit). Per the local `origin/main` reflog it was **pushed at 13:21:06 +0530, 51 seconds after it was committed, by someone other than Claude**; the actor is not verifiable locally. Claude did not push and cannot see GitHub, so **the CI result for `382d6a4` is unknown to Claude** (the PO is asked to report it). T1 review-fix commits (Session 7) follow it; check `git status -sb` and `git log` for their current state.
-
-**GitHub remote:** `origin` = `https://github.com/shailovesingh/AgentForge.git` (account `shailovesingh`). All history up to `cf738b5` is on it.
-
-**Three commit-and-push pairs were made by others, and a fourth push carried Claude's own T1 commit:** `b7e5cbc` (12:16:35 / pushed 12:17:05), `db451da` (12:37:04 / 12:37:28) and `cf738b5` (12:56:14 / 12:56:37), each with the editor-style message `git commit -m "docs: ..."`, each preceded by a `FETCH_HEAD` write 3 seconds before the push. Claude never ran `git push`, `fetch`, `pull` or `remote add`. Evidence and its limits are in `docs/DEVELOPMENT_LOG.md` Sessions 5 and 6; the actor and credential are not verifiable locally. Claude ran two read-only network commands: `git ls-remote origin HEAD` once (a slip: it should have asked first; disclosed in Session 6) and `git ls-remote --tags` against three public action repositories (with the PO's permission, for C5).
 ### Repository layout (actual)
 
 ```
 AgentForge/
   CLAUDE.md  .gitignore  .gitattributes
-  .claude/rules/{architecture,frontend,backend}.md
-  docs/{PROJECT_BRAIN,ARCHITECTURE,DECISIONS,ROADMAP,DEVELOPMENT_LOG}.md
-  docs/PHASE1_REVIEW.md   (review package: contract review, six questions, Playwright proposal; PO decisions in §4)
-  docs/PHASE1_1_PLAN.md   (Phase 1.1 plan, APPROVED FOR IMPLEMENTATION; T1 implemented (acceptance pending CI), T2 to T10 pending)
-  docs/PHASE2_PLAN.md     (PROPOSED, not approved)
-  .github/workflows/ci.yml   (CI: runs npm run verify; actions pinned to SHAs; pushed with 382d6a4; GitHub run result unknown to Claude)
+  .claude/rules/{architecture,frontend,backend}.md   .claude/agents/{implementer,reviewer,tutor}.md
+  .github/workflows/ci.yml     (npm ci then npm run verify; actions pinned to commit SHAs; permissions contents: read)
+  docs/                         PROJECT_BRAIN, ARCHITECTURE, DECISIONS (D-001 to D-036), ROADMAP, DEVELOPMENT_LOG (Sessions 1 to 13),
+                                PHASE1_REVIEW, PHASE1_1_PLAN, PHASE2_PLAN (PROPOSED), LEARNING, LEARNING_GUIDE (Lessons L1 to L13)
+  contracts/                    README, CANONICAL_JSON, CONFIG_SCHEMA, MIGRATIONS, WARNINGS, SECRETS (specifications)
+                                fixtures/{workflow/valid 21, workflow/invalid 107, connection 22, config 19, serialization 109,
+                                          schema 148, migration 10, warnings 39, secrets 84, catalog/builtin.catalog.json, format.json}
   frontend/
-    README.md  playwright.config.ts  tsconfig.e2e.json
-    e2e/         (26 Playwright tests in 5 specs, editor helpers, console-error fixture)
+    playwright.config.ts  tsconfig.{app,node,e2e,contracts}.json
+    e2e/                        8 files: canvas-editing, config-panel, connections, import-export, library, secrets, warnings specs
+                                (87 tests) plus editor helpers and the console-error fixture
     src/
-      app/           App.tsx, Toolbar.tsx (New / Import / Export, import error panel)
-      canvas/        Canvas.tsx (controlled React Flow), flowMapping.ts (the only Workflow <-> React Flow mapping)
-      nodes/         WorkflowNode.tsx (single generic node), NodeIcon.tsx, icons.ts
-      library/       Library.tsx (grouped, searchable, draggable), search.ts
-      config-panel/  ConfigPanel.tsx (form generated from configSchema)
-      catalog/       nodes.ts (static catalog, 6 nodes), index.ts (lookups)
-      store/         editorStore.ts (Zustand)
-      workflow/      types.ts, configSchema.ts, connections.ts, migrate.ts, validate.ts, serialize.ts
+      app/           App, Toolbar, UpgradeBanner, WarningsMenu, ConfirmDialog, downloadName, shorten, describeUpgrades
+      canvas/        Canvas, flowMapping (the only Workflow <-> React Flow mapping)
+      nodes/         WorkflowNode (single generic node, warning and secret badges), NodeIcon, icons
+      library/       Library, search
+      config-panel/  ConfigPanel (generated from the node schema and its ui block), propertyOrder
+      catalog/       nodes.ts (6 nodes, PROVIDERS with groq, agent.autonomous v2), index.ts
+      store/         editorStore, warnings, useWarnings, secretReport, useSecretReport (identity-stable derived data)
+      workflow/      types, errors (37 codes), strictJson, canonicalJson, valuePolicy, jsonSchema, configSchema, connections,
+                     migrate, nodeMigrations, validate, serialize, lint, secrets, codeExemptions (test support)
+      contracts/     fixtures.test.ts (the shared-fixture runner and the repository-wide token guard)
 ```
 
 No `backend/` directory exists. No Docker files exist.
@@ -118,50 +112,39 @@ No `backend/` directory exists. No Docker files exist.
 |---|---|
 | git | 2.51.0 |
 | Node / npm | 24.13.0 / 11.16.0 |
-| Python | 3.14.2 default; uv-managed 3.11.14 and 3.14.2 available |
+| Python | 3.14.2 default; uv-managed 3.11.14 and 3.14.2 available (no Python code in this repository) |
 | uv | 0.9.24 |
 | Docker | Docker Desktop 4.97.0 installed and running (per-user install; client and server 29.9.2; Compose v5.6.1); not on this shell's PATH |
 | PostgreSQL / Redis | **Not installed** |
-| Browser used for verification | Google Chrome (headless) |
+| Browser used for verification | Chromium through Playwright |
 | OS | Windows 11 |
+
+Tool note: in the Bash tool Vitest has failed intermittently with a `config` error that does not occur in PowerShell; several implementers ran their tests through PowerShell.
 
 ### Completed
 - [x] Repository initialized (git, branch `main`)
 - [x] Frontend initialized (Vite react-ts, strict TypeScript)
-- [ ] Backend initialized (not started; needs a separate review)
-- [x] Architecture documentation created and approved by PO (2026-11-03)
+- [ ] Backend initialized (not started; Phase 2 is not approved)
+- [x] Architecture documentation created, approved by the PO (2026-11-03) and brought in line with the code in T10
 
-### Phase 1 — Visual Builder
+### Phase 1 — Visual Builder (accepted by the PO, D-020)
+- [x] React Flow canvas, one generic catalog-driven node component, node library with search, drag-and-drop and click/Enter add, connection rules, schema-driven configuration panel, workflow JSON export and import with migrate and validate.
+- Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, auto-layout, NL generation, authentication.
 
-Status legend: **Implemented** = code exists. **Tested** = verified as stated in §7.
+### Phase 1.1 — Contract hardening, warnings, secret safeguards, Playwright (all tasks done, accepted by the Principal Architect; MS-A and MS-B approved by the PO; MS-C pending)
+- [x] **T1** Playwright harness, `npm run verify`, GitHub Actions CI with SHA-pinned actions (`382d6a4`, fixes `f4cc801`).
+- [x] **T2** Structured validation errors `{code, path, message}` with stable codes and JSON Pointer paths (`29b8aeb` and fixes).
+- [x] **T3** Shared JSON fixtures in `contracts/` and the TypeScript runner (strict shape checks, multiset comparison, coverage guards, floors, catalog drift test) (`e28483d`, `b299782`).
+- [x] **T4a** Strict RFC 8259 parser with policy limits (`9477df7`, `a0abf63`); **T4b** canonical compact JSON and pretty export JSON, export guard (`dd33e84`, `d2ef493`).
+- [x] **T5a** JSON Schema subset validator, explicit `applyDefaults` (`96cc80d`, `a009b20`); **T5b** catalog on the subset, `ui` block, `groq`, importer decision C1, panel from schema (`7b09662`, `44bd7f4`).
+- [x] **T6** Versioned node migrations, `agent.autonomous` version 2, upgrade banner (`2baee23`, `be43319`).
+- [x] **T8** Branching, skipping and join specification (ARCHITECTURE 6.1, D-034) and the `branch` catalog marker (`4c696b4`).
+- [x] **T7a** Pure `lintWorkflow`, five editor warnings, `warnings` fixtures (`62041bf`, `b472579`); **T7b** warning badge, toolbar list, settings-panel section, non-blocking (`eb166b1`, `5fd6687`).
+- [x] **T9a** Pure secret detector, `secret-likely` and `secret-suspected` lint codes, `secrets` fixtures with run-time token placeholders (`33740c3`, `2a0f501`); **T9b** prominent indicators, export confirmation dialog, never-echo browser tests (`23456e6`, `3e4a5a5`, `dbc68a0`).
+- [x] **T10** Documents aligned with the code, D-013 resolved (Principal Architect, `81310b7`).
+- [ ] **Final phase-level Opus review fixes** (two blockers: a credential in `schemaVersion` could still show in the import error panel because the check ran on JSON-escaped text; this file was stale): code fix in progress with the implementer; this file rewritten in Session 13.
 
-- [x] React Flow canvas — Implemented, Tested (unit + Chrome)
-- [x] Custom node components (one generic catalog-driven component) — Implemented, Tested (Chrome)
-- [x] Node library sidebar (categories, search) — Implemented, Tested (unit + Chrome)
-- [x] Drag-and-drop nodes (plus click / Enter add) — Implemented, Tested (Chrome)
-- [x] Node connections with rules (self-loop, duplicate, single input, data types, cycles) — Implemented, Tested (unit + Chrome; cycle rule also verified in Chrome)
-- [x] Configuration panel (schema-driven, invalid input not committed) — Implemented, Tested (unit for parsing + Chrome)
-- [x] Workflow JSON export — Implemented, Tested (unit + Chrome)
-- [x] Workflow JSON import with migrate + validate — Implemented, Tested (unit + Chrome)
-- [x] Phase 1 accepted as functionally complete by the PO (D-020), **subject to Phase 1.1**. D-013 (workflow contract) still pending final code review.
-
-Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, auto-layout, NL generation, authentication, repo-based E2E tests.
-
-### Phase 1.1 — Contract hardening, warnings, Playwright (APPROVED; T1, T2, T3 done; **milestone MS-A reached, PO review due**; T4 to T10 not started; next milestones MS-B after T6, MS-C after T10)
-- [x] T1 Playwright harness, 49 of 52 ad hoc checks ported (26 tests), `npm run verify`, GitHub Actions CI workflow with SHA-pinned actions — **done**: independently reviewed (Opus: PASS WITH FINDINGS), review fixes in `f4cc801`, and the **PO reported the GitHub Actions run green** (48 unit, 26 e2e; PO-reported, not verified by Claude, commit not specified)
-- [x] T2 Structured validation errors `{code, path, message}` (23 `ERROR_CODES`, RFC 6901 JSON Pointer paths), shown in the import-error panel — **done**: Sonnet-implemented (`29b8aeb`), Opus-reviewed twice (both PASS WITH FINDINGS, no blockers), fixes `b9d136a`, `60b1609`, `6e97207`; accepted by the Principal Architect; `npm run verify` exit 0 (83 unit, 27 e2e). Two real bugs of one class (untrusted keys reaching inherited object members) were found and fixed on the way: config keys and `schemaVersion` on the import path, and node ids in the canvas.
-- [x] T3 Shared JSON fixtures in `contracts/` (74 case files in four families plus the catalog export) and the TypeScript runner (strict shape checker, multiset comparison, coverage guards, minimum-count floors, catalog drift test) — **done**: Sonnet-implemented (`e28483d`), Opus-reviewed (PASS WITH FINDINGS, no blockers; the reviewer verified the expectations against the spec, not the code), fixes `b299782`, accepted by the Principal Architect; `npm run verify` exit 0 (184 unit, 27 e2e). **Tested in TypeScript only; no Python parity is claimed** (a Python runner is a Phase 2 task).
-- [ ] T2 Structured validation errors `{code, path, message}`
-- [ ] T3 Shared JSON fixtures in `contracts/` with a Vitest runner (H2, approved)
-- [ ] T4 Strict parsing, canonical JSON (compact, hashing) and export JSON (pretty) (H5, P7 revised): **split (D-031).** **T4a done**: strict RFC 8259 parser (`strictJson.ts`: duplicate keys after decoding, depth 64 with root = 1, NUL, lone surrogates, token-level number analysis, safe object building), import by bytes with a 5,000,000-UTF-8-byte limit, BOM, fatal UTF-8 decoding, `valuePolicy.ts` for editor values, 7 new error codes (30), `inputBytesBase64`, 153 fixtures; Sonnet-implemented (`9477df7`), Opus-reviewed (PASS WITH FINDINGS), fixes `a0abf63`, accepted; `npm run verify` exit 0 (460 unit, 28 e2e). **T4b in progress** (canonical and export JSON, serialization fixtures, export guard).
-- [ ] T5 JSON Schema subset for `configSchema`, UI hints separated, explicit `applyDefaults`, `groq` and a single `PROVIDERS` constant (H1, P1 revised)
-- [ ] T6 Versioned node migrations; `agent.autonomous` v2 as the first real migration (H3)
-- [ ] T7 Non-blocking editor warnings, category- and direction-aware (D-017, D-018)
-- [ ] T8 Branch semantics specification and the optional `PortDefinition.branch` field (H4)
-- [ ] T9 Secret detection, prominent warnings and explicit export confirmation (D-023 as revised)
-- [ ] T10 Documentation, decision records and acceptance report
-
-### Phase 2 — Backend (not started)
+### Phase 2 — Backend (not started; NOT approved)
 - [ ] FastAPI application
 - [ ] Workflow API
 - [ ] Pydantic schemas
@@ -207,165 +190,71 @@ Not part of Phase 1 and **not implemented**: persistence, execution, undo/redo, 
 
 ## 7. Current Development State
 
-- **Current phase:** Phase 1 accepted (D-020). **Phase 1.1 in progress: T1 to T6 and T8 done (MS-A and MS-B approved by the PO); T7a (pure warning function) in progress.** Cadence (D-029): Opus reviews every task, the Principal Architect accepts, the PO reviews at milestones (next after MS-B: MS-C after T10). T8, T7, T9, T10 are not started. Phase 2 is **proposed only** and unauthorized.
-- **Last completed task:** Session 11: T5a, T5b and T6 (JSON Schema subset validator; catalog, importer and config panel on the subset; versioned node migrations with the upgrade banner) implemented, Opus-reviewed, fixed and accepted; Lessons L6 to L8 written. Earlier: T4 (Session 10), T3 (Session 9), T2 (Session 8), T1 (Session 6).
-- **Last code commit:** `35fe3bc`.
+- **Current phase:** Phase 1.1 implemented; **in the closing step**: the phase-level Opus review (D-036) returned FAIL with two blockers, being fixed; then the acceptance report for milestone MS-C. Phase 2 is **proposed only** and unauthorized.
+- **Process:** since 2026-11-13 (D-036) Sonnet implements a whole phase, Opus reviews the completed phase once, and security-critical steps get an early Opus review (approved by the Product Owner).
+- **Last code commit:** `dbc68a0` (T9b second review fixes); the review-fix commit is in progress.
 
-### Verification results (actual, run 2026-11-03)
-
-| Check | Result |
-|---|---|
-| `npx tsc -b` (strict) | exit 0 |
-| `npm run lint` (oxlint) | exit 0, no warnings |
-| `npm test` (Vitest) | **6 files, 48 tests, all passed** |
-| `npm run build` | exit 0 (JS 431 kB / 137 kB gzip) |
-| Browser run, Chrome headless, Playwright script | **44 / 44 checks passed** |
-
-**Unit tests cover:** catalog consistency (unique types, unique port names, defaults satisfy schema); config validation and input parsing; every store action; every connection rule including transitive cycles; export -> import -> export byte-identical; migration chain; rejection of malformed JSON, wrong version, unknown node types, bad configs, duplicate ids, bad ports, type mismatch and cycles; library search; icon registry.
-
-**Browser run covered (Chrome only):** library list, search and empty state; drag-and-drop landing at the cursor; click and Enter-key add; Delete/Backspace on nodes and edges; valid connections; rejection of occupied-input, duplicate and type-mismatched connections; config panel editing, label edit, invalid number and invalid JSON flagged and **not committed**; export contents (no React Flow fields, edited config present, name-derived filename); import into a fresh page; byte-identical re-export; failed imports leaving the graph untouched; node drag persisting position; deleting a node removing its edges; "New" clearing the canvas; no console errors.
-
-**The browser script is not in the repository.** It ran from a scratch directory with `playwright-core` and the locally installed Chrome. It is therefore not reproducible from the repo, and repo-based E2E remains deferred (open question 2).
-
-### Verification results, Session 11 (Phase 1.1 T5a, T5b, T6; actual, 2026-11-05)
+### Verification results (actual)
 
 | Check | Result |
 |---|---|
-| `npm run verify` (run by the Principal Architect) | T5a `a009b20`: exit 0, 14 files, 905 unit, 30 e2e. T5b `44bd7f4`: exit 0, 15 files, 934 unit, 35 e2e. **T6 `be43319`: exit 0, 17 files, 988 unit, 39 e2e** |
-| Fixtures at `be43319` | workflow/valid 21, workflow/invalid 107, connection 22, config 19, serialization 109, schema 148, migration 10 (floor 436) |
-| Opus reviews | T5a: PASS WITH FINDINGS (1 major, `checkSchemaSubset` crash; own validator 120,000 cases, 0 differences). T5b: PASS WITH FINDINGS (1 major, UI showed "ollama" for an absent provider; 60,000-document differential old vs new). T6: PASS WITH FINDINGS (1 major in the written contract, fixed by D-033; own reference 6 x 20,000 documents, 0 differences). All reviewer numbers are the reviewers' reports, not repeated by Claude |
-| Mutation checks (by implementers; not repeated by Claude) | T5a 7 proofs, T5b 5, T6 8 plus the fix round; equivalent mutants recorded (`Math.round` vs half-up on 1 to 50; redundant loop guard) |
-| Not verified | Python parity (no Python runner; planned Phase 2); screen-reader behaviour of the banner; browsers other than Chromium; CI on Linux (PO-reported only) |
-
-### Verification results, Session 10 (Phase 1.1 T4b; actual, 2026-11-04)
-
-| Check | Result |
-|---|---|
-| `npm run verify` at `d2ef493` (run by the Principal Architect) | **exit 0**: oxlint clean; **13 files, 707 unit tests passed** (679 at `dd33e84`); build ok; **30 e2e tests passed** (29 before) |
-| Fixtures | 262 case files: workflow/valid 19, workflow/invalid 97, connection 22, config 15, serialization 109 (100 valid, 9 invalid; 12 are whole-workflow `ser-workflow-*`) |
-| Opus review of `dd33e84` | PASS WITH FINDINGS (no blockers or majors): the reviewer wrote its own writer from the spec and it reproduced all 100 valid fixtures with 0 mismatches (reviewer's report, not repeated by Claude) |
-| Mutation checks (by the implementer; not repeated by Claude) | `dd33e84`: 17 breaks of the writer, all caught except one equivalent mutant (`JSON.stringify(n)` for numbers). `d2ef493`: removing the try/catch fails 8 tests; skipping the projection fails 3 |
-| Not verified | Python parity (no Python runner exists; planned Phase 2); the e2e no-download check is timing based |
-
-### Verification results, Session 10 (Phase 1.1 T4a; actual, 2026-11-04)
-
-| Check | Result |
-|---|---|
-| `npm run verify` at `a0abf63` (run by the Principal Architect) | **exit 0**: oxlint clean; **12 files, 460 unit tests passed** (185 before T4a; 456 after `9477df7`; 460 after `a0abf63`); build ok; **28 e2e tests passed** (27 before) |
-| Fixtures | 153 case files: workflow/valid 19, workflow/invalid 97, connection 22, config 15 |
-| Opus review of `9477df7` | PASS WITH FINDINGS, no blockers/majors; the reviewer ran `npm run verify` itself (green), compared the number classifier with a post-conversion classifier on 300,000 tokens (0 differences), verified depth and size boundaries independently, timed 5 MB inputs as linear |
-| Invisible/decoded-escape scan of `frontend/src`, `frontend/e2e`, `contracts` | only the deliberate `é` and an emoji remain |
-| Mutation checks (by the implementer; not repeated by Claude) | `Number.isSafeInteger(Number(token))`: 50 failures; duplicates before decoding: 6; characters not bytes: 2; plain assignment (`__proto__`): 5; one mutation (post-conversion magnitude check) is an **equivalent mutant**, undetectable by design and recorded |
-### Verification results, Session 9 (Phase 1.1 T3; actual, 2026-11-03)
-
-| Check | Result |
-|---|---|
-| `npm run verify` at `058faae` (run by the Principal Architect) | **exit 0**: oxlint clean; **9 files, 185 unit tests passed** (83 before T3; 166 after `e28483d`; 184 after `b299782`; 185 after `058faae`); build ok; **27 e2e tests passed** (unchanged) |
-| Fixtures | 75 case files: workflow/valid 7, workflow/invalid 31, connection 22, config 15; plus `format.json` and the catalog export; largest fixture file now 9 KB |
-| Type-check separation | `npm exec --no -- tsc -p tsconfig.app.json --listFilesOnly` lists 0 `@types/node` files (the browser app does not see Node types) |
-| Opus review of `e28483d` | PASS WITH FINDINGS (no blockers, no majors); the reviewer ran `npm run verify` itself: green |
-| Mutation checks (by the implementer; not repeated by Claude) | four deliberate breaks of `connections.ts` each fail exactly the intended fixture; swapping `input-occupied` and `type-mismatch` is caught only by a new fixture |
-### Verification results, Session 8 (Phase 1.1 T2; actual, 2026-11-03)
-
-| Check | Result |
-|---|---|
-| `npm run verify` at `6e97207` (run by the Principal Architect after every fix commit) | **exit 0**: oxlint clean; **8 files, 83 unit tests passed** (78 after `29b8aeb`, 80 after `b9d136a`, 84 after `60b1609`, 83 after `6e97207`); build ok; **27 e2e tests passed** (26 plus one new test for node ids `constructor` and `__proto__`) |
-| Opus review 1 (`29b8aeb`) and review 2 (`b9d136a`, `60b1609`) | both PASS WITH FINDINGS, no blockers; each ran `npm run verify` itself: green |
-| Fault injection (by the implementer; not repeated by Claude) | reverting the own-property checks fails the new tests; breaking the path text fails the e2e tests |
-### Verification results, Session 6 (Phase 1.1 T1; actual, 2026-11-03)
-
-| Check | Result |
-|---|---|
-| `npx tsc -b` (app, node tooling, e2e) | exit 0 |
-| `npm run lint` | exit 0 |
-| `npm test` (Vitest) | 6 files, **48 tests passed** (unchanged) |
-| `npm run build` | exit 0 |
-| `npm run test:e2e` (Playwright, Chromium) | **26 passed**. First run 25 passed and 1 failed (a flaw in my test, fixed, not an app bug); then 5 consecutive green runs including one with `CI=1` |
-| `npm run verify` | **exit 0** |
-| Clean-room run (67 files, no `node_modules`, `npm ci` then `verify`) | **exit 0**. Windows only; Chromium download was already cached |
-| Fault injection (3 temporary source faults, restored) | all three caught by the intended tests; `git diff -- frontend/src` empty afterwards |
-| `.github/workflows/ci.yml` | YAML parses; every `uses:` is a 40-character SHA. Pushed with `382d6a4` by someone else; **the GitHub run result is unknown to Claude** |
-
-Pinned actions: `actions/checkout` v7.0.1 `3d3c42e5aac5ba805825da76410c181273ba90b1`; `actions/setup-node` v7.1.0 `949feb2413d6458794dcd2491c4babbbce0c15c1`; `actions/upload-artifact` v7.0.2 `cf430e030ddbb5b0abf93d22962f4752f3646cd9` (resolved with `git ls-remote --tags`; tag existence verified, not GitHub Release objects).
-**Re-run in Session 3 (code unchanged vs `HEAD`):** `npx tsc -b` exit 0; `npm run lint` exit 0; `npm test` 6 files / 48 tests passed; `npm run build` exit 0.
-
-**Follow-up browser run (second ad hoc script, Chrome, 8/8 checks):** cycle rejection (llm2 -> llm1 creates no edge); handle feedback while dragging (occupied input shows the danger colour, a valid free input shows the ok colour, releasing on it creates the edge); pan and wheel zoom change the viewport; dark colour scheme applies and was inspected in a screenshot (legible).
-
-**Not tested:** Firefox, Safari, Edge; screen-reader behavior; keyboard-only canvas operation (moving or connecting nodes without a mouse); large graphs; touch devices.
+| `npm run verify` at `dbc68a0` (run by the Principal Architect, Session 13) | **exit 0**: oxlint clean; typecheck of all four tsconfigs; **22 test files, 1429 unit tests passed**; build ok (JS 462.4 kB, 147.8 kB gzip; CSS 23.9 kB; Phase 1 was 431 kB / 137 kB); **87 Playwright (Chromium) tests passed** |
+| The same by the phase reviewer, from a clean `git archive` of `81310b7` | typecheck, lint, 1429 unit tests; e2e 87 passed three times in a row (reviewer's report) |
+| Fixtures at `dbc68a0` | 559 case files: workflow/valid 21, invalid 107, connection 22, config 19, serialization 109, schema 148, migration 10, warnings 39, secrets 84 (+ `format.json` and the catalog export); `MIN_COUNTS` matches |
+| Error codes | 37 in `ERROR_CODES`; every code appears in a fixture except the documented exemptions (`value.not-json-data`, export only; five schema-only codes) |
+| Progress of the counts | Phase 1: 48 unit; T1: 26 e2e; T2: 83 unit; T3: 185; T4a: 460; T4b: 707 and 30 e2e; T5: 934 and 35; T6: 988 and 39; T7: 1320 and 56; T9: 1429 and 87 |
+| Independent reviews | Opus reviewed every task T1 to T9 once or twice with real defects found and fixed each time (examples: prototype-key bypasses, a lost projection in export, a crash in `checkSchemaSubset`, a UI that showed a provider that was not in the data, a contradictory branching specification, a 500-node drag slowdown, a credential exportable without the dialog, a credential partly shown in an error panel); the phase-level review (Session 13) found two blockers. Reviewer numbers (differentials, mutation runs, timings) are the reviewers' reports and were not repeated by Claude; the mutation proofs are the implementers' reports |
+| Not verified | Python parity (no Python exists); screen-reader behaviour; browsers other than Chromium; CI on Linux for T2 to T10 (only T1 was reported green by the PO); the e2e suite runs against the Vite dev server, not the production build; GitHub's real push-protection patterns |
 
 ## 8. Technical Decisions
 
-Full log: `docs/DECISIONS.md`. **D-001 to D-012 and D-019 to D-024 are Approved** (D-022 H1 to H5 with P7 subject to revisions that are now applied; D-023 secret detection **as revised**: prominent warning plus explicit export confirmation, not blocking; D-024 providers mechanism, Ollama stays default). **D-025** (absent required config keys are a completeness concern, consequence of the P1 revision) is **Proposed**. **D-013** (workflow contract final code review) is still **pending**. Session 3 review decisions (recorded but uncommitted): D-012 keep TypeScript 7 / Vite 8 / Oxlint / Vitest 5 (Approved); **D-013 Workflow JSON v1 and catalog architecture: Pending final code review**; D-014 providers Groq, OpenAI, Anthropic, Ollama (Approved, catalog not yet updated); D-015 provider-neutral adapter (Approved, not implemented); D-016 no credentials in workflow JSON (Approved, holds today); D-017 non-blocking editor warnings (Approved, not implemented); D-018 errors separate from warnings (Approved, not implemented). D-006 carries the PO clarification (dependency-based DAG executor with branching, skipping and concurrency-capable design; cycles rejected in v1; LangGraph handles loops inside the Agent node).
-
-Small implementation choices made in Session 2 without a decision entry (flagged for architect review):
-- Followed Vite template defaults: **oxlint** instead of ESLint, **TypeScript 7**, Vite 8, Vitest 5.
-- `strict: true` enabled in `tsconfig.app.json` (the template lacked it).
-- Workflow JSON v1 omits `credentialRef` config fields for now; they arrive with credential management.
-- Connection rules live in one pure function (`workflow/connections.ts`) reused by the canvas, the store and the importer.
-- `fitView` runs only after an import; on mount it zoomed into the first node added.
+Full log: `docs/DECISIONS.md`, **D-001 to D-036**, each with a table row and an entry. Highlights for Phase 1.1: D-013 workflow contract (Approved after the T10 review); D-014 providers (`groq` now in the catalog; Ollama stays default, D-024); D-016 credentials never in workflow JSON; D-017 and D-018 warnings and errors are separate (implemented in T7); D-019 Playwright and CI; D-022 contract hardening H1 to H5; D-023 secret detection with explicit export confirmation, never blocking (implemented in T9); D-025 incomplete drafts (C1, implemented in T5b); D-026 Phase 1.1 authorization; D-029 milestone cadence; D-030 local-only, the Product Owner pushes; D-031 to D-035 task-level decisions (T4 split, T4b outcomes and T5 split, two-phase import, branching semantics, per-confidence secret caps that reverse an earlier accepted limit); **D-036 phase-level implementation and review with a security exception (Product Owner, 2026-11-13)**. D-006 carries the PO clarification (dependency-based DAG executor with branching, skipping and concurrency-capable design; cycles rejected in v1; LangGraph handles loops inside the Agent node).
 
 ## 9. Known Issues and Limitations
 
-1. **Unrelated parent instructions file.** `C:\Users\shail\Downloads\CLAUDE.md` is the spec for a different project (AI Hiring MVP: Streamlit/FAISS/Whisper). Claude Code loads it into every AgentForge session and it conflicts with this stack. **Action for PO:** move it out of the AgentForge parent path. Claude does not modify files outside this repo.
-2. **No persistence.** Reloading the page loses the in-editor workflow (by design; persistence is Phase 2). Export/import is the only way to keep work.
-3. **No undo/redo.**
-4. **Browser coverage is Chrome only**; see "Not tested" in §7.
-5. **Provider list is a placeholder.** The LLM and Agent nodes offer `ollama | openai | anthropic`, pending open question 1.
-6. **The importer does not enforce "required inputs connected" or non-empty required strings** (e.g. an empty HTTP URL is accepted). ARCHITECTURE §4 lists these as validator rules; they belong to run-time validation in Phase 3, since an editor must be able to hold incomplete graphs.
-7. **The workflow `description` and `metadata` are preserved on import/export but have no UI.**
-8. **Toolchain versions are newer than typical** (TypeScript 7, Vite 8, oxlint). They work, but the architect should confirm they are acceptable; falling back to ESLint is possible.
-9. **Windows encoding incident (fixed):** early in Session 2, PowerShell 5.1 `Set-Content -Encoding utf8` added UTF-8 BOMs and re-encoded non-ASCII characters in `docs/PROJECT_BRAIN.md` and `docs/DECISIONS.md` (e.g. `§` became `Â§`). Both were repaired and verified by scanning all docs for mojibake. These two files were committed with the damage in `798ab84`; the repair is in the documentation commit.
-10. **Edge stroke is low-contrast in dark mode** (cosmetic; React Flow default colours).
-11. Node ids are 8-character random strings; collision risk is negligible at editor scale but unchecked.
-12. **No CI yet.** The GitHub remote exists but there is no `.github/workflows/`; the first workflow is part of Phase 1.1 task T1. Note: history on GitHub still contains the first commit's damaged `PROJECT_BRAIN.md`/`DECISIONS.md` encoding (repaired in later commits); history was not rewritten.
-13. **HTTP Request `headers` is free-form JSON** and could hold a pasted secret; only its description warns against this (D-016). No technical guard yet. Planned (D-023, T9): detection, prominent warning and explicit confirmation before export (not blocking).
-14. **Workflow contract concerns for Phase 2** (5 high, 9 medium, 7 low) are listed in `docs/PHASE1_REVIEW.md` §1.4. The high ones (H1 config schema is a hand-rolled subset, H2 rules exist only in TypeScript, H3 no `typeVersion` migration, H4 branching not expressible, H5 JSONB key order vs byte-identical export) need decisions before the Pydantic models are written.
-15. The provider enum lacks `groq` (D-014); added in Phase 1.1 T5.
-16. **Unattributed commits and pushes.** `b7e5cbc` and `db451da` reached GitHub from outside Claude's shell; the actor and credential are not verifiable locally (see DEVELOPMENT_LOG Session 5). Both commits contained review documents that the PO had asked to keep uncommitted pending approval.
-17. **CI result unconfirmed.** `382d6a4` was pushed (13:21:06), so the workflow has very probably run once on GitHub, but Claude cannot see the result. The input names used with the v7 actions (`node-version`, `cache`, `cache-dependency-path`, `persist-credentials`, `name`, `path`, `retention-days`, `if-no-files-found`) were not checked against each action's `action.yml` (only tag listings were permitted). Linux behaviour of the e2e suite is unverified (local runs were Windows). The e2e suite tests the Vite dev server, not the production build.
-18. **E2E is Chromium only** and the 5 consecutive green runs are a small stability sample. Playwright prints a harmless Node `NO_COLOR`/`FORCE_COLOR` warning; the dev server prints a harmless React Flow attribution `console.warn` (the e2e fixture fails only on console errors).
-19. **Whether the T2 commits are pushed, and any CI result for them, is unknown to Claude** (D-030: the PO pushes and reports). The T1 CI result is PO-reported green.
-20. **Screen-reader behaviour of the import-error list is untested** with real assistive technology (the path is plain visible text, which should be fine).
-21. **The final T2 fix (`6e97207`) and Lesson L2 had no independent Opus re-review**, only the Principal Architect's verification (the tutor's external-world facts are unverified general knowledge).
-22. **Carry-overs** for T3, T5, T6 and T7 from the T2 reviews are listed in `docs/PHASE1_1_PLAN.md`.
-23. **Fixtures are tested in TypeScript only.** The Python runner is a Phase 2 task; **no parity between TypeScript and Python is claimed or verified.** The fixtures were written as language-neutral data so it can be proven later.
-24. **The `b299782` fix and Lesson L3 had no second Opus review**, only the Principal Architect's verification (same limitation as T2's last fix). The tutor's real-world parallels (conformance suites, golden files) are general knowledge and unverified in the repository.
-25. **Fixture files are read with `JSON.parse`**, so a duplicate key inside a fixture file is not detected until the strict parser exists (T4). The fixture runner needs Node 20.12 or newer (`package.json` has no `engines` field; CI and local use Node 24).
-26. **A 5 MB fixture blob is in the history of `e28483d`** (about 23 KB compressed). History is never rewritten, so it stays; the working tree no longer contains it.
-27. **Docker Desktop is installed and running (verified by Claude, 2026-11-04).** It is a **per-user install** (`C:\Users\shail\AppData\Local\Programs\DockerDesktop`, Docker Desktop 4.97.0, found through the registry and running processes; an earlier check looked only in `Program Files` and wrongly concluded it was missing). The engine answers on its named pipe: `docker` client and server 29.9.2 (linux/amd64), Docker Compose v5.6.1, WSL 2 backend (Ubuntu), 8 CPUs and about 8 GB of memory available to it, context `desktop-linux`, **0 containers and 0 images**. `docker` is **not on this shell's PATH**: use `C:\Users\shail\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe` (or add that folder to the PATH). Nothing was pulled or started. It unblocks nothing yet: Phase 2 is unauthorized.
-28. **An untracked `.kilo/` folder** (2 small files from another tool, created 2026-11-04 00:35) exists in the repository root. It is not ours, is not committed and is left alone; the PO may want to add it to `.gitignore` or delete it.
-29. **Safeguard 1 (token-level number decision) is met in structure but cannot be observed in behaviour** (equivalent mutant, see `docs/PHASE1_1_PLAN.md`). **Other messages that echo attacker-controlled ids, types or `schemaVersion` are not length-bounded** (the Toolbar truncates the display to 200 characters). (Resolved in T4b: the config panel's typed JSON now uses the strict parser.)
-30. **T4b soft spots (accepted, D-032):** the JSON Pointer in the export-only error `value.not-json-data` is parsed from the canonical writer's error text (a structured error would be sturdier); the Playwright no-download assertion after a refused export is a 1-second negative wait. A one-time effect: exported files list top-level keys alphabetically (`schemaVersion` last); older files still import. Old validator (`validateConfig`) and the new schema validator (T5a) coexist until T5b removes the old one.
+1. **Unrelated parent instructions file.** `C:\Users\shail\Downloads\CLAUDE.md` is the spec for a different project (AI Hiring MVP) and Claude Code loads it into every AgentForge session. **Action for the PO:** move it out of the AgentForge parent path. An untracked `.kilo/` folder (from another tool) sits in the repository root; it is not ours and is left alone.
+2. **No persistence, no undo/redo, no backend.** Reloading the page loses the in-editor workflow (by design until Phase 2); export/import is the only way to keep work.
+3. **Python parity is unproven.** All specifications and fixtures are run by TypeScript only. The cross-language hazards (number text, UTF-16 key order and key length, half-up rounding in migrations, the 25-code-point `trim` whitespace set, JavaScript `\s`, code-point string length, strict parsing, enum equality of booleans and numbers) are written down but unverified until a Python runner passes the 559 fixtures (Phase 2).
+4. **Credentials are detected, not stored safely.** `credentialRef` does not exist in the catalog; detection is a heuristic (`contracts/SECRETS.md`: formats not detected, `NAME_sk-...` style misses); the secret scan covers node `config` and `metadata` only: **workflow name, description, node labels and ids are not scanned** (the workflow name is kept out of the download file name when credential-shaped, but is still written into the exported JSON without a dialog: the phase reviewer's finding M2, a decision for the Product Owner under D-035, not yet decided); React Flow's own `data-id` attribute carries node ids. Backend secret policy (X10) is undecided.
+5. **Echoing untrusted text is fragile.** Every place that builds a message from attacker-controlled text must call `echoSafe` itself; two review rounds found cut-before-check and escape-before-check leaks (fixed); the final fix is in progress. Future backends (for example FastAPI validation errors that include the rejected input) must be treated the same way.
+6. **Editor speed at 500 nodes.** The phase reviewer measured, in the dev server, a median per frame vs `35fe3bc` (Phase 1.1 start): moving a node 249.9 vs 317.4 ms (+27%), typing in a config field 182.3 vs 276.2 ms (+52%); lint and secret scans cost about 1 ms, so it is rendering. A production-build measurement and a fix if cheap are part of the final fix round. No CI check measures speed.
+7. **UI tests are thin.** No React component test library is installed; components are covered by Playwright (Chromium, dev server) and by source-text guards, which check that text exists, not behaviour.
+8. **Duplicated helpers (debt).** Text cutting exists in four places (`shorten.ts`, a private `shorten` in `strictJson.ts`, `cutText`, the cut inside `safeDisplayName`) and the key-redaction rule is written twice; settings are scanned by both `lintWorkflow` and `scanSecrets`.
+9. **`exportWorkflowText` catches every exception** and reports it as `value.not-json-data` (so a bug in `projectWorkflow` would be hidden); the JSON Pointer in that error is parsed from the writer's message.
+10. **Catalog types are loose.** One `PortDefinition` interface allows output-only fields on inputs and the reverse (a catalog test enforces it); Phase 2 models should separate input and output ports.
+11. **CI on Linux unconfirmed.** The T1 run was reported green by the PO; later runs have not been seen by Claude (D-030).
+12. **Toolchain versions are newer than typical** (TypeScript 7, Vite 8, oxlint); they work; falling back is possible.
+13. **Process record.** Implementers repeatedly broke the tool rules (shell here-docs and `perl` edits, bare `npx`, stray `python` calls) in several tasks; every case is recorded in the development log and the results were verified by the checks; fix commits were reviewed only at the phase level.
+14. Minor: Node ids are 8-character random strings (collision risk negligible, unchecked); the workflow `description` and `metadata` have no UI; the edge stroke is low-contrast in dark mode; early documents had a Windows encoding incident (fixed); the Safeguard 1 number-token decision is met in structure but cannot be observed in behaviour (equivalent mutant).
 
 ## 10. Open Questions
 
-The six original questions are all decided (see `docs/PHASE1_REVIEW.md` §4 and §4.1). Phase 1.1 decisions P1 to P7, S1, W1, V1, G1 and C1 to C5 are decided (D-017, D-019, D-022 to D-026). **No design question is open.**
+No design question is open for Phase 1.1. **Pending (need the Product Owner):**
+- **MS-C: acceptance of Phase 1.1** (the Principal Architect's acceptance report follows the final fixes).
+- **Scope of secret detection (phase review M2):** should the detector and the export dialog also cover the workflow name, description and node labels? Recommendation: yes (a token pasted into a label is plausible).
+- **Phase 2:** approval of `docs/PHASE2_PLAN.md` with the Principal Architect's recommended answers to X1 to X10 (a ready-to-approve brief accompanies the MS-C report). **Phase 2 is not authorized.**
+- **Push to GitHub:** 46 local commits are unpushed; the Product Owner pushes (D-030) and reports the CI result; see the note under Git above.
+- **Housekeeping:** move `Downloads\CLAUDE.md` out of the AgentForge parent path; decide about the untracked `.kilo/` folder.
 
-**Pending (need PO review or decision):**
-- **PO review at milestone MS-B (after T6)** and MS-C (after T10); no review is pending now (MS-A was approved).
-- **D-013:** final code review of the Workflow contract, best done alongside Phase 1.1.
-- **Phase 2:** approval of `docs/PHASE2_PLAN.md` and decisions X1 to X10. **Phase 2 is not authorized.**
-- **Git coordination:** two kinds of actor now commit and push to this repository (see §6). The PO decides how that is coordinated; Claude will not push, fetch, pull or change remotes without explicit permission.
-- **First CI run:** needs a push, which Claude may not do. The PO can push when ready and report the result; failures would be fixed in a follow-up Phase 1.1 commit.
+**Blocked:** nothing in Phase 1.1. Phase 2 waits for the Product Owner's approval; Phase 2 step 6 onward needs Docker Desktop (installed).
 
-**Blocked:** nothing in Phase 1.1. Phase 2 step 2 onward waits for Phase 1.1 and D-013. Phase 2 step 6 onward waits for Docker Desktop (PO will install).
 ## 11. Last Session Handoff
 
-- **Date:** 2026-11-05 (Session 11)
-- **Last task:** T6 (node migrations): Sonnet implementer, Opus review (PASS WITH FINDINGS, no blockers, one major in the written contract fixed by D-033), fix commit, accepted. Also this session: T5a and T5b. Lessons L6 to L8 (Sonnet tutor). **Milestone MS-B (T1 to T6) reached.**
-- **Implemented changes (Session 11):** `workflow/jsonSchema.ts` (validator, `applyDefaults`, `checkSchemaSubset`), catalog on the schema subset with a `ui` block and `groq`, importer C1 (absent required keys import), config panel from schema, `workflow/nodeMigrations.ts` (`agent.autonomous` 1 to 2), `UpgradeBanner`, the `schema` and `migration` fixture families, `contracts/CONFIG_SCHEMA.md`, `contracts/MIGRATIONS.md`.
-- **Tests:** `npm run verify` exit 0 at `be43319` (17 files, 988 unit, 39 e2e), run by the Principal Architect. Fixtures: workflow/valid 21, invalid 107, connection 22, config 19, serialization 109, schema 148, migration 10 (436 floor).
-- **Git:** local commits only (D-030). Whether the PO has pushed is unknown to Claude.
-- **Learning:** Lessons L1 to L8 delivered, each ending in a Knowledge Check; nothing marked Understood; evaluation at the end of the project.
-- **In flight:** nothing; waiting for the Product Owner's MS-B review.
-- **Next task:** after the PO's MS-B decision: T8 (branch semantics and catalog marker), T7 (editor warnings), T9 (secret detection and export confirmation), T10 (documentation and acceptance report); MS-C after T10.
+- **Date:** 2026-11-13 (Session 13)
+- **Last task:** Phase 1.1 T7b, T9a, T9b and T10 completed and accepted by the Principal Architect; the Product Owner changed the process (D-036) and approved a security exception; the phase-level Opus review of Phase 1.1 returned FAIL with two blockers (stale project memory: fixed by this rewrite; a credential in `schemaVersion` could still show in the import error panel: fix in progress with the implementer).
+- **Tests:** `npm run verify` exit 0 at `dbc68a0` (22 files, 1429 unit, 87 e2e), run by the Principal Architect.
+- **Git:** local commits only (D-030); 46 unpushed.
+- **Learning:** Lessons L1 to L13 delivered, each ending in a Knowledge Check; nothing marked Understood; evaluation at the end of the project.
+- **In flight:** the implementer's final-review fix commit (check raw text before JSON escaping, one key rule, a production-build speed measurement).
+- **Next task:** verify the fix commit, then the MS-C acceptance report with a ready-to-approve Phase 2 brief.
 
 ## 12. Next Recommended Action
 
-1. **PO: review milestone MS-B (T1 to T6) and decide: continue with T8, T7, T9, T10 (recommended), or redirect.** What to look at: `docs/DEVELOPMENT_LOG.md` Sessions 10 and 11; the Opus reviews and their triage; `contracts/` (README, CONFIG_SCHEMA.md, MIGRATIONS.md, CANONICAL_JSON.md); `npm run verify` (or the GitHub Actions run if you push). Phase 2 stays unauthorized.
-2. **PO (optional):** push to GitHub for a Linux CI run and a backup; report any CI failure to Claude (D-030).
-3. **PO (housekeeping):** move `Downloads\CLAUDE.md` out of the AgentForge parent path; install Docker Desktop before Phase 2 step 6.
-4. **No Phase 2 or backend work.**
+1. **Principal Architect:** verify the final-review fix commit, record it, send the MS-C acceptance report.
+2. **PO:** review MS-C; decide the secret-scan scope (M2); approve or change the Phase 2 brief (X1 to X10); push when ready and report the CI result.
+3. **PO (housekeeping):** move `Downloads\CLAUDE.md` out of the parent path.
+4. **No Phase 2 or backend work until the PO approves it.**
+
 ## 13. Update Rules
 
 After every meaningful implementation task:

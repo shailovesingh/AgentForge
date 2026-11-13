@@ -3,7 +3,7 @@
 > Decision log. Only entries with **Status: Approved** are binding.
 > **Proposed** entries are recommendations awaiting Product Owner / Principal Architect review. **Pending** entries are accepted in direction but blocked on a named review step.
 > Never change an Approved decision silently. Supersede it with a new entry instead.
-> D-019 to D-025 were recorded in Sessions 4 and 5 and are in commits `db451da` and `cf738b5` (pushed, not by Claude). D-026 (final authorization, Session 6) is in commit `382d6a4`, which was pushed (not by Claude) at 13:21:06 +0530. D-027 and D-028 (Session 7) are uncommitted working-tree changes until committed.
+> D-019 to D-025 were recorded in Sessions 4 and 5 and are in commits `db451da` and `cf738b5` (pushed, not by Claude). D-026 (final authorization, Session 6) is in commit `382d6a4`, which was pushed (not by Claude) at 13:21:06 +0530. D-027 and D-028 (Session 7) were committed in Sessions 7 and 8.
 
 | ID | Title | Status |
 |---|---|---|
@@ -20,15 +20,15 @@
 | D-011 | CSS Modules for styling | **Approved** |
 | D-012 | Keep TypeScript 7, Vite 8, Oxlint, Vitest 5 (no ESLint) | **Approved** |
 | D-013 | Workflow JSON v1 and node catalog architecture | **Approved** (final code review completed in T10, 2026-11-13) |
-| D-014 | Initial LLM providers: Groq, OpenAI, Anthropic, Ollama | **Approved** (catalog not yet updated) |
+| D-014 | Initial LLM providers: Groq, OpenAI, Anthropic, Ollama | **Approved** (`groq` added to the catalog in T5b) |
 | D-015 | Provider-neutral LLM adapter architecture | **Approved** (not yet implemented) |
 | D-016 | Credentials never stored in workflow JSON | **Approved** (already holds in Phase 1) |
-| D-017 | Non-blocking editor warnings (amended: aware of node categories and port direction) | **Approved** (not yet implemented; rules proposed in PHASE1_1_PLAN §3.6) |
-| D-018 | Structural errors kept separate from warnings | **Approved** (not yet implemented) |
+| D-017 | Non-blocking editor warnings (amended: aware of node categories and port direction) | **Approved** (implemented in Phase 1.1 T7, `lintWorkflow` and the warnings UI) |
+| D-018 | Structural errors kept separate from warnings | **Approved** (implemented in T7) |
 | D-019 | Playwright added to the repository as a Phase 1.1 task; GitHub Actions CI with SHA-pinned actions | **Approved** |
 | D-020 | Phase 1 accepted as functionally complete, subject to Phase 1.1 | **Approved** |
 | D-021 | Single-user local mode with a `get_current_user()` boundary | **Approved** |
-| D-022 | Phase 1.1 contract hardening (H1 JSON Schema subset with explicit defaults, H2 shared fixtures, H3 node migrations, H4 branch semantics, H5 canonical JSON) | **Approved for implementation** (final authorization 2026-11-03); T1 implemented, T2 to T10 pending |
+| D-022 | Phase 1.1 contract hardening (H1 JSON Schema subset with explicit defaults, H2 shared fixtures, H3 node migrations, H4 branch semantics, H5 canonical JSON) | **Approved for implementation** (final authorization 2026-11-03); T1 to T10 implemented (Phase 1.1 complete pending MS-C) |
 | D-023 | Secret detection with warning and explicit export confirmation (not blocking) | **Approved as revised**; backend enforcement separate |
 | D-024 | Extensible provider architecture mechanism (Ollama stays the default) | **Approved** |
 | D-025 | Absent required config keys are a completeness concern (C1) | **Approved** |
@@ -41,8 +41,8 @@
 | D-032 | T4b outcomes: export-only error code, export never throws, distinct internal parser error; T5 split into T5a and T5b | **Approved** (Principal Architect, within D-022 and D-026) |
 | D-033 | Import is two phases: node version errors are returned alone, before validation; version errors never cascade through the importer | **Approved** (Principal Architect, within D-022 and D-026) |
 | D-034 | Branching, skipping and join semantics (H4) specified in `ARCHITECTURE.md` section 6.1; optional output-port marker `branch` in the catalog; no engine in Phase 1.1 | **Approved** (Principal Architect, within D-006, D-022 and D-026) |
-| D-036 | **Process change:** Sonnet 5.5 implements a whole phase (in batches, one commit per step); Opus 5.5 reviews once when the phase is complete instead of reviewing every task | **Approved** (Product Owner, 2026-11-13) |
 | D-035 | Secret findings are bounded per confidence; a limit may never hide a high-confidence finding (reverses the T9a "accepted limit"); the export confirmation reads the workflow captured at click time | **Approved** (Principal Architect; restores D-023, no change to the Product Owner's decision) |
+| D-036 | **Process change:** Sonnet 5.5 implements a whole phase (in batches, one commit per step); Opus 5.5 reviews once when the phase is complete instead of reviewing every task | **Approved** (Product Owner, 2026-11-13) |
 
 ---
 
@@ -136,15 +136,15 @@
 - **Scope under review:** `frontend/src/workflow/types.ts`, `frontend/src/catalog/nodes.ts`, `frontend/src/workflow/connections.ts`, `frontend/src/workflow/validate.ts` (plus `migrate.ts`, `configSchema.ts`, `serialize.ts`).
 - **Decision:** the contract stays frozen and **is not modified during the review**. Review findings and the Phase 2 concerns are in `docs/PHASE1_REVIEW.md` §1.
 - **Consequences:** Phase 2 step 2 (Pydantic models) must not start until this entry is Approved or amended. Any amendment must stay backward compatible (see ARCHITECTURE §4).
-- **Outcome of the final review (Principal Architect, T10, 2026-11-13).** Reviewed against the code as built after Phase 1.1 (`types.ts`, `catalog/nodes.ts`, `connections.ts`, `validate.ts`, `migrate.ts`, `nodeMigrations.ts`, `serialize.ts`, `jsonSchema.ts`, `configSchema.ts`, `canonicalJson.ts`, `strictJson.ts`), the specifications in `contracts/` and `ARCHITECTURE.md` sections 4 to 6.1, and the Opus reviews of tasks T1 to T9 (each task was independently reviewed; the contract-bearing ones with own-implementation differentials).
+- **Outcome of the final review (Principal Architect, T10, 2026-11-13).** Reviewed against the code as built after Phase 1.1 (`types.ts`, `catalog/nodes.ts`, `connections.ts`, `validate.ts`, `migrate.ts`, `nodeMigrations.ts`, `serialize.ts`, `jsonSchema.ts`, `configSchema.ts`, `canonicalJson.ts`, `strictJson.ts`), the specifications in `contracts/` and `ARCHITECTURE.md` sections 4 to 6.1, and the Opus reviews of tasks T1 to T9 (each task was reviewed by an independent Opus reviewer when it landed, the contract-bearing ones with own-implementation differentials, which are the reviewers' reports and were not repeated by the Principal Architect; the eight fix commits were not reviewed individually and were covered by the phase-level review of Session 13, which re-checked the Phase 1 default settings of every node type and one variant per setting against the final importer).
   - **The document contract is unchanged and is accepted:** Workflow JSON v1 (`schemaVersion` "1.0", nodes with `typeVersion`, edges with named ports, free-form `metadata`) is exactly the format approved in Phase 0; Phase 1.1 added no document field. Every load path is `importWorkflow` (strict parse with policy limits, document `migrate`, `migrateNodes`, validation); every write path is `exportWorkflowText` (canonical key order, never throws).
   - **The catalog contract changed ADDITIVELY and is accepted (the changes D-014, D-024, D-025, D-032 to D-034 describe):** `configSchema` is a documented JSON Schema subset; `defaults` removed in favour of schema `default`s applied explicitly; a separate presentation-only `ui` block; an optional `branch` marker on output ports; `groq` in `PROVIDERS`; `agent.autonomous` version 2 with a registered migration. No document written before Phase 1.1 stopped importing (differential tests, T5b and T6 reviews).
   - **Defects found in the contract documents and fixed during Phase 1.1 (not in the format):** the ARCHITECTURE section 4 example carried a `credentialRef` key that no catalog node declares and every catalog schema rejects (fixed in T10); the import-order text in `contracts/README.md` did not match the importer (fixed, D-033); the branching rules contradicted themselves (fixed before acceptance, D-034).
-  - **Carried into Phase 2 (recorded in `docs/PHASE2_PLAN.md`):** model input and output ports as separate types; the Python side must reproduce the shared fixtures (558 files) and the documented cross-language hazards (number text, UTF-16 key order, half-up rounding, `trim` whitespace set, code-point lengths); `credentialRef` does not exist in the catalog yet and is a Phase 2+ decision together with X10.
+  - **Carried into Phase 2 (recorded in `docs/PHASE2_PLAN.md`):** model input and output ports as separate types; the Python side must reproduce the shared fixtures (559 files) and the documented cross-language hazards (number text, UTF-16 key order, half-up rounding, `trim` whitespace set, code-point lengths); `credentialRef` does not exist in the catalog yet and is a Phase 2+ decision together with X10.
   - **Not claimed:** Python parity (no Python exists); that the contract is final forever (a future change must still be additive or bump `schemaVersion` with a migration).
 
 ## D-014 — Initial LLM provider support
-- **Status:** Approved (PO / Principal Architect review, 2026-11-03). **Not yet reflected in the catalog.**
+- **Status:** Approved (PO / Principal Architect review, 2026-11-03). **Reflected in the catalog in Phase 1.1 T5b (`groq` is last in `PROVIDERS`).**
 - **Decision:** initial providers are **Groq, OpenAI, Anthropic and Ollama**.
 - **Consequences:** the Phase 1 `provider` enum is `ollama | openai | anthropic` and lacks `groq`. Adding it is an additive catalog change and belongs with the D-013 outcome (not changed during this review).
 
