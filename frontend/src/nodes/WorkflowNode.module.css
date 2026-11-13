@@ -48,6 +48,13 @@
   line-height: 1.2;
 }
 
+/* A possible credential: a coloured pill, clearly louder than the muted warning, still not a filled error block. */
+.secret {
+  border-color: var(--danger);
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .ports {
   display: flex;
   justify-content: space-between;

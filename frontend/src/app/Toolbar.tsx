@@ -1,11 +1,15 @@
 import { useReactFlow } from '@xyflow/react'
-import { Download, FilePlus, Upload } from 'lucide-react'
-import { useId, useRef, useState } from 'react'
+import { Download, FilePlus, ShieldAlert, Upload } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { nodeDefinitions } from '../catalog'
 import { useEditorStore } from '../store/editorStore'
+import { getSecretReport } from '../store/secretReport'
+import type { SecretReport } from '../store/secretReport'
+import { useHasHighSecret } from '../store/useSecretReport'
 import type { ValidationError } from '../workflow/errors'
 import { MAX_IMPORT_BYTES, exportWorkflowText, importTooLarge, importWorkflow } from '../workflow/serialize'
+import { ConfirmDialog } from './ConfirmDialog'
 import { shorten } from './shorten'
 import { IMPORT_BUTTON_ID } from './importButton'
 import styles from './Toolbar.module.css'
@@ -26,8 +30,25 @@ export function Toolbar() {
   const setImportErrors = (errors: ValidationError[]) =>
     setProblem(errors.length > 0 ? { heading: 'Import failed. The current workflow was not changed.', errors } : null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const exportButton = useRef<HTMLButtonElement>(null)
   const nameId = useId()
   const { fitView } = useReactFlow()
+  const hasHighSecret = useHasHighSecret() // a boolean: a drag or a keystroke elsewhere does not re-render the toolbar
+  // The report of the export that is waiting for a confirmation (null: no dialog). Never remembered: every export asks again.
+  const [confirming, setConfirming] = useState<SecretReport | null>(null)
+  const wasConfirming = useRef(false)
+
+  // After the dialog is gone (its cleanup has closed it), focus goes back to the Export button.
+  useEffect(() => {
+    if (wasConfirming.current && confirming === null) exportButton.current?.focus()
+    wasConfirming.current = confirming !== null
+  }, [confirming])
+
+  const onExportClick = () => {
+    const report = getSecretReport(useEditorStore.getState().workflow)
+    if (report.hasHigh) setConfirming(report)
+    else onExport()
+  }
 
   const onExport = () => {
     const { workflow } = useEditorStore.getState()
@@ -68,6 +89,7 @@ export function Toolbar() {
   }
 
   return (
+    <>
     <header className={styles.toolbar}>
       <strong className={styles.brand}>AgentForge</strong>
       <label htmlFor={nameId} className={styles.srOnly}>
@@ -80,6 +102,12 @@ export function Toolbar() {
         value={name}
         onChange={(e) => setWorkflowName(e.target.value)}
       />
+      {hasHighSecret && (
+        // A status TEXT, not an alert and not a live region: it stays until the credential is removed. Never names a value.
+        <span className={styles.secretNotice} data-secret-indicator>
+          <ShieldAlert size={14} aria-hidden="true" /> Possible credential in this workflow
+        </span>
+      )}
       <div className={styles.actions}>
         <WarningsMenu />
         <button type="button" onClick={() => useEditorStore.getState().reset()}>
@@ -88,7 +116,7 @@ export function Toolbar() {
         <button id={IMPORT_BUTTON_ID} type="button" onClick={() => fileInput.current?.click()}>
           <Upload size={14} aria-hidden="true" /> Import
         </button>
-        <button type="button" onClick={onExport}>
+        <button ref={exportButton} type="button" onClick={onExportClick}>
           <Download size={14} aria-hidden="true" /> Export
         </button>
         <input
@@ -122,5 +150,16 @@ export function Toolbar() {
         </div>
       )}
     </header>
+    {confirming && (
+      <ConfirmDialog
+        report={confirming}
+        onCancel={() => setConfirming(null)}
+        onConfirm={() => {
+          setConfirming(null)
+          onExport() // the existing export path, unchanged (an export error still shows its panel)
+        }}
+      />
+    )}
+    </>
   )
 }

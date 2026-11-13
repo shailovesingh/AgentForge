@@ -23,6 +23,20 @@
   font: inherit;
 }
 
+/* More prominent than the muted warning count, but not an error flood: a coloured pill, no fill, no animation. */
+.secretNotice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .actions {
   display: flex;
   gap: 6px;

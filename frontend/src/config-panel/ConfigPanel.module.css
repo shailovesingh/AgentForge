@@ -75,6 +75,32 @@
   overflow-wrap: anywhere;
 }
 
+/* A possible credential in this node: a coloured border, not a filled error block. */
+.secret {
+  margin-top: 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.secret h3 {
+  margin: 0 0 4px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.secret ul {
+  margin: 0 0 6px;
+  padding-left: 16px;
+  overflow-wrap: anywhere;
+}
+
+.secret p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
 .error {
   color: var(--danger);
   font-size: 12px;

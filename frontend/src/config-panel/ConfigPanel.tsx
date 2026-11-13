@@ -17,6 +17,9 @@ export function ConfigPanel() {
   const warnings = useNodeWarnings(selectedId) // only the selected node's warnings
   const warningKeyList = warningKeys(warnings)
   const warningsHeading = useId()
+  const secretHeading = useId()
+  // Display paths only (never a value); a header named Authorization that holds a token is two warnings at one path.
+  const secretPaths = [...new Set(warnings.filter((w) => w.code === 'secret-likely').map((w) => w.field ?? ''))]
 
   if (!node) {
     return (
@@ -52,6 +55,23 @@ export function ConfigPanel() {
             value={node.config[key]}
           />
         ))}
+
+      {secretPaths.length > 0 && (
+        <section className={styles.secret} aria-labelledby={secretHeading} data-secret-notice>
+          <h3 id={secretHeading}>Possible credential in this node</h3>
+          <ul>
+            {secretPaths.map((path) => (
+              <li key={path}>
+                <code>{path}</code>
+              </li>
+            ))}
+          </ul>
+          <p>
+            Remove the value from this node. Credential references are not available yet, so keep the secret out of the
+            workflow and provide it where the workflow runs.
+          </p>
+        </section>
+      )}
 
       {warnings.length > 0 && (
         // After the fields, so a warning appearing while the user types does not move the field being edited.

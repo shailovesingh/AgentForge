@@ -6,8 +6,8 @@ the Product Owner), D-017 and D-018 (warnings are derived and never block; `vali
 **Status: TypeScript only.** The implementation is `frontend/src/workflow/secrets.ts` (`detectSecrets`, `scanSecrets`,
 `safeDisplayName`), used by `lintWorkflow` in `frontend/src/workflow/lint.ts` and run against the fixtures by
 `frontend/src/contracts/fixtures.test.ts`. **No Python parity is claimed; the Python runner is planned for Phase 2.**
-This task is the pure detector, the two lint codes, the fixtures and this spec. The confirmation dialog, the badge, the
-toolbar indicator and the config-panel notice (T9b) are **planned, not built**.
+T9a is the pure detector, the two lint codes, the fixtures and this spec. **T9b (the UI) is built**: the node badge, the
+toolbar indicator, the config-panel notice and the export confirmation dialog, described under "The UI (T9b)" below.
 
 **Backend enforcement is separate (Phase 2, decision X10); not implemented.** What a server does with a credential it
 receives (refuse on save, redact in logs and events, `credentialRef` resolution inside executors, never sending a secret
@@ -150,8 +150,10 @@ findings and 288 MB of path text before this cap). So:
   a kept finding counts too (the cap counts findings met, not distinct ones).
 - `detectSecrets(workflow)` returns `scanSecrets(workflow).findings`.
 - `lintWorkflow` emits one warning per **kept** config finding, so **at most 50 secret warnings per node**. It adds **no**
-  extra warning and **no** count in any message for what was omitted: the list is capped, and **T9b shows "and N more" from
-  `scanSecrets`**.
+  extra warning and **no** count in any message for what was omitted: the list is capped, and **the T9b dialog shows "and N more"
+  from `scanSecrets`**. (The cap counts findings of any confidence, so "N more" is an upper bound for the high ones. If a node has
+  50 or more findings before its first high one, the high ones may all be among the omitted: then that node is not listed and,
+  if it was the only one, no indicator or dialog appears. A hostile-file limit of the cap, accepted in T9a.)
 - Every path is at most 200 characters (above), so the output is bounded by nodes times 50 times 200.
 
 ## Never echo (a contract)
@@ -194,7 +196,7 @@ express (placeholders `@@FEFF@@`, `@@NEL@@`, `@@FS@@`, `@@E9@@` and `@@EMOJI:n@@
 - **"Letter" in the left boundary means ASCII letters only** (an `e` with an acute accent before `sk-...` still matches).
 - **Key order**: integer-like keys first (the order is only unit-tested; fixtures compare multisets).
 
-## How it fits with lint (T9a, done) and the UI (T9b, planned)
+## How it fits with lint (T9a) and the UI (T9b)
 
 `lintWorkflow` adds **one warning per kept config finding**, after the five rules of the same node, for every node (a node of
 an unknown type is scanned too, because it is exported all the same):
@@ -208,12 +210,51 @@ Order inside a node: the five rules, then every `secret-likely`, then every `sec
 depth-first traversal order. **Metadata findings are not warnings**: a warning needs a node (`Warning.nodeId` is a required
 string). The T9b UI reads `scanSecrets` directly for them and for the omitted counts. Details of the lint function: `WARNINGS.md`.
 
-**T9b (planned, not built):** a distinct node badge and a toolbar indicator for `secret-likely`, a notice in the config
-panel, and a confirmation dialog on **every export** when a high finding exists (Cancel is the default focus, Escape
-cancels, no "do not ask again"; the dialog lists nodes and display paths only, shows "and N more" from the omitted counts,
-and explains that credential references are not available yet). Node names appear there only through `safeDisplayName`. The
-export is never blocked: the user can always confirm (decision D-023, `docs/PHASE1_1_PLAN.md` section 3.7). Import is never
-blocked either.
+## The UI (T9b)
+
+Decision D-023 and `docs/PHASE1_1_PLAN.md` section 3.7: detect, warn prominently, **never echo the value**, require an
+**explicit confirmation on every export**. **Nothing is blocked**: the user can always confirm, import is never blocked,
+editing, dragging and connecting work as before. Medium confidence stays an ordinary muted `secret-suspected` warning: no
+indicator and no dialog.
+
+**The view model** is `frontend/src/store/secretReport.ts` (`buildSecretReport`, and `getSecretReport`, cached per workflow
+object with the previous report reused while the scan's inputs are unchanged). It is the ONLY thing the dialog and the toolbar
+read. It holds `hasHigh`, `hasMedium`, the HIGH findings grouped by node (`name`, `paths`, `omitted`), the high metadata
+paths and `omitted`, and counts. `name` is `safeDisplayName(label || id)` (never the raw label or id); `paths` are display
+paths, each once per node (a header named `Authorization` that holds a token is two findings at one path, listed once);
+`omitted` comes from `scanSecrets`. `hasHigh` is true for a high finding in a config OR in the metadata.
+
+**What the user sees, for a high-confidence finding (`secret-likely` or a high metadata finding):**
+
+| Where | What |
+|---|---|
+| Node badge | A distinct badge (`ShieldAlert` icon, coloured border, `data-secret-likely`), accessible name "N warnings, possible credential". Its title lists only the secret messages of that node (the other rules' messages quote the raw label, so they are replaced by a count). |
+| Toolbar | The status text "Possible credential in this workflow" (`data-secret-indicator`), present while `hasHigh` (config or metadata). Not `role=alert`, not a live region, not a modal. The toolbar subscribes to the boolean only. |
+| Config panel | For the selected node with a `secret-likely` warning: a section "Possible credential in this node" with the display paths and a sentence on removing the value. |
+| Export | If `hasHigh` at the moment Export is activated, a native modal `<dialog>` (`app/ConfirmDialog.tsx`) opens BEFORE any file is created, **on every attempt**: nothing is remembered, no "do not ask again", no storage of any kind. It says that anyone who obtains the file can use the credential and that the file may be shared, committed or stored; lists the nodes and paths (and the metadata paths) with "and N more" where `omitted > 0`; explains that credential references (an opaque id pointing to a credential stored by the AgentForge backend) are **not available yet**, that they arrive with backend credential management, and that until then the secret should be kept out of the file and provided where the workflow runs. **Cancel** has the focus on open, `Escape` cancels, Tab and Shift+Tab cycle inside, and focus returns to the Export button. **Export anyway** runs the existing export path unchanged (an export error still shows its own panel). The dialog component takes the report only (no workflow type). |
+
+With no high finding the export is exactly as before (no dialog, no extra step). The dialog opens only from the Export button.
+
+**What the never-echo test proves (`frontend/e2e/secrets.e2e.ts`).** A sentinel credential is built at run time and planted in an
+HTTP Request node's Headers field. The test shows that the sentinel, its first 8 and its last 8 characters appear in **no
+visible text, no element attribute (names or values), no form-control value and no console message** (all types, plus page
+errors) while the indicators are showing, while the dialog is open, after Cancel, with the warning list open, and after Export
+anyway. The one exception is the field the value was typed into; a second test proves that the exception is that narrow (the
+same scan fails when the sentinel is planted in the workflow name input). A metadata variant checks the same. Unit tests
+(`secretReport.test.ts`) plant the sentinel in a header value, a nested value, an array item, a key, a label, a node id, a
+long prompt, metadata and keys with `:` or `=`, and walk every string and key of the report. Source guards check that no UI
+file under `app`, `nodes`, `config-panel` or `store` uses `console.`, `localStorage`, `sessionStorage`, `document.cookie` or
+`dangerouslySetInnerHTML`.
+
+**What it does not prove.** It does not cover a credential the detector does not recognise (the formats listed below). A node
+**label** is shown on the node as the user typed it (labels are not scanned, and a label is the user's own text); only the
+secret surfaces use `safeDisplayName`. The toolbar warning list (`WarningsMenu`) and the config panel's "Warnings for this
+node" show the lint messages, which for the five older rules quote the raw label. Display paths show short plain keys as
+written, so a secret typed as a short plain KEY is shown (a documented limit above). The dialog list is not capped in the
+number of nodes (each node is capped at 50 paths): a hostile file with thousands of affected nodes gives a long, scrollable
+dialog. Nothing here is a server-side guarantee: **backend enforcement is separate (Phase 2, decision X10) and not
+implemented**, and **no Python parity is claimed**. The file the user exports with "Export anyway" does contain the credential:
+that is the user's explicit choice.
 
 ## Fixtures (`fixtures/secrets/*.json`) and the placeholder method
 

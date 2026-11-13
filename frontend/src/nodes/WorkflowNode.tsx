@@ -1,22 +1,38 @@
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
-import { TriangleAlert } from 'lucide-react'
+import { ShieldAlert, TriangleAlert } from 'lucide-react'
 import { shorten } from '../app/shorten'
 import { getNodeDefinition } from '../catalog'
 import type { FlowNode } from '../canvas/flowMapping'
 import { useNodeWarnings } from '../store/useWarnings'
 import { warningCountText } from '../store/warnings'
+import type { Warning } from '../workflow/lint'
 import { NodeIcon } from './NodeIcon'
 import styles from './WorkflowNode.module.css'
 
 // A message longer than this is cut in the badge's tooltip, so a huge node label cannot flood it.
 const MAX_TITLE = 200
 
+/**
+ * The badge's tooltip: one line per warning. On a node with a possible credential only the secret messages are listed (they name
+ * the node through safeDisplayName); the other rules' messages quote the raw label, which could itself be a pasted token, so
+ * they are left out and counted instead (contracts/SECRETS.md).
+ */
+function titleOf(warnings: readonly Warning[], likelySecret: boolean): string {
+  if (!likelySecret) return warnings.map((w) => shorten(w.message, MAX_TITLE)).join('\n')
+  const secret = warnings.filter((w) => w.code === 'secret-likely' || w.code === 'secret-suspected')
+  const lines = secret.map((w) => shorten(w.message, MAX_TITLE))
+  if (secret.length < warnings.length) lines.push(`and ${warningCountText(warnings.length - secret.length)} of other kinds`)
+  return lines.join('\n')
+}
+
 /** The single node component for every catalog type. Ports and icon come from the catalog. */
 export function WorkflowNodeView({ data, selected }: NodeProps<FlowNode>) {
   const { node } = data
   const def = getNodeDefinition(node.type, node.typeVersion)
   const warnings = useNodeWarnings(node.id) // only this node's warnings: a drag of another node does not re-render this one
+
+  const likelySecret = warnings.some((w) => w.code === 'secret-likely')
 
   if (!def) {
     return (
@@ -33,13 +49,16 @@ export function WorkflowNodeView({ data, selected }: NodeProps<FlowNode>) {
         <span className={styles.label}>{node.label}</span>
         {warnings.length > 0 && (
           // Subdued on purpose: a new node warns at once. Not a live region; the title lists the messages as plain text.
+          // A possible credential (secret-likely) gets a distinct, more prominent badge; the messages in its title only
+          // name the node (through safeDisplayName) and a display path, never a value.
           <span
-            className={styles.warning}
+            className={likelySecret ? `${styles.warning} ${styles.secret}` : styles.warning}
             role="img"
-            aria-label={warningCountText(warnings.length)}
-            title={warnings.map((w) => shorten(w.message, MAX_TITLE)).join('\n')}
+            aria-label={likelySecret ? `${warningCountText(warnings.length)}, possible credential` : warningCountText(warnings.length)}
+            title={titleOf(warnings, likelySecret)}
+            data-secret-likely={likelySecret ? '' : undefined}
           >
-            <TriangleAlert size={12} aria-hidden="true" />
+            {likelySecret ? <ShieldAlert size={12} aria-hidden="true" /> : <TriangleAlert size={12} aria-hidden="true" />}
             {warnings.length}
           </span>
         )}
