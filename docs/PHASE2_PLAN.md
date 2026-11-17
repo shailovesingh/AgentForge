@@ -1,6 +1,6 @@
-# PHASE 2 PLAN — BACKEND FOUNDATION (PROPOSED)
+# PHASE 2 PLAN — BACKEND FOUNDATION (APPROVED 2026-11-17, D-038)
 
-> **Status: PROPOSED. Phase 2 is NOT approved. No backend work has started and none will until the Product Owner explicitly approves this plan.**
+> **Status: APPROVED by the Product Owner on 2026-11-17 (D-038), with decisions X1 to X10 as recommended in `docs/PHASE1_1_ACCEPTANCE.md` section 7. Execution (D-036): three batches (A steps 1 to 5, B steps 6 to 8, C steps 9 and 10), one commit per step, the Principal Architect verifies at batch boundaries, Opus reviews the completed phase once and EARLY for the security-critical steps 7 (owner isolation) and 9 (the untrusted-input boundary). Phase 3 and later are NOT authorized.**
 > Prepared 2026-11-03 (Session 3) as review material. Committed locally as a proposal; NOT approved.
 > **Revision note (Session 4):** the PO's review decisions moved the contract concerns H1 to H5 into **Phase 1.1** (`docs/PHASE1_1_PLAN.md`). Steps 2, 3, 4, 8 and 9 below assume the Phase 1.1 outcomes (JSON Schema subset for configs, shared fixtures in `contracts/`, node migrations, `canonical-json/1`, structured error codes). Precondition P2 therefore means "Phase 1.1 approved and completed". Phase 2 is still **not approved**. §3, §4, §10 · `docs/DECISIONS.md` (D-002, D-004, D-008, D-009, D-013 to D-018) · `docs/PHASE1_REVIEW.md` §1.4 (contract concerns H1–H5, M1–M9).
 
